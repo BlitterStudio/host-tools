@@ -85,9 +85,9 @@ int main(int argc, char *argv[])
 
     for (int i = 1; i < argc; i++)
     {
-        // Try to resolve as a file path first
+        // Try to resolve as a file path first (skip URLs to avoid volume requester)
         int is_resolved_file = 0;
-        if (lock = Lock(argv[i], ACCESS_READ))
+        if (!strstr(argv[i], "://") && (lock = Lock(argv[i], ACCESS_READ)))
         {
             if (NativeDosOp((ULONG)0, (ULONG)lock, (ULONG)filename, (ULONG)sizeof(filename)) == 0) {
                  UnLock(lock);

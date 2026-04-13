@@ -41,17 +41,19 @@ void append_quoted(char *dest, const char *src, size_t max_len) {
     }
 
     for (const char *p = src; *p; p++) {
-        if (current_len >= max_len - 4) break; // Reserve space for close quote + null
-
         if (*p == '\'') {
             // Escape single quote: ' -> '\''
-            strcat(dest, "'\\''");
-            current_len += 4;
+            if (current_len + 4 >= max_len) break;
+            dest[current_len++] = '\'';
+            dest[current_len++] = '\\';
+            dest[current_len++] = '\'';
+            dest[current_len++] = '\'';
         } else {
+            if (current_len + 1 >= max_len - 1) break; // Reserve space for close quote + null
             dest[current_len++] = *p;
-            dest[current_len] = '\0';
         }
     }
+    dest[current_len] = '\0';
 
     // Closing quote
     if (needs_quote) {
@@ -64,7 +66,7 @@ int main(int argc, char *argv[])
 {
     BPTR lock;
     char command[MAX_CMD_LEN] = "";
-    char filename[256];
+    char filename[1024];
 
     if (!InitUAEResource())
     {
@@ -87,9 +89,9 @@ int main(int argc, char *argv[])
     {
         // Try to resolve as a file path first (skip URLs to avoid volume requester)
         int is_resolved_file = 0;
-        if (!strstr(argv[i], "://") && (lock = Lock(argv[i], ACCESS_READ)))
+        if (!strstr(argv[i], "://") && ((lock = Lock(argv[i], ACCESS_READ))))
         {
-            if (NativeDosOp((ULONG)0, (ULONG)lock, (ULONG)filename, (ULONG)sizeof(filename)) == 0) {
+            if (NativeDosOp(0, (ULONG)lock, (ULONG)filename, sizeof(filename)) == 0) {
                  UnLock(lock);
                  is_resolved_file = 1;
             } else {
@@ -112,6 +114,5 @@ int main(int argc, char *argv[])
 #ifdef DEBUG
     printf("DEBUG: argc=%d, command=%s\n", argc, command);
 #endif
-    ExecuteOnHost((UBYTE *)&command);
-    return 0;
+    return ExecuteOnHost((UBYTE *)command);
 }

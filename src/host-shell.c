@@ -26,6 +26,15 @@ int main(int argc, char *argv[])
         return 2;
     }
 
+    if (argc == 2 && strcmp(argv[1], "?") == 0)
+    {
+        printf("Host-Shell v1.9\n");
+        printf("Host-Shell opens an interactive terminal session on the host system.\n");
+        printf("$VER: Host-Shell v1.9 (2025-12-26)\n");
+        printf("Usage: host-shell [command]\n");
+        return 0;
+    }
+
     // Combine arguments into command string
     for (int i = 1; i < argc; i++)
     {
@@ -33,7 +42,7 @@ int main(int argc, char *argv[])
         strncat(command, argv[i], sizeof(command) - strlen(command) - 1);
     }
 
-    if (DOSBase = (struct DosLibrary *)OpenLibrary("dos.library", 0))
+    if ((DOSBase = (struct DosLibrary *)OpenLibrary("dos.library", 0)))
     {
         in = Input();
         out = Output();

@@ -8,15 +8,15 @@ static const char __ver[40] = "$VER: Host-MultiView v1.9 (2025-12-26)";
 int print_usage()
 {
     printf("Host-MultiView v1.9\n");
-    printf("Host-MultiView is a command line tool to open files with the host default handler, from within UAE.\n");
-    printf("%s\nUsage: host-multiview <filename> [filename2 ...]\n", __ver);
+    printf("Host-MultiView is a command line tool to open files or URLs with the host default handler, from within UAE.\n");
+    printf("%s\nUsage: host-multiview <filename|URL> [filename2|URL2 ...]\n", __ver);
     return 0;
 }
 
 int main(int argc, char *argv[])
 {
     BPTR lock;
-    char filename[256];
+    char filename[1024];
 
     if (!InitUAEResource())
     {
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 
     if (argc <= 1)
     {
-        printf("Missing filename argument\n");
+        printf("Missing filename or URL argument\n");
         return print_usage();
     }
 
@@ -41,9 +41,9 @@ int main(int argc, char *argv[])
         char *target = argv[i];
 
         /* Try to resolve as a file path first to get the host path (skip URLs) */
-        if (!strstr(argv[i], "://") && (lock = Lock(argv[i], ACCESS_READ)))
+        if (!strstr(argv[i], "://") && ((lock = Lock(argv[i], ACCESS_READ))))
         {
-            if (NativeDosOp((ULONG)0, (ULONG)lock, (ULONG)filename, (ULONG)sizeof(filename)) == 0) {
+            if (NativeDosOp(0, (ULONG)lock, (ULONG)filename, sizeof(filename)) == 0) {
                  UnLock(lock);
                  target = filename;
             } else {

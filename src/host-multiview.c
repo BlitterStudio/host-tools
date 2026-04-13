@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
     {
         char *target = argv[i];
 
-        /* Try to resolve as a file path first to get the host path */
-        if (lock = Lock(argv[i], ACCESS_READ))
+        /* Try to resolve as a file path first to get the host path (skip URLs) */
+        if (!strstr(argv[i], "://") && (lock = Lock(argv[i], ACCESS_READ)))
         {
             if (NativeDosOp((ULONG)0, (ULONG)lock, (ULONG)filename, (ULONG)sizeof(filename)) == 0) {
                  UnLock(lock);

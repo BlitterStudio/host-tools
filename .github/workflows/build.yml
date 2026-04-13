@@ -53,8 +53,7 @@ jobs:
           name: host-tools-package
 
       - name: Create Release
-        uses: softprops/action-gh-release@v3
-        with:
-          name: Host-Tools ${{ github.ref_name }}
-          files: "*.lha"
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create ${{ github.ref_name }} *.lha --title "Host-Tools ${{ github.ref_name }}" --generate-notes

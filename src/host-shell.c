@@ -8,7 +8,7 @@
 
 #define OUTBUFSIZE 4095
 
-static const char version[] = "$VER: Host-Shell v1.9 (2025-12-26)";
+static const char version[] = "$VER: Host-Shell v" VERSION_STR " (" DATE_STR ")";
 char outbuf[OUTBUFSIZE + 1];
 
 int main(int argc, char *argv[])
@@ -28,10 +28,9 @@ int main(int argc, char *argv[])
 
     if (argc == 2 && strcmp(argv[1], "?") == 0)
     {
-        printf("Host-Shell v1.9\n");
+        printf("Host-Shell v%s\n", VERSION_STR);
         printf("Host-Shell opens an interactive terminal session on the host system.\n");
-        printf("$VER: Host-Shell v1.9 (2025-12-26)\n");
-        printf("Usage: host-shell [command]\n");
+        printf("%s\nUsage: host-shell [command]\n", version);
         return 0;
     }
 

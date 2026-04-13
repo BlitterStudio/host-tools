@@ -3,13 +3,13 @@
 #include <stdlib.h>
 #include "uae_pragmas.h"
 
-static const char __ver[40] = "$VER: Host-Run v1.9 (2025-12-26)";
+static const char __ver[] = "$VER: Host-Run v" VERSION_STR " (" DATE_STR ")";
 
 #define MAX_CMD_LEN 4096
 
 int print_usage()
 {
-    printf("Host-Run v1.9\n");
+    printf("Host-Run v%s\n", VERSION_STR);
     printf("Host-Run is a command line tool to run host commands from within UAE.\n");
     printf("%s\nUsage: host-run <command> <argument1> <argument2> ...\n", __ver);
     return 0;

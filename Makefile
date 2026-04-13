@@ -1,8 +1,8 @@
 # m68k-amigaos-gcc -Isrc -noixemul -fomit-frame-pointer -Os -std=c99 -o host-run src/host-run.c
 all: host-run host-multiview host-shell
 
-VERSION		= 1.9
-DATE		= 2025-12-26
+VERSION		= 2.0
+DATE		= 2026-04-13
 
 CC			= m68k-amigaos-gcc
 INCLUDES	= -Isrc

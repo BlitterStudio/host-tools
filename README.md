@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 A collection of AmigaOS tools designed to bridge the gap between the Amiberry emulator and the host operating system (Linux, macOS, etc.).
 
-These tools allow you to execute commands, open files, and launch interactive shells on the host system directly from the Amiga environment.
+These tools allow you to execute commands, open files, launch interactive shells, inspect host paths, and use common host desktop integrations directly from the Amiga environment.
 
 ## The Tools
 
@@ -42,7 +42,63 @@ Opens a fully interactive terminal session on the host system, right inside your
 
 **Usage:**
 ```shell
-host-shell
+host-shell [command]
+```
+
+### 4. host-path
+**Print translated host paths.**
+`host-path` resolves existing Amiga paths and prints their host-side paths. It is useful for debugging mounted directories and scripts.
+
+**Usage:**
+```shell
+host-path <path> [path2 ...]
+```
+
+### 5. host-reveal
+**Reveal files in the host file manager.**
+`host-reveal` opens Finder on macOS or the containing directory on Linux for existing Amiga paths or raw host paths.
+
+**Usage:**
+```shell
+host-reveal <path> [path2 ...]
+```
+
+### 6. host-notify
+**Send host desktop notifications.**
+`host-notify` uses `notify-send` on Linux or `osascript` on macOS when available.
+
+**Usage:**
+```shell
+host-notify <message>
+host-notify <title> <message...>
+```
+
+### 7. host-edit
+**Open files in the host editor.**
+`host-edit` uses `VISUAL` or `EDITOR` on the host, with platform openers as fallback.
+
+**Usage:**
+```shell
+host-edit <path> [path2 ...]
+```
+
+### 8. host-clip
+**Use the host clipboard.**
+`host-clip` copies text to the host clipboard or prints the current host clipboard contents.
+
+**Usage:**
+```shell
+host-clip [copy] <text...>
+host-clip paste
+```
+
+### 9. host-info
+**Print host integration details.**
+`host-info` reports basic host OS, shell, editor, opener, and clipboard backend details.
+
+**Usage:**
+```shell
+host-info
 ```
 
 ---
@@ -51,12 +107,13 @@ host-shell
 
 -   **Amiberry v6.0+** (or a version with updated `uaelib` support).
 -   "Native Code" execution must be enabled in Amiberry settings.
+-   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, and `host-info`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Older builds still work, but use timeout-based completion detection.
 
 ## Installation
 
 1.  Download the latest release from the [Releases Page](../../releases).
 2.  Extract the `.lha` archive.
-3.  Copy the binaries (`host-run`, `host-multiview`, `host-shell`) to `C:` or anywhere in your system path.
+3.  Copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`) to `C:` or anywhere in your system path.
 
 ## Examples
 
@@ -99,6 +156,11 @@ make all
 To build locally with the same Docker image used by CI:
 ```shell
 docker run --rm -v "$PWD":/work -w /work sacredbanana/amiga-compiler:m68k-amigaos make all
+```
+
+To build a release archive:
+```shell
+make package
 ```
 
 To build with debug output enabled:

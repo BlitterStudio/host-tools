@@ -36,7 +36,7 @@ jobs:
         else
           VERSION="latest"
         fi
-        lha a "Host-Tools-${VERSION}.lha" host-run host-multiview host-shell README.md
+        make package PACKAGE="Host-Tools-${VERSION}.lha"
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v5

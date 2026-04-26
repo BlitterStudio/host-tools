@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#ifndef UAE_PRAGMAS_H
+#define UAE_PRAGMAS_H
+
 #include <proto/exec.h>
 #include <proto/dos.h>
 
@@ -189,8 +192,14 @@ static int UAE_UNUSED HostShell_Close(ULONG handle)
 {
     return calltrap(93, handle);
 }
+static ULONG UAE_UNUSED HostShell_Status(ULONG handle)
+{
+    return (ULONG)calltrap(94, handle);
+}
 
 static int UAE_UNUSED HostShell_View(UBYTE *filename)
 {
     return calltrap(89, filename);
 }
+
+#endif

@@ -6,8 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "host_common.h"
-#include "uae_pragmas.h"
+#include "host_path.h"
 
 static const char version[] = "$VER: Host-MultiView v" VERSION_STR " (" DATE_STR ")";
 
@@ -21,7 +20,6 @@ int print_usage()
 
 int main(int argc, char *argv[])
 {
-    BPTR lock;
     char filename[HOST_MAX_PATH_LEN];
     int status = 0;
 
@@ -53,22 +51,12 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        /* Try to resolve as a file path first to get the host path (skip URLs) */
-        if (!host_is_uri(argv[i]) && ((lock = Lock((STRPTR)argv[i], ACCESS_READ))))
-        {
-            filename[0] = '\0';
-            filename[sizeof(filename) - 1] = '\0';
-            if (NativeDosOp(0, (ULONG)lock, (ULONG)filename, sizeof(filename)) == 0) {
-                 UnLock(lock);
-                 if (host_filled_buffer(filename, sizeof(filename))) {
-                     printf("Resolved host path is too long: %s\n", argv[i]);
-                     status = HOST_RETURN_ERROR;
-                     continue;
-                 }
-                 target = filename;
-            } else {
-                 UnLock(lock);
-            }
+        int path_status = host_resolve_optional_path(argv[i], filename, sizeof(filename),
+                                                     (const char **)&target);
+        if (path_status != HOST_PATH_OK) {
+            printf("%s: %s\n", host_path_error(path_status), argv[i]);
+            status = HOST_RETURN_ERROR;
+            continue;
         }
         
         /* Send the request to Amiberry */

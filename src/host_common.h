@@ -18,6 +18,36 @@ static inline int host_filled_buffer(const char *value, size_t max_len)
     return max_len > 0 && strlen(value) >= max_len - 1;
 }
 
+static inline int host_append_literal(char *dest, size_t max_len, const char *src)
+{
+    size_t current_len;
+    size_t src_len;
+
+    if (max_len == 0 || dest == NULL || src == NULL) {
+        return 0;
+    }
+
+    current_len = strlen(dest);
+    src_len = strlen(src);
+    if (current_len >= max_len || src_len > max_len - current_len - 1) {
+        return 0;
+    }
+
+    memcpy(dest + current_len, src, src_len + 1);
+    return 1;
+}
+
+static inline int host_join_args(char *dest, size_t max_len, int argc, char *argv[], int start)
+{
+    for (int i = start; i < argc; i++) {
+        if (!host_append_literal(dest, max_len, i > start ? " " : "") ||
+            !host_append_literal(dest, max_len, argv[i])) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static inline int host_is_safe_shell_char(char c)
 {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
@@ -106,6 +136,13 @@ static inline int host_append_shell_arg(char *dest, size_t max_len, const char *
 
     dest[pos] = '\0';
     return 1;
+}
+
+static inline int host_append_shell_literal_and_arg(char *dest, size_t max_len,
+                                                   const char *literal, const char *arg)
+{
+    return host_append_literal(dest, max_len, literal) &&
+           host_append_shell_arg(dest, max_len, arg, 0);
 }
 
 static inline char host_ascii_lower(char c)

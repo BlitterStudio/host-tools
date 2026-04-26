@@ -6,8 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "host_common.h"
-#include "uae_pragmas.h"
+#include "host_path.h"
 
 static const char version[] = "$VER: Host-Run v" VERSION_STR " (" DATE_STR ")";
 
@@ -21,7 +20,6 @@ int print_usage()
 
 int main(int argc, char *argv[])
 {
-    BPTR lock;
     char command[HOST_MAX_COMMAND_LEN] = "";
     char filename[HOST_MAX_PATH_LEN];
 
@@ -46,24 +44,16 @@ int main(int argc, char *argv[])
     {
         // Try to resolve as a file path first (skip URLs to avoid volume requester)
         int is_resolved_file = 0;
-        if (argv[i][0] != '\0' && !host_is_uri(argv[i]) && ((lock = Lock((STRPTR)argv[i], ACCESS_READ))))
-        {
-            filename[0] = '\0';
-            filename[sizeof(filename) - 1] = '\0';
-            if (NativeDosOp(0, (ULONG)lock, (ULONG)filename, sizeof(filename)) == 0) {
-                 UnLock(lock);
-                 if (host_filled_buffer(filename, sizeof(filename))) {
-                     printf("Resolved host path is too long\n");
-                     return HOST_RETURN_ERROR;
-                 }
-                 is_resolved_file = 1;
-            } else {
-                 UnLock(lock);
-            }
+        const char *target = argv[i];
+        int path_status = host_resolve_optional_path(argv[i], filename, sizeof(filename), &target);
+        if (path_status != HOST_PATH_OK) {
+            printf("%s: %s\n", host_path_error(path_status), argv[i]);
+            return HOST_RETURN_ERROR;
         }
+        is_resolved_file = (target == filename);
 
         if (!host_append_shell_arg(command, sizeof(command),
-                                   is_resolved_file ? filename : argv[i], i > 1)) {
+                                   is_resolved_file ? filename : target, i > 1)) {
             printf("Command is too long\n");
             return HOST_RETURN_ERROR;
         }

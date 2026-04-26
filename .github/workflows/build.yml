@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 name: Build Amiberry Host Tools
 
 on:
@@ -17,7 +20,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: amigadev/crosstools:m68k-amigaos
+    container: sacredbanana/amiga-compiler:m68k-amigaos
 
     steps:
     - name: Checkout repository

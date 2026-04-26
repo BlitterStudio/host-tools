@@ -1,11 +1,15 @@
+/*
+ * SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "host_common.h"
 #include "uae_pragmas.h"
 
 static const char version[] = "$VER: Host-Run v" VERSION_STR " (" DATE_STR ")";
-
-#define MAX_CMD_LEN 4096
 
 int print_usage()
 {
@@ -15,58 +19,11 @@ int print_usage()
     return 0;
 }
 
-// Check if a character is safe for shell (no quoting needed)
-int is_safe_char(char c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-           c == '.' || c == '_' || c == '-' || c == '/' || c == ':' || c == '+' || c == '=' || c == ',' || c == '@';
-}
-
-// Append a string to the buffer, quoting it if necessary
-void append_quoted(char *dest, const char *src, size_t max_len) {
-    size_t current_len = strlen(dest);
-    if (current_len >= max_len - 1) return;
-
-    int needs_quote = 0;
-    for (const char *p = src; *p; p++) {
-        if (!is_safe_char(*p)) {
-            needs_quote = 1;
-            break;
-        }
-    }
-
-    // Ensure we have space for opening quote
-    if (needs_quote) {
-        if (current_len < max_len - 1) dest[current_len++] = '\'';
-        dest[current_len] = '\0';
-    }
-
-    for (const char *p = src; *p; p++) {
-        if (*p == '\'') {
-            // Escape single quote: ' -> '\''
-            if (current_len + 4 >= max_len) break;
-            dest[current_len++] = '\'';
-            dest[current_len++] = '\\';
-            dest[current_len++] = '\'';
-            dest[current_len++] = '\'';
-        } else {
-            if (current_len + 1 >= max_len - 1) break; // Reserve space for close quote + null
-            dest[current_len++] = *p;
-        }
-    }
-    dest[current_len] = '\0';
-
-    // Closing quote
-    if (needs_quote) {
-        if (current_len < max_len - 1) dest[current_len++] = '\'';
-        dest[current_len] = '\0';
-    }
-}
-
 int main(int argc, char *argv[])
 {
     BPTR lock;
-    char command[MAX_CMD_LEN] = "";
-    char filename[1024];
+    char command[HOST_MAX_COMMAND_LEN] = "";
+    char filename[HOST_MAX_PATH_LEN];
 
     if (!InitUAEResource())
     {
@@ -89,30 +46,35 @@ int main(int argc, char *argv[])
     {
         // Try to resolve as a file path first (skip URLs to avoid volume requester)
         int is_resolved_file = 0;
-        if (!strstr(argv[i], "://") && ((lock = Lock(argv[i], ACCESS_READ))))
+        if (argv[i][0] != '\0' && !host_is_uri(argv[i]) && ((lock = Lock((STRPTR)argv[i], ACCESS_READ))))
         {
+            filename[0] = '\0';
+            filename[sizeof(filename) - 1] = '\0';
             if (NativeDosOp(0, (ULONG)lock, (ULONG)filename, sizeof(filename)) == 0) {
                  UnLock(lock);
+                 if (host_filled_buffer(filename, sizeof(filename))) {
+                     printf("Resolved host path is too long\n");
+                     return HOST_RETURN_ERROR;
+                 }
                  is_resolved_file = 1;
             } else {
                  UnLock(lock);
             }
         }
 
-        // Separate arguments with space
-        if (i > 1) {
-            strncat(command, " ", MAX_CMD_LEN - strlen(command) - 1);
-        }
-
-        if (is_resolved_file) {
-            append_quoted(command, filename, MAX_CMD_LEN);
-        } else {
-            append_quoted(command, argv[i], MAX_CMD_LEN);
+        if (!host_append_shell_arg(command, sizeof(command),
+                                   is_resolved_file ? filename : argv[i], i > 1)) {
+            printf("Command is too long\n");
+            return HOST_RETURN_ERROR;
         }
     }
 
 #ifdef DEBUG
     printf("DEBUG: argc=%d, command=%s\n", argc, command);
 #endif
-    return ExecuteOnHost((UBYTE *)command);
+    if (!ExecuteOnHost((UBYTE *)command)) {
+        printf("Failed to execute command on host\n");
+        return HOST_RETURN_ERROR;
+    }
+    return 0;
 }

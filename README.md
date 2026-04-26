@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # Amiberry Host Tools
 
 A collection of AmigaOS tools designed to bridge the gap between the Amiberry emulator and the host operating system (Linux, macOS, etc.).
@@ -84,11 +89,16 @@ Make AmigaOS automatically open `.mkv` files on the host:
 
 ## Building
 
-This project is built using **GitHub Actions**. Every push to `master` or a version tag triggers a build using the `amigadev/crosstools:m68k-amigaos` Docker image.
+This project is built using **GitHub Actions**. Every push to `master` or a version tag triggers a build using the `sacredbanana/amiga-compiler:m68k-amigaos` Docker image.
 
 To build locally (requires the m68k-amigaos cross-compiler):
 ```shell
 make all
+```
+
+To build locally with the same Docker image used by CI:
+```shell
+docker run --rm -v "$PWD":/work -w /work sacredbanana/amiga-compiler:m68k-amigaos make all
 ```
 
 To build with debug output enabled:
@@ -97,4 +107,6 @@ make debug
 ```
 
 ## License
-GPLv3
+Copyright (C) 2020-2026 Dimitris Panokostas.
+
+Amiberry Host Tools is licensed under the GNU General Public License version 3 or later. See [LICENSE](LICENSE) for details.

@@ -1,6 +1,12 @@
+/*
+ * SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "host_common.h"
 #include "uae_pragmas.h"
 
 static const char version[] = "$VER: Host-MultiView v" VERSION_STR " (" DATE_STR ")";
@@ -16,7 +22,8 @@ int print_usage()
 int main(int argc, char *argv[])
 {
     BPTR lock;
-    char filename[1024];
+    char filename[HOST_MAX_PATH_LEN];
+    int status = 0;
 
     if (!InitUAEResource())
     {
@@ -40,11 +47,24 @@ int main(int argc, char *argv[])
     {
         char *target = argv[i];
 
+        if (argv[i][0] == '\0') {
+            printf("Empty filename or URL argument\n");
+            status = HOST_RETURN_ERROR;
+            continue;
+        }
+
         /* Try to resolve as a file path first to get the host path (skip URLs) */
-        if (!strstr(argv[i], "://") && ((lock = Lock(argv[i], ACCESS_READ))))
+        if (!host_is_uri(argv[i]) && ((lock = Lock((STRPTR)argv[i], ACCESS_READ))))
         {
+            filename[0] = '\0';
+            filename[sizeof(filename) - 1] = '\0';
             if (NativeDosOp(0, (ULONG)lock, (ULONG)filename, sizeof(filename)) == 0) {
                  UnLock(lock);
+                 if (host_filled_buffer(filename, sizeof(filename))) {
+                     printf("Resolved host path is too long: %s\n", argv[i]);
+                     status = HOST_RETURN_ERROR;
+                     continue;
+                 }
                  target = filename;
             } else {
                  UnLock(lock);
@@ -52,9 +72,12 @@ int main(int argc, char *argv[])
         }
         
         /* Send the request to Amiberry */
-        /* Opcode 94 handles the quoting and OS-specific command (open/xdg-open) */
-        HostShell_View((UBYTE *)target);
+        /* Opcode 89 handles the quoting and OS-specific command (open/xdg-open) */
+        if (!HostShell_View((UBYTE *)target)) {
+            printf("Failed to open on host: %s\n", argv[i]);
+            status = HOST_RETURN_ERROR;
+        }
     }
     
-    return 0;
+    return status;
 }

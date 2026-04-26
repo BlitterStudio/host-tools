@@ -1,9 +1,15 @@
+/*
+ * SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
 
+#include "host_common.h"
 #include "uae_pragmas.h"
 
 #define OUTBUFSIZE 4095
@@ -13,7 +19,7 @@ char outbuf[OUTBUFSIZE + 1];
 
 int main(int argc, char *argv[])
 {
-    char command[1024] = "";
+    char command[HOST_MAX_COMMAND_LEN] = "";
     char buffer[4096];
     BPTR in, out;
     long handle;
@@ -34,14 +40,25 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // Combine arguments into command string
-    for (int i = 1; i < argc; i++)
-    {
-        if (i > 1) strncat(command, " ", sizeof(command) - strlen(command) - 1);
-        strncat(command, argv[i], sizeof(command) - strlen(command) - 1);
+    if (argc == 2) {
+        size_t command_len = strlen(argv[1]);
+        if (command_len >= sizeof(command)) {
+            printf("Command is too long\n");
+            return HOST_RETURN_ERROR;
+        }
+        memcpy(command, argv[1], command_len + 1);
+    } else {
+        // Combine arguments into a safely quoted command string.
+        for (int i = 1; i < argc; i++)
+        {
+            if (!host_append_shell_arg(command, sizeof(command), argv[i], i > 1)) {
+                printf("Command is too long\n");
+                return HOST_RETURN_ERROR;
+            }
+        }
     }
 
-    if ((DOSBase = (struct DosLibrary *)OpenLibrary("dos.library", 0)))
+    if ((DOSBase = (struct DosLibrary *)OpenLibrary((UBYTE *)"dos.library", 0)))
     {
         in = Input();
         out = Output();
@@ -54,7 +71,7 @@ int main(int argc, char *argv[])
             printf("Failed to open host shell session.\n");
             SetMode(in, 0);
             CloseLibrary((struct Library *)DOSBase);
-            return 10;
+            return HOST_RETURN_ERROR;
         }
 
         BOOL esc_pending = FALSE;

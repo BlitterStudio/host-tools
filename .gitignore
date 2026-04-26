@@ -1,57 +1,75 @@
-# Prerequisites
+# SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Host OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor and local workspace state
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Local build directories and metadata
+build/
+dist/
+release/
+tmp/
+.cache/
+compile_commands.json
+
+# Compiler intermediates
 *.d
-
-# Object files
 *.o
-*.ko
 *.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
+*.lo
+*.ko
 *.gch
 *.pch
+*.lst
 
-# Libraries
-*.lib
+# Linker and debug output
+*.elf
+*.exp
+*.hex
+*.ilk
+*.map
+*.pdb
+*.su
+*.sym
+*.debug
+*.dSYM/
+
+# Libraries and host shared objects
 *.a
 *.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
+*.lib
 *.dll
+*.dylib
 *.so
 *.so.*
-*.dylib
 
-# Executables
+# Host executables
+*.app
 *.exe
 *.out
-*.app
 *.i*86
 *.x86_64
-*.hex
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+# Release packages and Amiga archives
+*.lha
+*.lzh
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.tar.bz2
+*.tar.xz
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
-# Amiberry Host Tools
+# Amiberry Host Tools binaries
 host-run
 host-shell
 host-multiview

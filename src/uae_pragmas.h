@@ -1,5 +1,16 @@
+/*
+ * SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include <proto/exec.h>
 #include <proto/dos.h>
+
+#if defined(__GNUC__)
+#define UAE_UNUSED __attribute__((unused))
+#else
+#define UAE_UNUSED
+#endif
 
 /*
  * Configuration structure
@@ -40,7 +51,7 @@ static int (*calltrap)(int arg0, ...) = (int (*)(int arg0, ...))0xF0FF60;
 
 static int InitUAEResource(void)
 {
-	UAEResource = (struct uaebase *)OpenResource("uae.resource");
+	UAEResource = (struct uaebase *)OpenResource((UBYTE *)"uae.resource");
 	if (UAEResource)
 	{
 		calltrap = (int (*)(int arg0, ...))((BYTE *)UAEResource->uae_rombase + 0xFF60);
@@ -49,137 +60,137 @@ static int InitUAEResource(void)
 	return 0;
 }
 
-static int GetVersion(void)
+static int UAE_UNUSED GetVersion(void)
 {
     return calltrap (0);
 }
-static int GetUaeConfig(struct UAE_CONFIG *a)
+static int UAE_UNUSED GetUaeConfig(struct UAE_CONFIG *a)
 {
     return calltrap (1, a);
 }
-static int SetUaeConfig(struct UAE_CONFIG *a)
+static int UAE_UNUSED SetUaeConfig(struct UAE_CONFIG *a)
 {
     return calltrap (2, a);
 }
-static int HardReset(void)
+static int UAE_UNUSED HardReset(void)
 {
     return calltrap (3);
 }
-static int Reset(void)
+static int UAE_UNUSED Reset(void)
 {
     return calltrap (4);
 }
-static int EjectDisk(ULONG drive)
+static int UAE_UNUSED EjectDisk(ULONG drive)
 {
     return calltrap (5, "", drive);
 }
-static int InsertDisk(UBYTE *name, ULONG drive)
+static int UAE_UNUSED InsertDisk(UBYTE *name, ULONG drive)
 {
     return calltrap (5, name, drive);
 }
-static int EnableSound(void)
+static int UAE_UNUSED EnableSound(void)
 {
     return calltrap (6, 2);
 }
-static int DisableSound(void)
+static int UAE_UNUSED DisableSound(void)
 {
     return calltrap (6, 1);
 }
-static int EnableJoystick(void)
+static int UAE_UNUSED EnableJoystick(void)
 {
     return calltrap (7, 1);
 }
-static int DisableJoystick(void)
+static int UAE_UNUSED DisableJoystick(void)
 {
     return calltrap (7, 0);
 }
-static int SetFrameRate(ULONG rate)
+static int UAE_UNUSED SetFrameRate(ULONG rate)
 {
     return calltrap (8, rate);
 }
-static int ChgCMemSize(ULONG mem)
+static int UAE_UNUSED ChgCMemSize(ULONG mem)
 {
     return calltrap (9, mem);
 }
-static int ChgSMemSize(ULONG mem)
+static int UAE_UNUSED ChgSMemSize(ULONG mem)
 {
     return calltrap (10, mem);
 }
-static int ChgFMemSize(ULONG mem)
+static int UAE_UNUSED ChgFMemSize(ULONG mem)
 {
     return calltrap (11, mem);
 }
-static int ChangeLanguage(ULONG lang)
+static int UAE_UNUSED ChangeLanguage(ULONG lang)
 {
     return calltrap (12, lang);
 }
-static int ExitEmu(void)
+static int UAE_UNUSED ExitEmu(void)
 {
     return calltrap (13);
 }
-static int GetDisk(ULONG drive, UBYTE *name)
+static int UAE_UNUSED GetDisk(ULONG drive, UBYTE *name)
 {
     return calltrap (14, drive, name);
 }
-static int DebugFunc(void)
+static int UAE_UNUSED DebugFunc(void)
 {
     return calltrap (15);
 }
-static int Minimize(void)
+static int UAE_UNUSED Minimize(void)
 {
     return calltrap(68);
 }
-static int ExecuteNativeCode()
+static int UAE_UNUSED ExecuteNativeCode()
 {
     return calltrap(69);
 }
-static int UnprotectMapRom()
+static int UAE_UNUSED UnprotectMapRom()
 {
     return calltrap(80);
 }
-static int EmuConfig(int mode, UBYTE *name, ULONG dst, ULONG maxlength)
+static int UAE_UNUSED EmuConfig(int mode, UBYTE *name, ULONG dst, ULONG maxlength)
 {
     return calltrap(81, mode, name, dst, maxlength);
 }
-static int EmuConfigModify(int mode, UBYTE *parms, ULONG size, ULONG out, ULONG outsize)
+static int UAE_UNUSED EmuConfigModify(int mode, UBYTE *parms, ULONG size, ULONG out, ULONG outsize)
 {
     return calltrap(82, mode, parms, size, out, outsize);
 }
-static int IsMMKeyboard()
+static int UAE_UNUSED IsMMKeyboard()
 {
     return calltrap(83);
 }
-static int NativeDosOp(ULONG mode, ULONG lock, ULONG out, ULONG outsize)
+static int UAE_UNUSED NativeDosOp(ULONG mode, ULONG lock, ULONG out, ULONG outsize)
 {
     return calltrap(85, mode, lock, out, outsize);
 }
-static int GetCpuRate()
+static int UAE_UNUSED GetCpuRate()
 {
     return calltrap(87);
 }
-static int ExecuteOnHost(UBYTE *name)
+static int UAE_UNUSED ExecuteOnHost(UBYTE *name)
 {
     return calltrap (88, name);
 }
 
-static int HostShell_Open(UBYTE *command)
+static int UAE_UNUSED HostShell_Open(UBYTE *command)
 {
     return calltrap(90, command);
 }
-static int HostShell_Read(ULONG handle, UBYTE *buffer, ULONG size)
+static int UAE_UNUSED HostShell_Read(ULONG handle, UBYTE *buffer, ULONG size)
 {
     return calltrap(91, handle, buffer, size);
 }
-static int HostShell_Write(ULONG handle, UBYTE *buffer, ULONG size)
+static int UAE_UNUSED HostShell_Write(ULONG handle, UBYTE *buffer, ULONG size)
 {
     return calltrap(92, handle, buffer, size);
 }
-static int HostShell_Close(ULONG handle)
+static int UAE_UNUSED HostShell_Close(ULONG handle)
 {
     return calltrap(93, handle);
 }
 
-static int HostShell_View(UBYTE *filename)
+static int UAE_UNUSED HostShell_View(UBYTE *filename)
 {
     return calltrap(89, filename);
 }

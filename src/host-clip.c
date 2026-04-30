@@ -27,8 +27,8 @@ static int append_copy_command(char *command, size_t command_size, const char *t
 
 int main(int argc, char *argv[])
 {
-    char command[HOST_MAX_COMMAND_LEN] = "";
-    char text[2048] = "";
+    static char command[HOST_MAX_COMMAND_LEN];
+    static char text[2048];
     int start = 1;
 
     static const char paste_command[] =
@@ -37,6 +37,9 @@ int main(int argc, char *argv[])
         "elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard -o; "
         "elif command -v xsel >/dev/null 2>&1; then xsel --clipboard --output; "
         "else printf 'No host clipboard backend found\\n' >&2; exit 127; fi";
+
+    command[0] = '\0';
+    text[0] = '\0';
 
     if (!InitUAEResource())
     {

@@ -15,16 +15,18 @@
 #define OUTBUFSIZE 4095
 
 static const char version[] = "$VER: Host-Shell v" VERSION_STR " (" DATE_STR ")";
-char outbuf[OUTBUFSIZE + 1];
+static char outbuf[OUTBUFSIZE + 1];
 
 int main(int argc, char *argv[])
 {
-    char command[HOST_MAX_COMMAND_LEN] = "";
-    char buffer[4096];
+    static char command[HOST_MAX_COMMAND_LEN];
+    static char buffer[4096];
     BPTR in, out;
     long handle;
     BOOL brk = FALSE;
     long actual;
+
+    command[0] = '\0';
 
     if (!InitUAEResource())
     {

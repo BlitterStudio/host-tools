@@ -20,8 +20,10 @@ int print_usage()
 
 int main(int argc, char *argv[])
 {
-    char command[HOST_MAX_COMMAND_LEN] = "";
-    char filename[HOST_MAX_PATH_LEN];
+    static char command[HOST_MAX_COMMAND_LEN];
+    static char filename[HOST_MAX_PATH_LEN];
+
+    command[0] = '\0';
 
     if (!InitUAEResource())
     {

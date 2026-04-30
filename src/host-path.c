@@ -19,7 +19,7 @@ int print_usage()
 
 int main(int argc, char *argv[])
 {
-    char filename[HOST_MAX_PATH_LEN];
+    static char filename[HOST_MAX_PATH_LEN];
     int status = 0;
 
     if (!InitUAEResource())

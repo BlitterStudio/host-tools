@@ -7,8 +7,8 @@ PACKAGE		= Host-Tools-$(VERSION).lha
 
 all: $(TOOLS)
 
-VERSION		= 2.1
-DATE		= 2026-04-26
+VERSION		= 2.2
+DATE		= 2026-04-30
 
 ifeq ($(origin CC),default)
 CC			= m68k-amigaos-gcc

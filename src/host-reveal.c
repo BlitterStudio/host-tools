@@ -32,7 +32,8 @@ static int append_reveal_command(char *command, size_t command_size, const char 
 
 int main(int argc, char *argv[])
 {
-    char filename[HOST_MAX_PATH_LEN];
+    static char filename[HOST_MAX_PATH_LEN];
+    static char command[HOST_MAX_COMMAND_LEN];
     int status = 0;
 
     if (!InitUAEResource())
@@ -53,9 +54,10 @@ int main(int argc, char *argv[])
     }
 
     for (int i = 1; i < argc; i++) {
-        char command[HOST_MAX_COMMAND_LEN] = "";
         const char *target = argv[i];
         int path_status;
+
+        command[0] = '\0';
 
         if (argv[i][0] == '\0') {
             printf("Empty path argument\n");

@@ -34,9 +34,13 @@ static int append_notify_command(char *command, size_t command_size,
 
 int main(int argc, char *argv[])
 {
-    char command[HOST_MAX_COMMAND_LEN] = "";
-    char title[512] = "Amiga";
-    char message[2048] = "";
+    static char command[HOST_MAX_COMMAND_LEN];
+    static char title[512];
+    static char message[2048];
+
+    command[0] = '\0';
+    strcpy(title, "Amiga");
+    message[0] = '\0';
 
     if (!InitUAEResource())
     {

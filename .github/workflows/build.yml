@@ -29,6 +29,9 @@ jobs:
     - name: Build tools
       run: make all
 
+    - name: Run tests
+      run: make test
+
     - name: Package tools
       run: |
         if [ "${{ github.ref_type }}" = "tag" ]; then

@@ -108,6 +108,7 @@ host-info
 -   **Amiberry v6.0+** (or a version with updated `uaelib` support).
 -   "Native Code" execution must be enabled in Amiberry settings.
 -   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, and `host-info`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Older builds still work, but use timeout-based completion detection.
+-   Linux desktop integration uses `xdg-utils` (`xdg-open`, `xdg-mime`) and GTK's `gtk-launch` when available. Notifications use `notify-send`; clipboard support uses `wl-clipboard`, `xclip`, or `xsel`.
 
 ## Installation
 
@@ -156,6 +157,11 @@ make all
 To build locally with the same Docker image used by CI:
 ```shell
 docker run --rm -v "$PWD":/work -w /work sacredbanana/amiga-compiler:m68k-amigaos make all
+```
+
+To run the host-side command-builder tests:
+```shell
+make test
 ```
 
 To build a release archive:

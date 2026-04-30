@@ -10,7 +10,7 @@ all: $(TOOLS)
 test: $(TESTS)
 	./$(TESTS)
 
-VERSION		= 2.2
+VERSION		= 2.3
 DATE		= 2026-04-30
 
 ifeq ($(origin CC),default)

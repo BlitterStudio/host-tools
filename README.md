@@ -74,8 +74,8 @@ host-notify <title> <message...>
 ```
 
 ### 7. host-edit
-**Open files in the host editor.**
-`host-edit` uses `VISUAL` or `EDITOR` on the host, with platform openers as fallback.
+**Open files in the host desktop editor.**
+`host-edit` uses `open -t` on macOS and the host's default GUI text editor on Linux via `xdg-mime` and `gtk-launch`, with `xdg-open`, `VISUAL`, or `EDITOR` as fallbacks.
 
 **Usage:**
 ```shell

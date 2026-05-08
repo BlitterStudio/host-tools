@@ -10,7 +10,7 @@
 
 static const char version[] = "$VER: Host-Notify v" VERSION_STR " (" DATE_STR ")";
 
-int print_usage()
+static int print_usage(void)
 {
     printf("Host-Notify v%s\n", VERSION_STR);
     printf("Host-Notify sends a desktop notification on the host.\n");

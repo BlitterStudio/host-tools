@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "host_clip_command.h"
+#include "host_info_command.h"
 #include "host_notify_command.h"
 #include "host_reveal_command.h"
 
@@ -94,6 +95,16 @@ static void test_clip_paste_command(void)
     require_shell_syntax(HOST_CLIP_PASTE_COMMAND);
 }
 
+static void test_info_command(void)
+{
+    require_contains(HOST_INFO_COMMAND, "printf 'OS: '");
+    require_contains(HOST_INFO_COMMAND, "printf 'Editor: '");
+    require_contains(HOST_INFO_COMMAND, "xdg-mime query default text/plain");
+    require_contains(HOST_INFO_COMMAND, "printf 'Opener: '");
+    require_contains(HOST_INFO_COMMAND, "printf 'Clipboard: '");
+    require_shell_syntax(HOST_INFO_COMMAND);
+}
+
 static void test_small_buffer_failures(void)
 {
     char command[32];
@@ -117,6 +128,7 @@ int main(void)
     test_notify_command();
     test_clip_copy_command();
     test_clip_paste_command();
+    test_info_command();
     test_small_buffer_failures();
     return 0;
 }

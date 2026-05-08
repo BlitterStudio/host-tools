@@ -10,7 +10,7 @@
 
 static const char version[] = "$VER: Host-Run v" VERSION_STR " (" DATE_STR ")";
 
-int print_usage()
+static int print_usage(void)
 {
     printf("Host-Run v%s\n", VERSION_STR);
     printf("Host-Run is a command line tool to run host commands from within UAE.\n");

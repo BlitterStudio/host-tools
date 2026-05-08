@@ -10,7 +10,7 @@
 
 static const char version[] = "$VER: Host-MultiView v" VERSION_STR " (" DATE_STR ")";
 
-int print_usage()
+static int print_usage(void)
 {
     printf("Host-MultiView v%s\n", VERSION_STR);
     printf("Host-MultiView is a command line tool to open files or URLs with the host default handler, from within UAE.\n");

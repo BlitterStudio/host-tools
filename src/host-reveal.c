@@ -11,7 +11,7 @@
 
 static const char version[] = "$VER: Host-Reveal v" VERSION_STR " (" DATE_STR ")";
 
-int print_usage()
+static int print_usage(void)
 {
     printf("Host-Reveal v%s\n", VERSION_STR);
     printf("Host-Reveal reveals files in the host file manager.\n");

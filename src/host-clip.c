@@ -10,7 +10,7 @@
 
 static const char version[] = "$VER: Host-Clip v" VERSION_STR " (" DATE_STR ")";
 
-int print_usage()
+static int print_usage(void)
 {
     printf("Host-Clip v%s\n", VERSION_STR);
     printf("Host-Clip copies text to or pastes text from the host clipboard.\n");

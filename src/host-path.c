@@ -9,7 +9,7 @@
 
 static const char version[] = "$VER: Host-Path v" VERSION_STR " (" DATE_STR ")";
 
-int print_usage()
+static int print_usage(void)
 {
     printf("Host-Path v%s\n", VERSION_STR);
     printf("Host-Path prints host paths for Amiga paths.\n");

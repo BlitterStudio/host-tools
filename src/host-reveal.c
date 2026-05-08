@@ -7,6 +7,7 @@
 #include <string.h>
 #include "host_capture.h"
 #include "host_path.h"
+#include "host_reveal_command.h"
 
 static const char version[] = "$VER: Host-Reveal v" VERSION_STR " (" DATE_STR ")";
 
@@ -16,18 +17,6 @@ int print_usage()
     printf("Host-Reveal reveals files in the host file manager.\n");
     printf("%s\nUsage: host-reveal <path> [path2 ...]\n", version);
     return 0;
-}
-
-static int append_reveal_command(char *command, size_t command_size, const char *path)
-{
-    return host_append_literal(command, command_size,
-                              "if [ \"$(uname -s)\" = Darwin ] && command -v open >/dev/null 2>&1; then open -R ") &&
-           host_append_shell_arg(command, command_size, path, 0) &&
-           host_append_literal(command, command_size,
-                               "; elif command -v xdg-open >/dev/null 2>&1; then xdg-open \"$(dirname -- ") &&
-           host_append_shell_arg(command, command_size, path, 0) &&
-           host_append_literal(command, command_size,
-                               ")\"; else exit 127; fi");
 }
 
 int main(int argc, char *argv[])
@@ -78,7 +67,7 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        if (!append_reveal_command(command, sizeof(command), target)) {
+        if (!host_append_reveal_command(command, sizeof(command), target)) {
             printf("Command is too long\n");
             status = HOST_RETURN_ERROR;
             continue;

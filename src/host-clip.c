@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "host_capture.h"
+#include "host_clip_command.h"
 
 static const char version[] = "$VER: Host-Clip v" VERSION_STR " (" DATE_STR ")";
 
@@ -17,26 +18,11 @@ int print_usage()
     return 0;
 }
 
-static int append_copy_command(char *command, size_t command_size, const char *text)
-{
-    return host_append_literal(command, command_size, "printf %s ") &&
-           host_append_shell_arg(command, command_size, text, 0) &&
-           host_append_literal(command, command_size,
-                               " | if command -v pbcopy >/dev/null 2>&1; then pbcopy; elif command -v wl-copy >/dev/null 2>&1; then wl-copy; elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard; elif command -v xsel >/dev/null 2>&1; then xsel --clipboard --input; else printf 'No host clipboard backend found\\n' >&2; exit 127; fi");
-}
-
 int main(int argc, char *argv[])
 {
     static char command[HOST_MAX_COMMAND_LEN];
     static char text[2048];
     int start = 1;
-
-    static const char paste_command[] =
-        "if command -v pbpaste >/dev/null 2>&1; then pbpaste; "
-        "elif command -v wl-paste >/dev/null 2>&1; then wl-paste -n; "
-        "elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard -o; "
-        "elif command -v xsel >/dev/null 2>&1; then xsel --clipboard --output; "
-        "else printf 'No host clipboard backend found\\n' >&2; exit 127; fi";
 
     command[0] = '\0';
     text[0] = '\0';
@@ -63,7 +49,7 @@ int main(int argc, char *argv[])
             printf("Unexpected argument after paste\n");
             return print_usage();
         }
-        return host_print_command_output(paste_command);
+        return host_print_command_output(HOST_CLIP_PASTE_COMMAND);
     }
 
     if (strcmp(argv[1], "copy") == 0 || strcmp(argv[1], "-c") == 0) {
@@ -80,7 +66,7 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
-    if (!append_copy_command(command, sizeof(command), text)) {
+    if (!host_append_clip_copy_command(command, sizeof(command), text)) {
         printf("Command is too long\n");
         return HOST_RETURN_ERROR;
     }

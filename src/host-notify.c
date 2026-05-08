@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "host_capture.h"
+#include "host_notify_command.h"
 
 static const char version[] = "$VER: Host-Notify v" VERSION_STR " (" DATE_STR ")";
 
@@ -17,21 +18,6 @@ int print_usage()
     return 0;
 }
 
-static int append_notify_command(char *command, size_t command_size,
-                                 const char *title, const char *message)
-{
-    return host_append_literal(command, command_size,
-                              "if command -v notify-send >/dev/null 2>&1; then notify-send ") &&
-           host_append_shell_arg(command, command_size, title, 0) &&
-           host_append_shell_arg(command, command_size, message, 1) &&
-           host_append_literal(command, command_size,
-                               "; elif command -v osascript >/dev/null 2>&1; then osascript -e 'on run argv' -e 'display notification (item 2 of argv) with title (item 1 of argv)' -e 'end run' ") &&
-           host_append_shell_arg(command, command_size, title, 0) &&
-           host_append_shell_arg(command, command_size, message, 1) &&
-           host_append_literal(command, command_size,
-                               "; else exit 127; fi");
-}
-
 int main(int argc, char *argv[])
 {
     static char command[HOST_MAX_COMMAND_LEN];
@@ -39,7 +25,8 @@ int main(int argc, char *argv[])
     static char message[2048];
 
     command[0] = '\0';
-    strcpy(title, "Amiga");
+    title[0] = '\0';
+    host_append_literal(title, sizeof(title), "Amiga");
     message[0] = '\0';
 
     if (!InitUAEResource())
@@ -77,7 +64,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (!append_notify_command(command, sizeof(command), title, message)) {
+    if (!host_append_notify_command(command, sizeof(command), title, message)) {
         printf("Command is too long\n");
         return HOST_RETURN_ERROR;
     }

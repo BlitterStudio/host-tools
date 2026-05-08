@@ -143,11 +143,11 @@ static int UAE_UNUSED Minimize(void)
 {
     return calltrap(68);
 }
-static int UAE_UNUSED ExecuteNativeCode()
+static int UAE_UNUSED ExecuteNativeCode(void)
 {
     return calltrap(69);
 }
-static int UAE_UNUSED UnprotectMapRom()
+static int UAE_UNUSED UnprotectMapRom(void)
 {
     return calltrap(80);
 }
@@ -159,7 +159,7 @@ static int UAE_UNUSED EmuConfigModify(int mode, UBYTE *parms, ULONG size, ULONG 
 {
     return calltrap(82, mode, parms, size, out, outsize);
 }
-static int UAE_UNUSED IsMMKeyboard()
+static int UAE_UNUSED IsMMKeyboard(void)
 {
     return calltrap(83);
 }
@@ -167,7 +167,7 @@ static int UAE_UNUSED NativeDosOp(ULONG mode, ULONG lock, ULONG out, ULONG outsi
 {
     return calltrap(85, mode, lock, out, outsize);
 }
-static int UAE_UNUSED GetCpuRate()
+static int UAE_UNUSED GetCpuRate(void)
 {
     return calltrap(87);
 }

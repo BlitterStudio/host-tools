@@ -10,7 +10,7 @@
 
 static const char version[] = "$VER: Host-Edit v" VERSION_STR " (" DATE_STR ")";
 
-int print_usage()
+static int print_usage(void)
 {
     printf("Host-Edit v%s\n", VERSION_STR);
     printf("Host-Edit opens files in the host desktop editor.\n");

@@ -3,7 +3,7 @@
 
 TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info
 TESTS		= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out
-COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_clip_command.h src/host_edit_command.h src/host_notify_command.h src/host_reveal_command.h src/uae_pragmas.h
+COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_clip_command.h src/host_edit_command.h src/host_info_command.h src/host_notify_command.h src/host_reveal_command.h src/uae_pragmas.h
 PACKAGE		= Host-Tools-$(VERSION).lha
 
 .PHONY: all test debug package clean
@@ -21,7 +21,7 @@ ifeq ($(origin CC),default)
 CC			= m68k-amigaos-gcc
 endif
 INCLUDES	= -Isrc
-CFLAGS		= -mcpu=68020 -noixemul -Os -fomit-frame-pointer -std=c99 -Wall -Wextra
+CFLAGS		= -mcpu=68020 -noixemul -Os -fomit-frame-pointer -std=c99 -Wall -Wextra -Wstrict-prototypes
 VERFLAGS	= -DVERSION_STR="\"$(VERSION)\"" -DDATE_STR="\"$(DATE)\""
 HOST_CC		?= $(shell command -v x86_64-linux-gnu-gcc 2>/dev/null || command -v cc 2>/dev/null || printf cc)
 HOST_NATIVE_FLAGS = $(if $(findstring x86_64-linux-gnu-gcc,$(notdir $(HOST_CC))),-B/usr/bin/x86_64-linux-gnu- -fuse-ld=bfd,)
@@ -57,7 +57,7 @@ host-info: src/host-info.c $(COMMON_HEADERS)
 tests/test_host_common.out: tests/test_host_common.c src/host_common.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_common.c -o $@
 
-tests/test_host_command_builders.out: tests/test_host_command_builders.c src/host_clip_command.h src/host_common.h src/host_notify_command.h src/host_reveal_command.h
+tests/test_host_command_builders.out: tests/test_host_command_builders.c src/host_clip_command.h src/host_common.h src/host_info_command.h src/host_notify_command.h src/host_reveal_command.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_command_builders.c -o $@
 
 tests/test_host_edit_command.out: tests/test_host_edit_command.c src/host_edit_command.h src/host_common.h

@@ -9,8 +9,8 @@
 #include <proto/exec.h>
 #include <proto/dos.h>
 
+#include "host_capture.h"
 #include "host_common.h"
-#include "uae_pragmas.h"
 
 #define OUTBUFSIZE 4095
 
@@ -21,10 +21,15 @@ int main(int argc, char *argv[])
 {
     static char command[HOST_MAX_COMMAND_LEN];
     static char buffer[4096];
-    BPTR in, out;
-    long handle;
-    BOOL brk = FALSE;
+    BPTR in = 0;
+    BPTR out = 0;
+    long handle = 0;
+    BOOL esc_pending = FALSE;
+    BOOL raw_mode = FALSE;
     long actual;
+    ULONG status;
+    int status_supported = 0;
+    int return_code = 0;
 
     command[0] = '\0';
 
@@ -60,108 +65,146 @@ int main(int argc, char *argv[])
         }
     }
 
-    if ((DOSBase = (struct DosLibrary *)OpenLibrary((UBYTE *)"dos.library", 0)))
+    if ((DOSBase = (struct DosLibrary *)OpenLibrary((UBYTE *)"dos.library", 0)) == NULL) {
+        printf("dos.library not found!\n");
+        return HOST_RETURN_ERROR;
+    }
+
+    in = Input();
+    out = Output();
+    if (in == 0 || out == 0) {
+        printf("Failed to access console IO.\n");
+        return_code = HOST_RETURN_ERROR;
+        goto cleanup;
+    }
+
+    // Enable Raw Mode
+    if (!SetMode(in, 1)) {
+        printf("Failed to enable raw input mode.\n");
+        return_code = HOST_RETURN_ERROR;
+        goto cleanup;
+    }
+    raw_mode = TRUE;
+
+    handle = HostShell_Open((UBYTE *)command);
+    if (handle == 0) {
+        printf("Failed to open host shell session.\n");
+        return_code = HOST_RETURN_ERROR;
+        goto cleanup;
+    }
+
+    for (;;)
     {
-        in = Input();
-        out = Output();
+        // Check for output from host
+        actual = HostShell_Read(handle, (UBYTE *)buffer, sizeof(buffer) - 2);
+        if (actual > 0)
+        {
+            int outptr = 0;
+            for (int i = 0; i < actual; i++) {
+                unsigned char c = (unsigned char)buffer[i];
+                if (esc_pending) {
+                    if (c == 0x5B) { // '['
+                        outbuf[outptr++] = 0x9B; // CSI
+                    } else {
+                        outbuf[outptr++] = 0x1B; // Original ESC
+                        outbuf[outptr++] = c;
+                    }
+                    esc_pending = FALSE;
+                } else {
+                    if (c == 0x1B) {
+                        esc_pending = TRUE;
+                    } else {
+                        outbuf[outptr++] = c;
+                    }
+                }
 
-        // Enable Raw Mode
-        SetMode(in, 1);
-
-        handle = HostShell_Open((UBYTE *)command);
-        if (handle == 0) {
-            printf("Failed to open host shell session.\n");
-            SetMode(in, 0);
-            CloseLibrary((struct Library *)DOSBase);
-            return HOST_RETURN_ERROR;
+                // Safety check for outbuf overflow (should rarely happen given the math)
+                if (outptr >= OUTBUFSIZE) {
+                    Write(out, outbuf, outptr);
+                    outptr = 0;
+                }
+            }
+            if (outptr > 0) {
+                Write(out, outbuf, outptr);
+            }
+        }
+        else if (actual < 0) // Error or closed
+        {
+            status = HostShell_Status(handle);
+            if (status == HOST_SHELL_STATUS_INVALID) {
+                return_code = status_supported ? HOST_RETURN_ERROR : 0;
+            } else {
+                return_code = host_capture_status_rc(status);
+            }
+            break;
+        }
+        else {
+            status = HostShell_Status(handle);
+            if (status != HOST_SHELL_STATUS_INVALID) {
+                status_supported = 1;
+            }
+            if ((status & HOST_SHELL_STATUS_EXITED) != 0) {
+                return_code = host_capture_status_rc(status);
+                break;
+            }
+            if (status == HOST_SHELL_STATUS_INVALID && status_supported) {
+                return_code = HOST_RETURN_ERROR;
+                break;
+            }
         }
 
-        BOOL esc_pending = FALSE;
-
-        while (!brk)
+        // Check for input from Amiga user
+        // Wait up to 20ms (20000 microseconds)
+        if (WaitForChar(in, 20000))
         {
-            // Check for output from host
-            actual = HostShell_Read(handle, (UBYTE *)buffer, sizeof(buffer) - 2);
+            // Read less than buffer size to allow for expansion (max 2x)
+            actual = Read(in, buffer, 1024);
             if (actual > 0)
             {
                 int outptr = 0;
                 for (int i = 0; i < actual; i++) {
                     unsigned char c = (unsigned char)buffer[i];
-                    if (esc_pending) {
-                        if (c == 0x5B) { // '['
-                            outbuf[outptr++] = 0x9B; // CSI
-                        } else {
-                            outbuf[outptr++] = 0x1B; // Original ESC
-                            outbuf[outptr++] = c;
-                        }
-                        esc_pending = FALSE;
+                    if (c == 0x9B) { // Amiga CSI
+                        // Convert to ANSI ESC [
+                        outbuf[outptr++] = 0x1B;
+                        outbuf[outptr++] = 0x5B;
+                    } else if (c == 0x08) { // Backspace
+                        // Convert BS (0x08) to DEL (0x7F)
+                        outbuf[outptr++] = 0x7F;
                     } else {
-                        if (c == 0x1B) {
-                            esc_pending = TRUE;
-                        } else {
-                            outbuf[outptr++] = c;
-                        }
-                    }
-                    
-                    // Safety check for outbuf overflow (should rarely happen given the math)
-                    if (outptr >= OUTBUFSIZE) {
-                        Write(out, outbuf, outptr);
-                        outptr = 0;
+                        outbuf[outptr++] = c;
                     }
                 }
                 if (outptr > 0) {
-                    Write(out, outbuf, outptr);
+                    HostShell_Write(handle, (UBYTE *)outbuf, outptr);
                 }
             }
-            else if (actual < 0) // Error or closed
+            else if (actual == 0) // EOF
             {
-                break;
-            }
-
-            // Check for input from Amiga user
-            // Wait up to 20ms (20000 microseconds)
-            if (WaitForChar(in, 20000)) 
-            {
-                // Read less than buffer size to allow for expansion (max 2x)
-                actual = Read(in, buffer, 1024);
-                if (actual > 0)
-                {
-                    int outptr = 0;
-                    for (int i = 0; i < actual; i++) {
-                        unsigned char c = (unsigned char)buffer[i];
-                        if (c == 0x9B) { // Amiga CSI
-                            // Convert to ANSI ESC [
-                            outbuf[outptr++] = 0x1B;
-                            outbuf[outptr++] = 0x5B;
-                        } else if (c == 0x08) { // Backspace
-                            // Convert BS (0x08) to DEL (0x7F)
-                            outbuf[outptr++] = 0x7F;
-                        } else {
-                            outbuf[outptr++] = c;
-                        }
-                    }
-                    if (outptr > 0) {
-                        HostShell_Write(handle, (UBYTE *)outbuf, outptr);
-                    }
-                }
-                else if (actual == 0) // EOF
-                {
-                    // Maybe break? Or just ignore?
-                }
-            }
-
-            if (SetSignal(0, 0) & SIGBREAKF_CTRL_C)
-            {
-                SetSignal(0, SIGBREAKF_CTRL_C); // Clear the signal
-                // Send Ctrl-C (ETX) to host
-                char ctrlc = 0x03;
-                HostShell_Write(handle, (UBYTE *)&ctrlc, 1);
+                // Maybe break? Or just ignore?
             }
         }
 
-        HostShell_Close(handle);
-        SetMode(in, 0); // Restore Cooked Mode
-        CloseLibrary((struct Library *)DOSBase);
+        if (SetSignal(0, 0) & SIGBREAKF_CTRL_C)
+        {
+            SetSignal(0, SIGBREAKF_CTRL_C); // Clear the signal
+            // Send Ctrl-C (ETX) to host
+            char ctrlc = 0x03;
+            HostShell_Write(handle, (UBYTE *)&ctrlc, 1);
+        }
     }
-    return 0;
+
+cleanup:
+    if (esc_pending && out != 0) {
+        outbuf[0] = 0x1B;
+        Write(out, outbuf, 1);
+    }
+    if (handle != 0) {
+        HostShell_Close(handle);
+    }
+    if (raw_mode) {
+        SetMode(in, 0); // Restore Cooked Mode
+    }
+    CloseLibrary((struct Library *)DOSBase);
+    return return_code;
 }

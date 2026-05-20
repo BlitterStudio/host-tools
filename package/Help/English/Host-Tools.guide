@@ -1,0 +1,125 @@
+@database
+@$VER: Host-Tools.guide 2.3 (2026-05-20)
+@index Main
+@wordwrap
+
+@node Main "Host-Tools"
+Host-Tools provides command line utilities for classic AmigaOS 68k systems running under Amiberry.
+
+Installed components:
+
+@{"Command tools" link Commands}
+@{"Installation notes" link InstallNotes}
+
+@endnode
+
+@node Commands "Command Tools"
+The command tools are installed to C: when selected in the installer.
+
+@{"host-run" link HostRun} executes host commands.
+@{"host-multiview" link HostMultiView} opens files or URLs with the host default application.
+@{"host-shell" link HostShell} opens an interactive host shell.
+@{"host-path" link HostPath} prints translated host paths.
+@{"host-reveal" link HostReveal} reveals files in the host file manager.
+@{"host-notify" link HostNotify} sends host desktop notifications.
+@{"host-edit" link HostEdit} opens files in the host text editor.
+@{"host-clip" link HostClip} exchanges text with the host clipboard.
+@{"host-info" link HostInfo} prints host integration details.
+
+@endnode
+
+@node HostRun "host-run"
+host-run executes a command on the host operating system.
+
+Usage:
+
+host-run <command> [arguments...]
+
+Arguments that name existing Amiga paths are translated to host paths before the command is sent to the host.
+
+@endnode
+
+@node HostMultiView "host-multiview"
+host-multiview opens one or more files or URLs with the host operating system's default application.
+
+Usage:
+
+host-multiview <filename|URL> [filename2|URL2 ...]
+
+@endnode
+
+@node HostShell "host-shell"
+host-shell opens an interactive terminal session on the host operating system.
+
+Usage:
+
+host-shell [command]
+
+Without a command, the host user's default shell is opened.
+
+@endnode
+
+@node HostPath "host-path"
+host-path prints the host-side path for one or more existing Amiga paths.
+
+Usage:
+
+host-path <path> [path2 ...]
+
+@endnode
+
+@node HostReveal "host-reveal"
+host-reveal opens the host file manager at one or more translated paths.
+
+Usage:
+
+host-reveal <path> [path2 ...]
+
+@endnode
+
+@node HostNotify "host-notify"
+host-notify sends a notification through the host desktop environment.
+
+Usage:
+
+host-notify <message>
+host-notify <title> <message...>
+
+@endnode
+
+@node HostEdit "host-edit"
+host-edit opens files with the host desktop text editor.
+
+Usage:
+
+host-edit <path> [path2 ...]
+
+@endnode
+
+@node HostClip "host-clip"
+host-clip copies text to the host clipboard or prints the current host clipboard contents.
+
+Usage:
+
+host-clip [copy] <text...>
+host-clip paste
+
+@endnode
+
+@node HostInfo "host-info"
+host-info prints host integration details such as host OS, shell, opener, editor, and clipboard backend.
+
+Usage:
+
+host-info
+
+@endnode
+
+@node InstallNotes "Installation Notes"
+The installer copies selected files only. When a command tool already exists in C:, Installer shows the package and installed versions before replacing it.
+
+It does not edit startup files, system settings, or existing driver configuration.
+
+Native Code execution must be enabled in Amiberry for these tools to communicate with the host.
+
+@endnode

@@ -2,16 +2,32 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info
-TESTS		= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out
+TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out
+TEST_SCRIPTS	= tests/test_package_layout.sh
+TESTS		= $(TEST_BINS) $(TEST_SCRIPTS)
 COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_clip_command.h src/host_edit_command.h src/host_info_command.h src/host_notify_command.h src/host_reveal_command.h src/uae_pragmas.h
 PACKAGE		= Host-Tools-$(VERSION).lha
+PACKAGE_ROOT	= Host-Tools
+PACKAGE_DIR	?= build/package
+PACKAGE_STAGE	= $(PACKAGE_DIR)/$(PACKAGE_ROOT)
+AHI_AUDIO	= drivers/ahi/package/Devs/AHI/uae.audio
+AHI_MODE	= drivers/ahi/package/Devs/AudioModes/UAE
+HELP_GUIDE	= package/Help/English/Host-Tools.guide
+DRAWER_ICON	= package/icons/drawer.info
+HELP_ICON	= package/icons/Help.info
+INSTALL_ICON	= package/icons/Install.info
+README_ICON	= package/icons/readme.info
+GUIDE_ICON	= package/icons/guide.info
 
-.PHONY: all test debug package clean
+.PHONY: all test debug package package-dir clean
 
 all: $(TOOLS)
 test: $(TESTS)
 	@for test in $(TESTS); do \
-		./$$test || exit $$?; \
+		case "$$test" in \
+			*.sh) sh "$$test" ;; \
+			*) ./$$test ;; \
+		esac || exit $$?; \
 	done
 
 VERSION		= 2.3
@@ -66,9 +82,28 @@ tests/test_host_edit_command.out: tests/test_host_edit_command.c src/host_edit_c
 debug: CFLAGS += -DDEBUG -g
 debug: clean all
 
-package: all
+package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INSTALL_ICON) $(README_ICON) $(GUIDE_ICON)
+	rm -rf $(PACKAGE_STAGE) $(PACKAGE_DIR)/$(PACKAGE_ROOT).info
+	mkdir -p $(PACKAGE_STAGE)/C
+	mkdir -p $(PACKAGE_STAGE)/Help/English
+	cp $(TOOLS) $(PACKAGE_STAGE)/C/
+	cp package/Install $(PACKAGE_STAGE)/Install
+	cp $(INSTALL_ICON) $(PACKAGE_STAGE)/Install.info
+	cp README.md $(PACKAGE_STAGE)/README
+	cp $(README_ICON) $(PACKAGE_STAGE)/README.info
+	cp $(HELP_GUIDE) $(PACKAGE_STAGE)/Help/English/Host-Tools.guide
+	cp $(GUIDE_ICON) $(PACKAGE_STAGE)/Help/English/Host-Tools.guide.info
+	cp $(HELP_ICON) $(PACKAGE_STAGE)/Help.info
+	cp $(DRAWER_ICON) $(PACKAGE_DIR)/$(PACKAGE_ROOT).info
+	if [ -f $(AHI_AUDIO) ] && [ -f $(AHI_MODE) ]; then \
+		mkdir -p $(PACKAGE_STAGE)/Devs/AHI $(PACKAGE_STAGE)/Devs/AudioModes; \
+		cp $(AHI_AUDIO) $(PACKAGE_STAGE)/Devs/AHI/uae.audio; \
+		cp $(AHI_MODE) $(PACKAGE_STAGE)/Devs/AudioModes/UAE; \
+	fi
+
+package: package-dir
 	rm -f $(PACKAGE)
-	lha a $(PACKAGE) $(TOOLS) README.md
+	cd $(PACKAGE_DIR) && lha a $(CURDIR)/$(PACKAGE) $(PACKAGE_ROOT) $(PACKAGE_ROOT).info
 
 clean:
-	rm -f $(TOOLS) $(TESTS)
+	rm -f $(TOOLS) $(TEST_BINS)

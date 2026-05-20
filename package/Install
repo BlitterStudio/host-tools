@@ -1,0 +1,108 @@
+; Host-Tools Installer
+; Classic AmigaOS 68k package installer.
+
+(set @app-name "Host-Tools")
+(set @default-dest "")
+
+(welcome
+	"Host-Tools installs the command line tools used to integrate classic AmigaOS 68k systems with the Amiberry host environment."
+)
+
+(procedure P_InstallCommandTool #_toolname
+	(
+		(if
+			(exists (tackon "C:" #_toolname))
+			(copylib
+				(prompt (cat "Install " #_toolname))
+				(help "This tool already exists in C:. Installer will show the package and installed versions before replacing it.")
+				(source (cat "C/" #_toolname))
+				(dest "C:")
+				(confirm 1)
+			)
+			(copylib
+				(prompt (cat "Install " #_toolname))
+				(help "Installs this Host-Tools command into C:.")
+				(source (cat "C/" #_toolname))
+				(dest "C:")
+			)
+		)
+	)
+)
+
+(procedure P_InstallGuide
+	(
+		(if
+			(exists (tackon #help-dest "Host-Tools.guide"))
+			(copylib
+				(prompt "Install Host-Tools.guide")
+				(help "This AmigaGuide file already exists in HELP:. Installer will show the package and installed versions before replacing it.")
+				(source "Help/English/Host-Tools.guide")
+				(dest #help-dest)
+				(confirm 1)
+			)
+			(copylib
+				(prompt "Install Host-Tools.guide")
+				(help "Installs the Host-Tools AmigaGuide documentation into HELP:.")
+				(source "Help/English/Host-Tools.guide")
+				(dest #help-dest)
+			)
+		)
+		(copyfiles
+			(source "Help/English/Host-Tools.guide.info")
+			(dest #help-dest)
+			(prompt "AmigaGuide icon")
+			(confirm)
+			(help @copyfiles-help)
+		)
+	)
+)
+
+(set #install-commands
+	(askbool
+		(prompt "Install Host command tools to C:?")
+		(help "Installs host-run, host-shell, host-path, host-multiview, host-reveal, host-notify, host-edit, host-clip, and host-info into C:. Existing tools are checked by Installer before replacement, with the package and installed versions shown in the confirmation requester.")
+		(default 1)
+	)
+)
+
+(set #help-language
+	(getenv "Language")
+)
+
+(if (= #help-language "")
+	(set #help-language "English")
+)
+
+(set #help-dest
+	(tackon "HELP:" #help-language)
+)
+
+(set #install-guide
+	(askbool
+		(prompt "Install AmigaGuide documentation to HELP:<default language>?")
+		(help "Installs Host-Tools.guide into the system HELP: drawer for the current Language setting. English is used if no Language setting is available.")
+		(default 1)
+	)
+)
+
+(if #install-commands
+	(
+		(P_InstallCommandTool "host-run")
+		(P_InstallCommandTool "host-multiview")
+		(P_InstallCommandTool "host-shell")
+		(P_InstallCommandTool "host-path")
+		(P_InstallCommandTool "host-reveal")
+		(P_InstallCommandTool "host-notify")
+		(P_InstallCommandTool "host-edit")
+		(P_InstallCommandTool "host-clip")
+		(P_InstallCommandTool "host-info")
+	)
+)
+
+(if #install-guide
+	(P_InstallGuide)
+)
+
+(exit
+	"Host-Tools installation is complete. No startup files or system settings were changed."
+)

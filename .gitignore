@@ -13,6 +13,9 @@ Desktop.ini
 .idea/
 .vscode/
 
+# Local planning notes
+docs/superpowers/
+
 # Local build directories and metadata
 build/
 dist/

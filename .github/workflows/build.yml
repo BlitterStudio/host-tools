@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-name: Build Amiberry Host Tools
+name: Build Host-Tools
 
 on:
   push:

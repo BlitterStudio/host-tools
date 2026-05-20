@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# Amiberry Host Tools
+# Host-Tools
 
 A collection of AmigaOS tools designed to bridge the gap between the Amiberry emulator and the host operating system (Linux, macOS, etc.).
 
@@ -113,8 +113,12 @@ host-info
 ## Installation
 
 1.  Download the latest release from the [Releases Page](../../releases).
-2.  Extract the `.lha` archive.
-3.  Copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`) to `C:` or anywhere in your system path.
+2.  Extract the `Host-Tools-<version>.lha` archive.
+3.  Open the `Host-Tools` drawer and run `Install`.
+
+The installer copies the command tools to `C:` and can install the AmigaGuide documentation into the system `HELP:` drawer for the current default language. If a command tool already exists in `C:`, Installer shows the package and installed versions before replacing it. It does not edit startup files, system settings, or existing driver configuration.
+
+For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`) from the package `C` drawer to `C:` or anywhere in your system path.
 
 ## Examples
 
@@ -169,6 +173,10 @@ To build a release archive:
 make package
 ```
 
+The package target creates `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, and AmigaGuide documentation.
+
+Native package builds also require `lha`. The Docker build image contains this tool.
+
 To build with debug output enabled:
 ```shell
 make debug
@@ -177,4 +185,4 @@ make debug
 ## License
 Copyright (C) 2020-2026 Dimitris Panokostas.
 
-Amiberry Host Tools is licensed under the GNU General Public License version 3 or later. See [LICENSE](LICENSE) for details.
+Host-Tools is licensed under the GNU General Public License version 3 or later. See [LICENSE](LICENSE) for details.

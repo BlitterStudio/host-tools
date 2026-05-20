@@ -116,9 +116,9 @@ host-info
 2.  Extract the `Host-Tools-<version>.lha` archive.
 3.  Open the `Host-Tools` drawer and run `Install`.
 
-The installer copies the command tools to `C:` and can install the AmigaGuide documentation into the system `HELP:` drawer for the current default language. If a command tool already exists in `C:`, Installer shows the package and installed versions before replacing it. It does not edit startup files, system settings, or existing driver configuration.
+The installer copies the command tools to `C:`, can install the AmigaGuide documentation into the system `HELP:` drawer for the current default language, and can install the UAE AHI audio driver. If a command tool already exists in `C:`, or `uae.audio` already exists in `DEVS:AHI`, Installer shows the package and installed versions before replacing it. It does not edit startup files, system settings, AHI preferences, or existing driver configuration.
 
-For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`) from the package `C` drawer to `C:` or anywhere in your system path.
+For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`) from the package `C` drawer to `C:` or anywhere in your system path. To install the AHI driver manually, copy `Devs/AHI/uae.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAE` to `DEVS:AudioModes/`.
 
 ## Examples
 
@@ -173,7 +173,7 @@ To build a release archive:
 make package
 ```
 
-The package target creates `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, and AmigaGuide documentation.
+The package target creates `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, AmigaGuide documentation, and the UAE AHI driver files.
 
 Native package builds also require `lha`. The Docker build image contains this tool.
 

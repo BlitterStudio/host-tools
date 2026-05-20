@@ -57,6 +57,43 @@
 	)
 )
 
+(procedure P_InstallAHIDriver
+	(
+		(if
+			(exists (tackon "DEVS:AHI" "uae.audio"))
+			(copylib
+				(prompt "Install UAE AHI audio driver")
+				(help "The UAE AHI driver already exists in DEVS:AHI. Installer will show the package and installed versions before replacing it.")
+				(source "Devs/AHI/uae.audio")
+				(dest "DEVS:AHI")
+				(confirm 1)
+			)
+			(copylib
+				(prompt "Install UAE AHI audio driver")
+				(help "Installs the UAE AHI driver into DEVS:AHI.")
+				(source "Devs/AHI/uae.audio")
+				(dest "DEVS:AHI")
+			)
+		)
+		(if
+			(exists (tackon "DEVS:AudioModes" "UAE"))
+			(copyfiles
+				(prompt "Install UAE AudioMode")
+				(help "The UAE AudioMode file already exists in DEVS:AudioModes. Confirm before replacing it.")
+				(source "Devs/AudioModes/UAE")
+				(dest "DEVS:AudioModes")
+				(confirm)
+			)
+			(copyfiles
+				(prompt "Install UAE AudioMode")
+				(help "Installs the UAE AudioMode descriptor into DEVS:AudioModes.")
+				(source "Devs/AudioModes/UAE")
+				(dest "DEVS:AudioModes")
+			)
+		)
+	)
+)
+
 (set #install-commands
 	(askbool
 		(prompt "Install Host command tools to C:?")
@@ -85,6 +122,14 @@
 	)
 )
 
+(set #install-ahi
+	(askbool
+		(prompt "Install UAE AHI audio driver?")
+		(help "Installs uae.audio into DEVS:AHI and the UAE AudioMode descriptor into DEVS:AudioModes. This does not change AHI preferences or startup files.")
+		(default 1)
+	)
+)
+
 (if #install-commands
 	(
 		(P_InstallCommandTool "host-run")
@@ -101,6 +146,10 @@
 
 (if #install-guide
 	(P_InstallGuide)
+)
+
+(if #install-ahi
+	(P_InstallAHIDriver)
 )
 
 (exit

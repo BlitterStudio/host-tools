@@ -9,6 +9,7 @@ Host-Tools provides command line utilities for classic AmigaOS 68k systems runni
 Installed components:
 
 @{"Command tools" link Commands}
+@{"UAE AHI audio driver" link AHI}
 @{"Installation notes" link InstallNotes}
 
 @endnode
@@ -25,6 +26,23 @@ The command tools are installed to C: when selected in the installer.
 @{"host-edit" link HostEdit} opens files in the host text editor.
 @{"host-clip" link HostClip} exchanges text with the host clipboard.
 @{"host-info" link HostInfo} prints host integration details.
+
+@endnode
+
+@node AHI "UAE AHI Audio Driver"
+The UAE AHI audio driver is installed only when selected in the installer.
+
+Installed files:
+
+Devs/AHI/uae.audio
+Devs/AudioModes/UAE
+
+The driver exposes two UAE HiFi stereo AHI modes and sends mixed AHI audio to Amiberry through the classic UAE AHI v1 host interface.
+
+UAE: HiFi stereo++ uses stereo output with panning enabled.
+UAE: HiFi stereo uses stereo output with panning disabled.
+
+The installer does not change AHI preferences. Select the UAE mode in AHI preferences yourself if you want it to become the active output mode.
 
 @endnode
 
@@ -116,7 +134,7 @@ host-info
 @endnode
 
 @node InstallNotes "Installation Notes"
-The installer copies selected files only. When a command tool already exists in C:, Installer shows the package and installed versions before replacing it.
+The installer copies selected files only. When a command tool already exists in C:, or uae.audio already exists in DEVS:AHI, Installer shows the package and installed versions before replacing it.
 
 It does not edit startup files, system settings, or existing driver configuration.
 

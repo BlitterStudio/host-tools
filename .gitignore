@@ -18,6 +18,7 @@ docs/superpowers/
 
 # Local build directories and metadata
 build/
+drivers/ahi/package/
 dist/
 release/
 tmp/

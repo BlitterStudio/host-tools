@@ -3,7 +3,7 @@
 
 TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info
 TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out
-TEST_SCRIPTS	= tests/test_package_layout.sh
+TEST_SCRIPTS	= tests/test_package_layout.sh tests/test_ahi_driver_source.sh
 TESTS		= $(TEST_BINS) $(TEST_SCRIPTS)
 COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_clip_command.h src/host_edit_command.h src/host_info_command.h src/host_notify_command.h src/host_reveal_command.h src/uae_pragmas.h
 PACKAGE		= Host-Tools-$(VERSION).lha
@@ -12,6 +12,7 @@ PACKAGE_DIR	?= build/package
 PACKAGE_STAGE	= $(PACKAGE_DIR)/$(PACKAGE_ROOT)
 AHI_AUDIO	= drivers/ahi/package/Devs/AHI/uae.audio
 AHI_MODE	= drivers/ahi/package/Devs/AudioModes/UAE
+AHI_FILES	= $(AHI_AUDIO) $(AHI_MODE)
 HELP_GUIDE	= package/Help/English/Host-Tools.guide
 DRAWER_ICON	= package/icons/drawer.info
 HELP_ICON	= package/icons/Help.info
@@ -19,9 +20,9 @@ INSTALL_ICON	= package/icons/Install.info
 README_ICON	= package/icons/readme.info
 GUIDE_ICON	= package/icons/guide.info
 
-.PHONY: all test debug package package-dir clean
+.PHONY: all test debug package package-dir ahi clean
 
-all: $(TOOLS)
+all: $(TOOLS) $(AHI_FILES)
 test: $(TESTS)
 	@for test in $(TESTS); do \
 		case "$$test" in \
@@ -82,6 +83,11 @@ tests/test_host_edit_command.out: tests/test_host_edit_command.c src/host_edit_c
 debug: CFLAGS += -DDEBUG -g
 debug: clean all
 
+ahi: $(AHI_FILES)
+
+$(AHI_FILES):
+	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE)
+
 package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INSTALL_ICON) $(README_ICON) $(GUIDE_ICON)
 	rm -rf $(PACKAGE_STAGE) $(PACKAGE_DIR)/$(PACKAGE_ROOT).info
 	mkdir -p $(PACKAGE_STAGE)/C
@@ -107,3 +113,4 @@ package: package-dir
 
 clean:
 	rm -f $(TOOLS) $(TEST_BINS)
+	$(MAKE) -C drivers/ahi clean

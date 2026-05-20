@@ -51,6 +51,10 @@ grep -q '^@database' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
 grep -q 'host-run' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
 grep -q 'host-shell' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
 grep -q 'host-clip' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
+grep -q 'UAE: HiFi stereo++' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
+grep -q 'panning enabled' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
+grep -q 'UAE: HiFi stereo' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
+grep -q 'panning disabled' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
 
 for icon in "$PACKAGE_ROOT/Help/English/Host-Tools.guide.info"; do
 	magic="$(od -An -tx1 -N2 "$icon" | tr -d ' \n')"
@@ -115,10 +119,20 @@ if grep -E "User-Startup|ScreenMode|Prefs:" "$PACKAGE_ROOT/Install"; then
 	exit 1
 fi
 
-if [ -e "$PACKAGE_ROOT/Devs/AHI/uae.audio" ] || [ -e "$PACKAGE_ROOT/Devs/AudioModes/UAE" ]; then
-	echo "AHI files must not be staged before the source-built driver exists" >&2
+test -f "$PACKAGE_ROOT/Devs/AHI/uae.audio"
+test -f "$PACKAGE_ROOT/Devs/AudioModes/UAE"
+grep -a -q '\$VER: uae.audio' "$PACKAGE_ROOT/Devs/AHI/uae.audio"
+mode_magic="$(od -An -tx1 -N4 "$PACKAGE_ROOT/Devs/AudioModes/UAE" | tr -d ' \n')"
+if [ "$mode_magic" != "464f524d" ]; then
+	echo "$PACKAGE_ROOT/Devs/AudioModes/UAE is not an IFF FORM mode file" >&2
 	exit 1
 fi
+grep -q "Install UAE AHI audio driver" "$PACKAGE_ROOT/Install"
+grep -q "(procedure P_InstallAHIDriver" "$PACKAGE_ROOT/Install"
+grep -q "(source \"Devs/AHI/uae.audio\")" "$PACKAGE_ROOT/Install"
+grep -q "(dest \"DEVS:AHI\")" "$PACKAGE_ROOT/Install"
+grep -q "(source \"Devs/AudioModes/UAE\")" "$PACKAGE_ROOT/Install"
+grep -q "(dest \"DEVS:AudioModes\")" "$PACKAGE_ROOT/Install"
 
 package_dry_run="$(make -n package PACKAGE_DIR="${PACKAGE_DIR}-dryrun")"
 case "$package_dry_run" in

@@ -8,7 +8,7 @@
 #include "host_edit_command.h"
 #include "host_path.h"
 
-static const char version[] = "$VER: Host-Edit v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Edit " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {

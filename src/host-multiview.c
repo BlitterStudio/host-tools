@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include "host_path.h"
 
-static const char version[] = "$VER: Host-MultiView v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-MultiView " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {

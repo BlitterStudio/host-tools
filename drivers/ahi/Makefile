@@ -31,6 +31,7 @@ VASM_INCLUDE_FLAGS = -I$(V1_INCLUDE_DIR) -I/opt/m68k-amigaos/m68k-amigaos/includ
 VASM_HUNK_FLAGS = -m68020 -devpac -Fhunkexe $(VASM_INCLUDE_FLAGS)
 VASM_BIN_FLAGS = -m68020 -devpac -Fbin $(VASM_INCLUDE_FLAGS)
 
+.SUFFIXES:
 .PHONY: all clean
 
 all: $(DRIVER) $(MODE)

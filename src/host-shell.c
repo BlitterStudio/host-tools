@@ -14,7 +14,7 @@
 
 #define OUTBUFSIZE 4095
 
-static const char version[] = "$VER: Host-Shell v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Shell " VERSION_STR " (" DATE_STR ")";
 static char outbuf[OUTBUFSIZE + 1];
 
 int main(int argc, char *argv[])

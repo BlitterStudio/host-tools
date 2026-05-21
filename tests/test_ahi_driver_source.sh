@@ -37,6 +37,16 @@ if grep -q 'src/uae.audio.c\|src/uae-gates.S\|uae.audio.o\|uae-gates.o\|-nostart
 	exit 1
 fi
 
+if find drivers/ahi/src -path '*uaesnd*' | grep .; then
+	echo "UAESND belongs to the future AHI v2 work and must not be included in this package" >&2
+	exit 1
+fi
+
+if grep -R -i 'uaesnd' "$MAKEFILE" "$ROOT_MAKEFILE"; then
+	echo "UAESND must not be built or packaged in this pass" >&2
+	exit 1
+fi
+
 grep -F -q 'MINBUFFLEN EQU 2' "$DRIVER_SOURCE"
 grep -F -q 'VERSION   EQU 4' "$DRIVER_SOURCE"
 grep -F -q 'REVISION  EQU 2' "$DRIVER_SOURCE"

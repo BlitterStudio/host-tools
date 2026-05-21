@@ -7,7 +7,7 @@
 #include <string.h>
 #include "host_path.h"
 
-static const char version[] = "$VER: Host-Path v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Path " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {

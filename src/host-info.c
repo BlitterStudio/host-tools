@@ -8,7 +8,7 @@
 #include "host_capture.h"
 #include "host_info_command.h"
 
-static const char version[] = "$VER: Host-Info v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Info " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {

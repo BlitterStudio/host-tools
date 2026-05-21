@@ -5,100 +5,240 @@
 (set @default-dest "")
 
 (welcome
-	"Host-Tools installs the command line tools used to integrate classic AmigaOS 68k systems with the Amiberry host environment."
+	"Host-Tools installs command line tools and the optional UAE AHI audio driver for classic AmigaOS 68k systems running under Amiberry."
 )
 
-(procedure P_InstallCommandTool #_toolname
+(procedure P_SetVersionFields #_source #_destfile
 	(
+		(set #source-version (getversion #_source))
+		(set #dest-version (getversion #_destfile))
+		(set #source-major (/ #source-version 65536))
+		(set #source-revision (- #source-version (* #source-major 65536)))
+		(set #dest-major (/ #dest-version 65536))
+		(set #dest-revision (- #dest-version (* #dest-major 65536)))
+	)
+)
+
+(procedure P_CopyVersionedFile #_label #_source #_destdir #_filename
+	(
+		(set #destfile (tackon #_destdir #_filename))
 		(if
-			(exists (tackon "C:" #_toolname))
-			(copylib
-				(prompt (cat "Install " #_toolname))
-				(help "This tool already exists in C:. Installer will show the package and installed versions before replacing it.")
-				(source (cat "C/" #_toolname))
-				(dest "C:")
-				(confirm 1)
+			(exists #destfile)
+			(
+				(P_SetVersionFields #_source #destfile)
+				(set #dest-version-line
+					(if
+						(= #dest-version 0)
+						"Installed version: unavailable\n"
+						("Installed version: %ld.%ld\n" #dest-major #dest-revision)
+					)
+				)
+				(set #source-version-line
+					(if
+						(= #source-version 0)
+						"Package version: unavailable\n\n"
+						("Package version: %ld.%ld\n\n" #source-major #source-revision)
+					)
+				)
+				(set #replace-default
+					(if
+						(OR
+							(= #dest-version 0)
+							(> #source-version #dest-version)
+						)
+						0
+						1
+					)
+				)
+				(set #replace-choice
+					(if
+						(OR
+							(= #dest-version 0)
+							(> #source-version #dest-version)
+						)
+						"Replace"
+						"Replace anyway"
+					)
+				)
+				(set #replace-reason
+					(if
+						(= #dest-version 0)
+						"Installer could not read the installed file version, so Replace is selected by default."
+						(if
+							(> #source-version #dest-version)
+							"The package file is newer, so Replace is selected by default."
+							"The installed file is the same version or newer, so Skip is selected by default."
+						)
+					)
+				)
+				(if
+					(=
+						(askchoice
+							(prompt
+								#_label " already exists.\n\n"
+								"Installed file: " #destfile "\n"
+								#dest-version-line
+								"Package file: " #_source "\n"
+								#source-version-line
+								#replace-reason
+							)
+							(help "Installer reads both files with getversion before copying. Choose Replace to copy the package file, or Skip to leave the installed file unchanged.")
+							(choices #replace-choice "Skip")
+							(default #replace-default)
+						)
+						0
+					)
+					(
+						(if
+							(> #source-version #dest-version)
+							(copylib
+								(prompt (cat "Copy " #_label))
+								(help @copylib-help)
+								(source #_source)
+								(dest #_destdir)
+							)
+							(copyfiles
+								(prompt (cat "Copy " #_label))
+								(help "The installed file is not older than the package file. It will only be overwritten because you selected Replace anyway.")
+								(source #_source)
+								(dest #_destdir)
+								(files)
+							)
+						)
+					)
+				)
 			)
 			(copylib
-				(prompt (cat "Install " #_toolname))
-				(help "Installs this Host-Tools command into C:.")
-				(source (cat "C/" #_toolname))
-				(dest "C:")
+				(prompt (cat "Install " #_label))
+				(help @copylib-help)
+				(source #_source)
+				(dest #_destdir)
 			)
 		)
 	)
 )
 
-(procedure P_InstallGuide
+(procedure P_ReplaceFile #_label #_source #_destdir
+	(copyfiles
+		(prompt (cat "Install " #_label))
+		(help @copyfiles-help)
+		(source #_source)
+		(dest #_destdir)
+		(files)
+	)
+)
+
+(procedure P_CopyVersionedFileAutomatic #_label #_source #_destdir
+	(copylib
+		(prompt (cat "Install " #_label))
+		(help @copylib-help)
+		(source #_source)
+		(dest #_destdir)
+	)
+)
+
+(procedure P_CopyPlainFileAutomatic #_label #_source #_destdir
+	(copyfiles
+		(prompt (cat "Install " #_label))
+		(help @copyfiles-help)
+		(source #_source)
+		(dest #_destdir)
+		(files)
+	)
+)
+
+(procedure P_CopyPlainFile #_label #_source #_destdir #_filename
+	(
+		(set #destfile (tackon #_destdir #_filename))
+		(if
+			(exists #destfile)
+			(
+				(if
+					(=
+						(askchoice
+							(prompt
+								#_label " already exists. Replace it?\n\n"
+								"Installed file: " #destfile "\n"
+								"Package file: " #_source "\n\n"
+								"This file has no version string, so Installer can only check that it exists."
+							)
+							(help "Choose Replace to overwrite the existing file, or Skip to leave it unchanged.")
+							(choices "Replace" "Skip")
+							(default 1)
+						)
+						0
+					)
+					(copyfiles
+						(prompt (cat "Copy " #_label))
+						(help @copyfiles-help)
+						(source #_source)
+						(dest #_destdir)
+						(files)
+					)
+				)
+			)
+			(copyfiles
+				(prompt (cat "Install " #_label))
+				(help @copyfiles-help)
+				(source #_source)
+				(dest #_destdir)
+				(files)
+			)
+		)
+	)
+)
+
+(procedure P_CopySelectedVersionedFile #_label #_source #_destdir #_filename
 	(
 		(if
-			(exists (tackon #help-dest "Host-Tools.guide"))
-			(copylib
-				(prompt "Install Host-Tools.guide")
-				(help "This AmigaGuide file already exists in HELP:. Installer will show the package and installed versions before replacing it.")
-				(source "Help/English/Host-Tools.guide")
-				(dest #help-dest)
-				(confirm 1)
-			)
-			(copylib
-				(prompt "Install Host-Tools.guide")
-				(help "Installs the Host-Tools AmigaGuide documentation into HELP:.")
-				(source "Help/English/Host-Tools.guide")
-				(dest #help-dest)
+			(= @user-level 0)
+			(P_ReplaceFile #_label #_source #_destdir)
+			(if
+				(= @user-level 2)
+				(P_CopyVersionedFile #_label #_source #_destdir #_filename)
+				(if
+					(= @user-level 1)
+					(P_CopyVersionedFileAutomatic #_label #_source #_destdir)
+					(P_CopyVersionedFileAutomatic #_label #_source #_destdir)
+				)
 			)
 		)
-		(copyfiles
-			(source "Help/English/Host-Tools.guide.info")
-			(dest #help-dest)
-			(prompt "AmigaGuide icon")
-			(confirm)
-			(help @copyfiles-help)
+	)
+)
+
+(procedure P_CopySelectedPlainFile #_label #_source #_destdir #_filename
+	(
+		(if
+			(= @user-level 0)
+			(P_ReplaceFile #_label #_source #_destdir)
+			(if
+				(= @user-level 2)
+				(P_CopyPlainFile #_label #_source #_destdir #_filename)
+				(if
+					(= @user-level 1)
+					(P_CopyPlainFileAutomatic #_label #_source #_destdir)
+					(P_CopyPlainFileAutomatic #_label #_source #_destdir)
+				)
+			)
 		)
+	)
+)
+
+(procedure P_InstallCommandTool #_toolname
+	(P_CopySelectedVersionedFile (cat "Host command tool " #_toolname) (cat "C/" #_toolname) "C:" #_toolname)
+)
+
+(procedure P_InstallGuide
+	(
+		(P_CopySelectedPlainFile "Host-Tools.guide" "Help/Host-Tools.guide" #help-dest "Host-Tools.guide")
+		(P_CopySelectedPlainFile "Host-Tools.guide icon" "Help/Host-Tools.guide.info" #help-dest "Host-Tools.guide.info")
 	)
 )
 
 (procedure P_InstallAHIDriver
 	(
-		(if
-			(exists (tackon "DEVS:AHI" "uae.audio"))
-			(copylib
-				(prompt "Install UAE AHI audio driver")
-				(help "The UAE AHI driver already exists in DEVS:AHI. Installer will show the package and installed versions before replacing it.")
-				(source "Devs/AHI/uae.audio")
-				(dest "DEVS:AHI")
-				(confirm 1)
-			)
-			(copylib
-				(prompt "Install UAE AHI audio driver")
-				(help "Installs the UAE AHI driver into DEVS:AHI.")
-				(source "Devs/AHI/uae.audio")
-				(dest "DEVS:AHI")
-			)
-		)
-		(if
-			(exists (tackon "DEVS:AudioModes" "UAE"))
-			(copyfiles
-				(prompt "Install UAE AudioMode")
-				(help "The UAE AudioMode file already exists in DEVS:AudioModes. Confirm before replacing it.")
-				(source "Devs/AudioModes/UAE")
-				(dest "DEVS:AudioModes")
-				(confirm)
-			)
-			(copyfiles
-				(prompt "Install UAE AudioMode")
-				(help "Installs the UAE AudioMode descriptor into DEVS:AudioModes.")
-				(source "Devs/AudioModes/UAE")
-				(dest "DEVS:AudioModes")
-			)
-		)
-	)
-)
-
-(set #install-commands
-	(askbool
-		(prompt "Install Host command tools to C:?")
-		(help "Installs host-run, host-shell, host-path, host-multiview, host-reveal, host-notify, host-edit, host-clip, and host-info into C:. Existing tools are checked by Installer before replacement, with the package and installed versions shown in the confirmation requester.")
-		(default 1)
+		(P_CopySelectedVersionedFile "UAE AHI audio driver" "Devs/AHI/uae.audio" "DEVS:AHI" "uae.audio")
+		(P_CopySelectedPlainFile "UAE AudioMode" "Devs/AudioModes/UAE" "DEVS:AudioModes" "UAE")
 	)
 )
 
@@ -114,23 +254,31 @@
 	(tackon "HELP:" #help-language)
 )
 
-(set #install-guide
-	(askbool
-		(prompt "Install AmigaGuide documentation to HELP:<default language>?")
-		(help "Installs Host-Tools.guide into the system HELP: drawer for the current Language setting. English is used if no Language setting is available.")
-		(default 1)
+(if
+	(= @user-level 0)
+	(set #install-components 7)
+	(set #install-components
+		(askoptions
+			(prompt
+				"Select the Host-Tools components to install.\n\n"
+				"Command tools: host commands to C:.\n"
+				"Docs: Host-Tools.guide to HELP:.\n"
+				"UAE AHI: uae.audio and UAE AudioMode."
+			)
+			(help
+				"All components are selected by default. Novice installs every component and replaces existing files without further questions. Intermediate lets you select components, then copies versioned files automatically and replaces unversioned files. Expert shows installed and package versions before replacing existing versioned files, and asks before replacing unversioned files. No startup files, AHI preferences, or system preferences are changed."
+			)
+			(choices
+				"Command tools"
+				"AmigaGuide documentation"
+				"UAE AHI audio driver"
+			)
+			(default 7)
+		)
 	)
 )
 
-(set #install-ahi
-	(askbool
-		(prompt "Install UAE AHI audio driver?")
-		(help "Installs uae.audio into DEVS:AHI and the UAE AudioMode descriptor into DEVS:AudioModes. This does not change AHI preferences or startup files.")
-		(default 1)
-	)
-)
-
-(if #install-commands
+(if (BITAND #install-components 1)
 	(
 		(P_InstallCommandTool "host-run")
 		(P_InstallCommandTool "host-multiview")
@@ -144,14 +292,12 @@
 	)
 )
 
-(if #install-guide
+(if (BITAND #install-components 2)
 	(P_InstallGuide)
 )
 
-(if #install-ahi
+(if (BITAND #install-components 4)
 	(P_InstallAHIDriver)
 )
 
-(exit
-	"Host-Tools installation is complete. No startup files or system settings were changed."
-)
+(exit)

@@ -133,7 +133,7 @@ host-info
 @endnode
 
 @node InstallNotes "Installation Notes"
-The installer copies selected files only. When a command tool already exists in C:, or uae.audio already exists in DEVS:AHI, Installer shows the package and installed versions before replacing it.
+The installer copies selected files only. It shows a component checklist first. When a versioned file already exists, Installer shows the installed and package versions and asks whether to replace or skip it. Files without version strings are still checked for existence and ask before overwrite.
 
 It does not edit startup files, system settings, or existing driver configuration.
 

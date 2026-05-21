@@ -116,9 +116,9 @@ host-info
 2.  Extract the `Host-Tools-<version>.lha` archive.
 3.  Open the `Host-Tools` drawer and run `Install`.
 
-The installer copies the command tools to `C:`, can install the AmigaGuide documentation into the system `HELP:` drawer for the current default language, and can install the UAE AHI audio driver. If a command tool already exists in `C:`, or `uae.audio` already exists in `DEVS:AHI`, Installer shows the package and installed versions before replacing it. It does not edit startup files, system settings, AHI preferences, or existing driver configuration.
+The installer shows a component checklist for the command tools, AmigaGuide documentation, and UAE AHI audio driver. Before replacing an existing versioned file, it shows the installed and package versions and asks whether to replace or skip it. Files without version strings are still checked for existence and ask before overwrite. It does not edit startup files, system settings, AHI preferences, or existing driver configuration.
 
-For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`) from the package `C` drawer to `C:` or anywhere in your system path. To install the AHI driver manually, copy `Devs/AHI/uae.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAE` to `DEVS:AudioModes/`.
+For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`) from the package `C` drawer to `C:` or anywhere in your system path. To install the UAE AHI driver manually, copy `Devs/AHI/uae.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAE` to `DEVS:AudioModes/`.
 
 ## Examples
 

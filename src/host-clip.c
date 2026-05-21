@@ -8,7 +8,7 @@
 #include "host_capture.h"
 #include "host_clip_command.h"
 
-static const char version[] = "$VER: Host-Clip v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Clip " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {

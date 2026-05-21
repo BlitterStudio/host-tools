@@ -9,7 +9,7 @@
 #include "host_path.h"
 #include "host_reveal_command.h"
 
-static const char version[] = "$VER: Host-Reveal v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Reveal " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {

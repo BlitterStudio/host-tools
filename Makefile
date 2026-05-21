@@ -23,13 +23,14 @@ AHI_SOURCES	= drivers/ahi/Makefile \
 	drivers/ahi/src/v1/include/lvos/cardres_lib.i \
 	drivers/ahi/src/v1/include/lvos/ahi_sub_lib.i \
 	drivers/ahi/src/v1/include/macros.i
-HELP_GUIDE	= package/Help/English/Host-Tools.guide
+HELP_GUIDE	= package/Help/Host-Tools.guide
 DRAWER_ICON	= package/icons/drawer.info
 HELP_ICON	= package/icons/Help.info
 INSTALL_ICON	= package/icons/Install.info
 README_ICON	= package/icons/readme.info
 GUIDE_ICON	= package/icons/guide.info
 
+.SUFFIXES:
 .PHONY: all test debug package package-dir ahi clean
 
 all: $(TOOLS) $(AHI_FILES)
@@ -101,14 +102,14 @@ $(AHI_FILES): $(AHI_SOURCES)
 package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INSTALL_ICON) $(README_ICON) $(GUIDE_ICON)
 	rm -rf $(PACKAGE_STAGE) $(PACKAGE_DIR)/$(PACKAGE_ROOT).info
 	mkdir -p $(PACKAGE_STAGE)/C
-	mkdir -p $(PACKAGE_STAGE)/Help/English
+	mkdir -p $(PACKAGE_STAGE)/Help
 	cp $(TOOLS) $(PACKAGE_STAGE)/C/
 	cp package/Install $(PACKAGE_STAGE)/Install
 	cp $(INSTALL_ICON) $(PACKAGE_STAGE)/Install.info
 	cp README.md $(PACKAGE_STAGE)/README
 	cp $(README_ICON) $(PACKAGE_STAGE)/README.info
-	cp $(HELP_GUIDE) $(PACKAGE_STAGE)/Help/English/Host-Tools.guide
-	cp $(GUIDE_ICON) $(PACKAGE_STAGE)/Help/English/Host-Tools.guide.info
+	cp $(HELP_GUIDE) $(PACKAGE_STAGE)/Help/Host-Tools.guide
+	cp $(GUIDE_ICON) $(PACKAGE_STAGE)/Help/Host-Tools.guide.info
 	cp $(HELP_ICON) $(PACKAGE_STAGE)/Help.info
 	cp $(DRAWER_ICON) $(PACKAGE_DIR)/$(PACKAGE_ROOT).info
 	if [ -f $(AHI_AUDIO) ] && [ -f $(AHI_MODE) ]; then \

@@ -37,10 +37,9 @@ Installed files:
 Devs/AHI/uae.audio
 Devs/AudioModes/UAE
 
-The driver exposes two UAE HiFi stereo AHI modes and sends mixed AHI audio to Amiberry through the classic UAE AHI v1 host interface.
+The driver exposes the classic UAE 16 bit HIFI Stereo++ AHI mode and sends mixed AHI audio to Amiberry through the classic UAE AHI v1 host interface.
 
-UAE: HiFi stereo++ uses stereo output with panning enabled.
-UAE: HiFi stereo uses stereo output with panning disabled.
+UAE :16 bit HIFI Stereo++ uses 16 bit stereo output with panning enabled.
 
 The installer does not change AHI preferences. Select the UAE mode in AHI preferences yourself if you want it to become the active output mode.
 

@@ -4,30 +4,32 @@
 VERSION		?= 2.3
 DATE		?= 2026-04-30
 
-ifeq ($(origin CC),default)
-CC		= m68k-amigaos-gcc
+ifeq ($(origin VASMM68K),default)
+VASMM68K	= vasmm68k_mot
 endif
-ifeq ($(origin OBJCOPY),default)
-OBJCOPY		= m68k-amigaos-objcopy
-endif
-ifeq ($(origin STRIP),default)
-STRIP		= m68k-amigaos-strip
-endif
-STRIP_CMD	= $(if $(STRIP),$(STRIP),m68k-amigaos-strip)
-OBJCOPY_CMD	= $(if $(OBJCOPY),$(OBJCOPY),m68k-amigaos-objcopy)
+VASMM68K_CMD	= $(if $(VASMM68K),$(VASMM68K),vasmm68k_mot)
 
 BUILD_DIR	= build
 AHI_PACKAGE_DIR	= package
 DRIVER		= $(AHI_PACKAGE_DIR)/Devs/AHI/uae.audio
 MODE		= $(AHI_PACKAGE_DIR)/Devs/AudioModes/UAE
 
-SOURCES		= src/uae.audio.c src/uae-gates.S
-OBJECTS		= $(BUILD_DIR)/uae.audio.o $(BUILD_DIR)/uae-gates.o
+V1_SOURCE_DIR	= src/v1
+V1_DRIVER	= $(V1_SOURCE_DIR)/uae.audio.asm
+V1_MODE		= $(V1_SOURCE_DIR)/UAE.asm
+V1_INCLUDE_DIR	= $(V1_SOURCE_DIR)/include
+V1_INCLUDE_FILES = \
+	$(V1_INCLUDE_DIR)/hardware/all.i \
+	$(V1_INCLUDE_DIR)/lvos/exec_lib.i \
+	$(V1_INCLUDE_DIR)/lvos/utility_lib.i \
+	$(V1_INCLUDE_DIR)/lvos/dos_lib.i \
+	$(V1_INCLUDE_DIR)/lvos/cardres_lib.i \
+	$(V1_INCLUDE_DIR)/lvos/ahi_sub_lib.i \
+	$(V1_INCLUDE_DIR)/macros.i
 
-CFLAGS		= -mcpu=68020 -noixemul -Os -fomit-frame-pointer -std=c99 -Wall -Wextra -Wstrict-prototypes
-CPPFLAGS	= -DVERSION_STR="\"$(VERSION)\"" -DDATE_STR="\"$(DATE)\""
-ASFLAGS		= -mcpu=68020 -noixemul
-LDFLAGS		= -mcpu=68020 -noixemul -nostartfiles
+VASM_INCLUDE_FLAGS = -I$(V1_INCLUDE_DIR) -I/opt/m68k-amigaos/m68k-amigaos/include -I/opt/m68k-amigaos/m68k-amigaos/ndk-include
+VASM_HUNK_FLAGS = -m68020 -devpac -Fhunkexe $(VASM_INCLUDE_FLAGS)
+VASM_BIN_FLAGS = -m68020 -devpac -Fbin $(VASM_INCLUDE_FLAGS)
 
 .PHONY: all clean
 
@@ -39,24 +41,14 @@ $(BUILD_DIR):
 $(AHI_PACKAGE_DIR)/Devs/AHI $(AHI_PACKAGE_DIR)/Devs/AudioModes:
 	mkdir -p $@
 
-$(BUILD_DIR)/uae.audio.o: src/uae.audio.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/uae-gates.o: src/uae-gates.S | $(BUILD_DIR)
-	$(CC) $(ASFLAGS) $(CPPFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/uae.audio: $(OBJECTS)
-	$(CC) $(LDFLAGS) $^ -o $@
-	$(STRIP_CMD) $@
+$(BUILD_DIR)/uae.audio: $(V1_DRIVER) $(V1_INCLUDE_FILES) | $(BUILD_DIR)
+	$(VASMM68K_CMD) $(VASM_HUNK_FLAGS) -o $@ $<
 
 $(DRIVER): $(BUILD_DIR)/uae.audio | $(AHI_PACKAGE_DIR)/Devs/AHI
 	cp $< $@
 
-$(BUILD_DIR)/UAE.o: src/UAE.S | $(BUILD_DIR)
-	$(CC) $(ASFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/UAE: $(BUILD_DIR)/UAE.o
-	$(OBJCOPY_CMD) --output-target=binary $< $@
+$(BUILD_DIR)/UAE: $(V1_MODE) $(V1_INCLUDE_FILES) | $(BUILD_DIR)
+	$(VASMM68K_CMD) $(VASM_BIN_FLAGS) -o $@ $<
 
 $(MODE): $(BUILD_DIR)/UAE | $(AHI_PACKAGE_DIR)/Devs/AudioModes
 	cp $< $@

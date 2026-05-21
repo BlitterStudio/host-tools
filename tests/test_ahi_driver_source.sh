@@ -1,186 +1,71 @@
 #!/bin/sh
 set -eu
 
-DRIVER_SOURCE="drivers/ahi/src/uae.audio.c"
-GATES_SOURCE="drivers/ahi/src/uae-gates.S"
-MODE_SOURCE="drivers/ahi/src/UAE.S"
+MAKEFILE="drivers/ahi/Makefile"
+ROOT_MAKEFILE="Makefile"
+V1_SOURCE_DIR="drivers/ahi/src/v1"
+DRIVER_SOURCE="$V1_SOURCE_DIR/uae.audio.asm"
+MODE_SOURCE="$V1_SOURCE_DIR/UAE.asm"
+COMPAT_INCLUDE="$V1_SOURCE_DIR/include"
 
+test -f "$MAKEFILE"
+test -f "$ROOT_MAKEFILE"
+test -d "$V1_SOURCE_DIR"
 test -f "$DRIVER_SOURCE"
-test -f "$GATES_SOURCE"
 test -f "$MODE_SOURCE"
+test -f "$COMPAT_INCLUDE/hardware/all.i"
+test -f "$COMPAT_INCLUDE/lvos/ahi_sub_lib.i"
+test -f "$COMPAT_INCLUDE/macros.i"
 
-grep -q '#define UAE_MAX_AHI_CHANNELS[[:space:]]\+128' "$DRIVER_SOURCE"
-grep -q '#define UAE_BUFFER_BLOCKS[[:space:]]\+2' "$DRIVER_SOURCE"
-grep -q '96000' "$DRIVER_SOURCE"
-grep -q 'ahi_winuae' "$DRIVER_SOURCE"
-grep -q 'uae_find_trap' "$DRIVER_SOURCE"
-grep -q '_uae_find_trap' "$GATES_SOURCE"
-grep -q 'moveq[[:space:]]*#6,d0' "$GATES_SOURCE"
+grep -q 'VASMM68K' "$MAKEFILE"
+grep -q 'V1_SOURCE_DIR[[:space:]]*= src/v1' "$MAKEFILE"
+grep -q 'V1_DRIVER[[:space:]]*= $(V1_SOURCE_DIR)/uae.audio.asm' "$MAKEFILE"
+grep -q 'V1_MODE[[:space:]]*= $(V1_SOURCE_DIR)/UAE.asm' "$MAKEFILE"
+grep -q -- '-devpac' "$MAKEFILE"
+grep -q -- '-Fhunkexe' "$MAKEFILE"
+grep -q -- '-Fbin' "$MAKEFILE"
+grep -q 'AHI_SOURCES' "$ROOT_MAKEFILE"
+grep -q 'drivers/ahi/src/v1/UAE.asm' "$ROOT_MAKEFILE"
 
-if grep -q 'UAE_PRELOAD_BLOCKS' "$DRIVER_SOURCE"; then
-	echo "driver must not preload by advancing AHI player hooks before host pacing begins"
+if test -e "drivers/ahi/src/uae.audio.c" || test -e "drivers/ahi/src/uae-gates.S" || test -e "drivers/ahi/src/original"; then
+	echo "AHI v1 must contain only the original ASM source layout; C belongs in the future v2 phase" >&2
 	exit 1
 fi
 
-awk '
-	/while \(data->running\)/ {
-		in_playback_loop = 1
-	}
-	in_playback_loop && /uae_ahi_poll/ {
-		print "driver playback loop must wait for host write interrupts, not poll the emulator clock"
-		exit 1
-	}
-	in_playback_loop && /FreeSignal\(data->slavesignal\)/ {
-		in_playback_loop = 0
-	}
-' "$DRIVER_SOURCE"
-
-grep -q 'audioctrl->ahiac_BuffSamples[[:space:]]*=' "$DRIVER_SOURCE"
-grep -q 'audioctrl->ahiac_BuffSize[[:space:]]*=' "$DRIVER_SOURCE"
-grep -q 'ahi_call_pre_timer' "$DRIVER_SOURCE"
-grep -q 'ahi_call_post_timer' "$DRIVER_SOURCE"
-grep -q 'convert_hifi_to_host' "$DRIVER_SOURCE"
-grep -q 'dst\[0\][[:space:]]*=[[:space:]]*src\[0\]' "$DRIVER_SOURCE"
-grep -q 'dst\[1\][[:space:]]*=[[:space:]]*src\[2\]' "$DRIVER_SOURCE"
-grep -q 'AHIACF_HIFI' "$DRIVER_SOURCE"
-grep -q 'AHISF_KNOWHIFI' "$DRIVER_SOURCE"
-grep -q 'LONG2[[:space:]]\+AHIDB_HiFi,[[:space:]]*TRUE' "$MODE_SOURCE"
-grep -q 'UAE: HiFi stereo++' "$MODE_SOURCE"
-grep -q 'UAE: HiFi stereo' "$MODE_SOURCE"
-grep -q '0x001a0002' "$MODE_SOURCE"
-grep -q '_ahi_call_pre_timer' "$GATES_SOURCE"
-grep -q '_ahi_call_post_timer' "$GATES_SOURCE"
-grep -q 'uae_ahi_write(data->base->trap_addr, UAE_UNIT, buffer)' "$DRIVER_SOURCE"
-grep -q 'AddIntServer(INTB_EXTER, &data->playinterrupt)' "$DRIVER_SOURCE"
-grep -q 'RemIntServer(INTB_EXTER, &data->playinterrupt)' "$DRIVER_SOURCE"
-grep -q 'Cause(&data->softinterrupt)' "$DRIVER_SOURCE"
-grep -q 'ahi_interrupt_entry' "$DRIVER_SOURCE"
-grep -q 'ahi_softint_entry' "$DRIVER_SOURCE"
-grep -q '_ahi_interrupt_entry' "$GATES_SOURCE"
-grep -q '_ahi_softint_entry' "$GATES_SOURCE"
-grep -q 'volatile UWORD disable_count' "$DRIVER_SOURCE"
-grep -q 'data->disable_count++' "$DRIVER_SOURCE"
-grep -q 'data->disable_count--' "$DRIVER_SOURCE"
-grep -q 'data->disable_count != 0' "$DRIVER_SOURCE"
-grep -q 'data->softinterrupt.is_Node.ln_Type = NT_INTERRUPT' "$DRIVER_SOURCE"
-
-awk '
-	/_uae_ahi_open:/ {
-		in_func = 1
-		next
-	}
-	in_func && /movem\.l[[:space:]]+d2-d5,-\(sp\)/ {
-		saves = 1
-	}
-	in_func && /movem\.l[[:space:]]+\(sp\)\+,d2-d5/ {
-		restores = 1
-	}
-	in_func && /^[[:space:]]*rts/ {
-		exit !(saves && restores)
-	}
-	END {
-		if (!saves || !restores) {
-			exit 1
-		}
-	}
-' "$GATES_SOURCE"
-
-awk '
-	/_ahi_call_pre_timer:/ {
-		in_func = 1
-		next
-	}
-	in_func && /movem\.l[[:space:]]+d2-d7\/a2-a6,-\(sp\)/ {
-		saves = 1
-	}
-	in_func && /movem\.l[[:space:]]+\(sp\)\+,d2-d7\/a2-a6/ {
-		restores = 1
-	}
-	in_func && /^[[:space:]]*rts/ {
-		exit !(saves && restores)
-	}
-	END {
-		if (!saves || !restores) {
-			exit 1
-		}
-	}
-' "$GATES_SOURCE"
-
-awk '
-	/_ahi_call_post_timer:/ {
-		in_func = 1
-		next
-	}
-	in_func && /movem\.l[[:space:]]+d2-d7\/a2-a6,-\(sp\)/ {
-		saves = 1
-	}
-	in_func && /movem\.l[[:space:]]+\(sp\)\+,d2-d7\/a2-a6/ {
-		restores = 1
-	}
-	in_func && /^[[:space:]]*rts/ {
-		exit !(saves && restores)
-	}
-	END {
-		if (!saves || !restores) {
-			exit 1
-		}
-	}
-' "$GATES_SOURCE"
-
-if grep -q 'CreateNewProc\|SlaveEntry\|slavetask' "$DRIVER_SOURCE"; then
-	echo "driver playback must use INTB_EXTER plus software interrupt, not a polling task"
+if grep -q 'src/uae.audio.c\|src/uae-gates.S\|uae.audio.o\|uae-gates.o\|-nostartfiles\|src/original' "$MAKEFILE"; then
+	echo "AHI package must build the known-good original ASM driver, not the experimental C port" >&2
 	exit 1
 fi
 
-if grep -q 'UAE_OUTPUT_GAIN\|scale_host_sample\|amplify_host_buffer' "$DRIVER_SOURCE"; then
-	echo "driver must not apply fixed gain; keep sample scaling aligned with original uae.audio"
+grep -F -q 'MINBUFFLEN EQU 2' "$DRIVER_SOURCE"
+grep -F -q 'VERSION   EQU 4' "$DRIVER_SOURCE"
+grep -F -q 'REVISION  EQU 2' "$DRIVER_SOURCE"
+grep -F -q 'Dc.b  "uae 4.4"' "$DRIVER_SOURCE"
+grep -F -q 'Dc.b "ahi_winuae",0' "$DRIVER_SOURCE"
+grep -F -q 'move.l #$f0ffc0,calladdr' "$DRIVER_SOURCE"
+grep -F -q 'moveq #0,d0' "$DRIVER_SOURCE"
+grep -F -q 'moveq #2,d0' "$DRIVER_SOURCE"
+grep -F -q 'moveq #4,d0' "$DRIVER_SOURCE"
+grep -F -q 'AHISF_KNOWHIFI|AHISF_KNOWSTEREO|AHISF_CANRECORD|AHISF_MIXING|AHISF_TIMING' "$DRIVER_SOURCE"
+grep -F -q 'move.w (a1),(a0)+' "$DRIVER_SOURCE"
+grep -F -q 'move.w 4(a1),(a0)+' "$DRIVER_SOURCE"
+grep -F -q 'DBF d0,.loop' "$DRIVER_SOURCE"
+grep -F -q 'AHIDB_MaxChannels' "$DRIVER_SOURCE"
+
+for freq in 10000 11000 12000 13000 14000 17640 18900 19200 22050 27348 32000 33075 37800 44100 48000 63000 88200 96000; do
+	grep -q "$freq" "$DRIVER_SOURCE"
+done
+
+grep -q '_LVOAHIsub_Start EQU -54' "$COMPAT_INCLUDE/lvos/ahi_sub_lib.i"
+grep -q '_LVOAHIsub_Update EQU -60' "$COMPAT_INCLUDE/lvos/ahi_sub_lib.i"
+grep -q '_LVOAHIsub_Stop EQU -66' "$COMPAT_INCLUDE/lvos/ahi_sub_lib.i"
+grep -F -q 'CUSTOM EQU $dff000' "$COMPAT_INCLUDE/hardware/all.i"
+
+grep -q 'dc.l[[:space:]]\+AHIDB_HiFi,TRUE' "$MODE_SOURCE"
+grep -q 'dc.l[[:space:]]\+AHIDB_Bits,16' "$MODE_SOURCE"
+grep -F -q '$001a0000' "$MODE_SOURCE"
+grep -q 'UAE :16 bit HIFI Stereo++' "$MODE_SOURCE"
+if grep -q 'AHIDB_PingPong\|0x001a0002\|UAE: HiFi stereo' "$MODE_SOURCE"; then
+	echo "baseline UAE AudioMode should match the original single WinUAE mode" >&2
 	exit 1
 fi
-
-if grep -q 'Forbid()\|Permit()' "$DRIVER_SOURCE"; then
-	echo "driver disable/enable must use local interrupt gating, not global Forbid/Permit"
-	exit 1
-fi
-
-if grep -q 'AHIC_OutputVolume\|AHIC_MonitorVolume\|AHIDB_MinOutputVolume\|AHIDB_MaxOutputVolume' "$DRIVER_SOURCE"; then
-	echo "driver must not advertise unsupported hardware volume controls"
-	exit 1
-fi
-
-awk '
-	/case AHIDB_MaxChannels:/ {
-		in_case = 1
-		next
-	}
-	in_case && /return UAE_MAX_AHI_CHANNELS;/ {
-		found = 1
-		exit 0
-	}
-	in_case && /case AHIDB_/ {
-		exit 1
-	}
-	END {
-		if (!found) {
-			exit 1
-		}
-	}
-' "$DRIVER_SOURCE"
-
-awk '
-	/case AHIDB_MaxPlaySamples:/ {
-		in_case = 1
-		next
-	}
-	in_case && /ahiac_BuffSamples[[:space:]]*\*[[:space:]]*UAE_BUFFER_BLOCKS/ {
-		found = 1
-		exit 0
-	}
-	in_case && /case AHIDB_/ {
-		exit 1
-	}
-	END {
-		if (!found) {
-			exit 1
-		}
-	}
-' "$DRIVER_SOURCE"

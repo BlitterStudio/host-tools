@@ -51,10 +51,7 @@ grep -q '^@database' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
 grep -q 'host-run' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
 grep -q 'host-shell' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
 grep -q 'host-clip' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
-grep -q 'UAE: HiFi stereo++' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
-grep -q 'panning enabled' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
-grep -q 'UAE: HiFi stereo' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
-grep -q 'panning disabled' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
+grep -q 'UAE :16 bit HIFI Stereo++' "$PACKAGE_ROOT/Help/English/Host-Tools.guide"
 
 for icon in "$PACKAGE_ROOT/Help/English/Host-Tools.guide.info"; do
 	magic="$(od -An -tx1 -N2 "$icon" | tr -d ' \n')"
@@ -121,10 +118,17 @@ fi
 
 test -f "$PACKAGE_ROOT/Devs/AHI/uae.audio"
 test -f "$PACKAGE_ROOT/Devs/AudioModes/UAE"
-grep -a -q '\$VER: uae.audio' "$PACKAGE_ROOT/Devs/AHI/uae.audio"
+grep -a -q 'uae 4.4 (11.8.04)' "$PACKAGE_ROOT/Devs/AHI/uae.audio"
+grep -a -q 'ahi_winuae' "$PACKAGE_ROOT/Devs/AHI/uae.audio"
 mode_magic="$(od -An -tx1 -N4 "$PACKAGE_ROOT/Devs/AudioModes/UAE" | tr -d ' \n')"
 if [ "$mode_magic" != "464f524d" ]; then
 	echo "$PACKAGE_ROOT/Devs/AudioModes/UAE is not an IFF FORM mode file" >&2
+	exit 1
+fi
+expected_mode_hex="464f524d0000007a4148494d4155444e00000004756165004155444d0000006280000064001a00008000006e000000108000006700000001800000680000000180000069000000018000006a000000018000006c000000008000806d000000480000000000000000554145203a31362062697420484946492053746572656f2b2b00"
+actual_mode_hex="$(od -An -tx1 "$PACKAGE_ROOT/Devs/AudioModes/UAE" | tr -d ' \n')"
+if [ "$actual_mode_hex" != "$expected_mode_hex" ]; then
+	echo "$PACKAGE_ROOT/Devs/AudioModes/UAE does not match the original WinUAE AudioMode bytes" >&2
 	exit 1
 fi
 grep -q "Install UAE AHI audio driver" "$PACKAGE_ROOT/Install"

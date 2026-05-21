@@ -13,6 +13,16 @@ PACKAGE_STAGE	= $(PACKAGE_DIR)/$(PACKAGE_ROOT)
 AHI_AUDIO	= drivers/ahi/package/Devs/AHI/uae.audio
 AHI_MODE	= drivers/ahi/package/Devs/AudioModes/UAE
 AHI_FILES	= $(AHI_AUDIO) $(AHI_MODE)
+AHI_SOURCES	= drivers/ahi/Makefile \
+	drivers/ahi/src/v1/uae.audio.asm \
+	drivers/ahi/src/v1/UAE.asm \
+	drivers/ahi/src/v1/include/hardware/all.i \
+	drivers/ahi/src/v1/include/lvos/exec_lib.i \
+	drivers/ahi/src/v1/include/lvos/utility_lib.i \
+	drivers/ahi/src/v1/include/lvos/dos_lib.i \
+	drivers/ahi/src/v1/include/lvos/cardres_lib.i \
+	drivers/ahi/src/v1/include/lvos/ahi_sub_lib.i \
+	drivers/ahi/src/v1/include/macros.i
 HELP_GUIDE	= package/Help/English/Host-Tools.guide
 DRAWER_ICON	= package/icons/drawer.info
 HELP_ICON	= package/icons/Help.info
@@ -85,7 +95,7 @@ debug: clean all
 
 ahi: $(AHI_FILES)
 
-$(AHI_FILES):
+$(AHI_FILES): $(AHI_SOURCES)
 	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE)
 
 package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INSTALL_ICON) $(README_ICON) $(GUIDE_ICON)

@@ -14,12 +14,115 @@
 
 #define OUTBUFSIZE 4095
 
-static const char version[] = "$VER: Host-Shell v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Shell " VERSION_STR " (" DATE_STR ")";
 static char outbuf[OUTBUFSIZE + 1];
+
+/*
+ * Scan buf for the console window bounds report "CSI 1;1;<rows>;<cols> r".
+ * On a match, store the size and the report's [start, end) byte range.
+ */
+static int parse_window_report(const char *buf, int len, int *rows, int *cols,
+                               int *report_start, int *report_end)
+{
+    for (int i = 0; i < len; i++) {
+        long vals[4] = { 0, 0, 0, 0 };
+        int field = 0;
+        int j = i + 1;
+
+        if ((unsigned char)buf[i] != 0x9B) {
+            continue;
+        }
+
+        while (j < len && field < 4) {
+            char c = buf[j];
+            if (c >= '0' && c <= '9') {
+                vals[field] = vals[field] * 10 + (c - '0');
+                j++;
+            } else if (c == ';' && field < 3) {
+                field++;
+                j++;
+            } else {
+                break;
+            }
+        }
+
+        if (field == 3 && j + 1 < len && buf[j] == ' ' && buf[j + 1] == 'r' &&
+            vals[2] > 0 && vals[2] < 1000 && vals[3] > 0 && vals[3] < 1000) {
+            *rows = (int)vals[2];
+            *cols = (int)vals[3];
+            *report_start = i;
+            *report_end = j + 2;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Ask the console for its window size so the host pty can be set up to
+ * match. Bytes that are not part of the report are typed-ahead input and
+ * are returned in pending for forwarding to the host session.
+ */
+static int query_console_size(BPTR in, BPTR out, int *rows, int *cols,
+                              char *pending, int pending_size, int *pending_len)
+{
+    static char rbuf[128];
+    int rlen = 0;
+    int found = 0;
+    int report_start = 0;
+    int report_end = 0;
+
+    *pending_len = 0;
+    Write(out, (APTR)"\x9B" "0 q", 4);
+
+    for (int tries = 0; tries < 10 && rlen < (int)sizeof(rbuf); tries++) {
+        long got;
+
+        if (!WaitForChar(in, 50000)) {
+            break;
+        }
+        got = Read(in, rbuf + rlen, sizeof(rbuf) - rlen);
+        if (got <= 0) {
+            break;
+        }
+        rlen += got;
+        if (parse_window_report(rbuf, rlen, rows, cols, &report_start, &report_end)) {
+            found = 1;
+            break;
+        }
+    }
+
+    for (int i = 0; i < rlen && *pending_len < pending_size; i++) {
+        if (found && i >= report_start && i < report_end) {
+            continue;
+        }
+        pending[(*pending_len)++] = rbuf[i];
+    }
+
+    return found;
+}
+
+static int append_size_prefix(char *dest, size_t dest_size, int rows, int cols)
+{
+    char digits[16];
+
+    sprintf(digits, "%d", rows);
+    if (!host_append_literal(dest, dest_size, "stty rows ") ||
+        !host_append_literal(dest, dest_size, digits)) {
+        return 0;
+    }
+    sprintf(digits, "%d", cols);
+    return host_append_literal(dest, dest_size, " cols ") &&
+           host_append_literal(dest, dest_size, digits) &&
+           host_append_literal(dest, dest_size, " 2>/dev/null; ");
+}
 
 int main(int argc, char *argv[])
 {
     static char command[HOST_MAX_COMMAND_LEN];
+    static char session_command[HOST_MAX_COMMAND_LEN + 64];
+    static char pending[128];
     static char buffer[4096];
     BPTR in = 0;
     BPTR out = 0;
@@ -30,8 +133,12 @@ int main(int argc, char *argv[])
     ULONG status;
     int status_supported = 0;
     int return_code = 0;
+    int term_rows = 0;
+    int term_cols = 0;
+    int pending_len = 0;
 
     command[0] = '\0';
+    session_command[0] = '\0';
 
     if (!InitUAEResource())
     {
@@ -65,11 +172,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    if ((DOSBase = (struct DosLibrary *)OpenLibrary((UBYTE *)"dos.library", 0)) == NULL) {
-        printf("dos.library not found!\n");
-        return HOST_RETURN_ERROR;
-    }
-
     in = Input();
     out = Output();
     if (in == 0 || out == 0) {
@@ -86,11 +188,41 @@ int main(int argc, char *argv[])
     }
     raw_mode = TRUE;
 
-    handle = HostShell_Open((UBYTE *)command);
+    /*
+     * The host pty is created without a window size; pass the console
+     * size through stty so full-screen host programs render correctly.
+     */
+    if (query_console_size(in, out, &term_rows, &term_cols,
+                           pending, sizeof(pending), &pending_len) &&
+        append_size_prefix(session_command, sizeof(session_command), term_rows, term_cols)) {
+        if (command[0] != '\0') {
+            if (!host_append_literal(session_command, sizeof(session_command), command)) {
+                session_command[0] = '\0';
+            }
+        } else if (!host_append_literal(session_command, sizeof(session_command),
+                                        "exec \"${SHELL:-/bin/sh}\"")) {
+            session_command[0] = '\0';
+        }
+    } else {
+        session_command[0] = '\0';
+    }
+
+    if (session_command[0] == '\0' &&
+        !host_append_literal(session_command, sizeof(session_command), command)) {
+        printf("Command is too long\n");
+        return_code = HOST_RETURN_ERROR;
+        goto cleanup;
+    }
+
+    handle = HostShell_Open((UBYTE *)session_command);
     if (handle == 0) {
         printf("Failed to open host shell session.\n");
         return_code = HOST_RETURN_ERROR;
         goto cleanup;
+    }
+
+    if (pending_len > 0) {
+        HostShell_Write(handle, (UBYTE *)pending, pending_len);
     }
 
     for (;;)
@@ -205,6 +337,5 @@ cleanup:
     if (raw_mode) {
         SetMode(in, 0); // Restore Cooked Mode
     }
-    CloseLibrary((struct Library *)DOSBase);
     return return_code;
 }

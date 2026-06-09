@@ -1,0 +1,317 @@
+; Host-Tools Installer
+; Classic AmigaOS 68k package installer.
+
+(set @app-name "Host-Tools")
+(set @default-dest "")
+
+(welcome
+	"Host-Tools installs command line tools and the optional UAE and UAESND AHI audio drivers for classic AmigaOS 68k systems running under Amiberry."
+)
+
+(procedure P_SetVersionFields #_source #_destfile
+	(
+		(set #source-version (getversion #_source))
+		(set #dest-version (getversion #_destfile))
+		(set #source-major (/ #source-version 65536))
+		(set #source-revision (- #source-version (* #source-major 65536)))
+		(set #dest-major (/ #dest-version 65536))
+		(set #dest-revision (- #dest-version (* #dest-major 65536)))
+	)
+)
+
+(procedure P_CopyVersionedFile #_label #_source #_destdir #_filename
+	(
+		(set #destfile (tackon #_destdir #_filename))
+		(if
+			(exists #destfile)
+			(
+				(P_SetVersionFields #_source #destfile)
+				(set #dest-version-line
+					(if
+						(= #dest-version 0)
+						"Installed version: unavailable\n"
+						("Installed version: %ld.%ld\n" #dest-major #dest-revision)
+					)
+				)
+				(set #source-version-line
+					(if
+						(= #source-version 0)
+						"Package version: unavailable\n\n"
+						("Package version: %ld.%ld\n\n" #source-major #source-revision)
+					)
+				)
+				(set #replace-default
+					(if
+						(OR
+							(= #dest-version 0)
+							(> #source-version #dest-version)
+						)
+						0
+						1
+					)
+				)
+				(set #replace-choice
+					(if
+						(OR
+							(= #dest-version 0)
+							(> #source-version #dest-version)
+						)
+						"Replace"
+						"Replace anyway"
+					)
+				)
+				(set #replace-reason
+					(if
+						(= #dest-version 0)
+						"Installer could not read the installed file version, so Replace is selected by default."
+						(if
+							(> #source-version #dest-version)
+							"The package file is newer, so Replace is selected by default."
+							"The installed file is the same version or newer, so Skip is selected by default."
+						)
+					)
+				)
+				(if
+					(=
+						(askchoice
+							(prompt
+								#_label " already exists.\n\n"
+								"Installed file: " #destfile "\n"
+								#dest-version-line
+								"Package file: " #_source "\n"
+								#source-version-line
+								#replace-reason
+							)
+							(help "Installer reads both files with getversion before copying. Choose Replace to copy the package file, or Skip to leave the installed file unchanged.")
+							(choices #replace-choice "Skip")
+							(default #replace-default)
+						)
+						0
+					)
+					(
+						(if
+							(> #source-version #dest-version)
+							(copylib
+								(prompt (cat "Copy " #_label))
+								(help @copylib-help)
+								(source #_source)
+								(dest #_destdir)
+							)
+							(copyfiles
+								(prompt (cat "Copy " #_label))
+								(help "The installed file is not older than the package file. It will only be overwritten because you selected Replace anyway.")
+								(source #_source)
+								(dest #_destdir)
+								(files)
+							)
+						)
+					)
+				)
+			)
+			(copylib
+				(prompt (cat "Install " #_label))
+				(help @copylib-help)
+				(source #_source)
+				(dest #_destdir)
+			)
+		)
+	)
+)
+
+(procedure P_ReplaceFile #_label #_source #_destdir
+	(copyfiles
+		(prompt (cat "Install " #_label))
+		(help @copyfiles-help)
+		(source #_source)
+		(dest #_destdir)
+		(files)
+	)
+)
+
+(procedure P_CopyVersionedFileAutomatic #_label #_source #_destdir
+	(copylib
+		(prompt (cat "Install " #_label))
+		(help @copylib-help)
+		(source #_source)
+		(dest #_destdir)
+	)
+)
+
+(procedure P_CopyPlainFileAutomatic #_label #_source #_destdir
+	(copyfiles
+		(prompt (cat "Install " #_label))
+		(help @copyfiles-help)
+		(source #_source)
+		(dest #_destdir)
+		(files)
+	)
+)
+
+(procedure P_CopyPlainFile #_label #_source #_destdir #_filename
+	(
+		(set #destfile (tackon #_destdir #_filename))
+		(if
+			(exists #destfile)
+			(
+				(if
+					(=
+						(askchoice
+							(prompt
+								#_label " already exists. Replace it?\n\n"
+								"Installed file: " #destfile "\n"
+								"Package file: " #_source "\n\n"
+								"This file has no version string, so Installer can only check that it exists."
+							)
+							(help "Choose Replace to overwrite the existing file, or Skip to leave it unchanged.")
+							(choices "Replace" "Skip")
+							(default 1)
+						)
+						0
+					)
+					(copyfiles
+						(prompt (cat "Copy " #_label))
+						(help @copyfiles-help)
+						(source #_source)
+						(dest #_destdir)
+						(files)
+					)
+				)
+			)
+			(copyfiles
+				(prompt (cat "Install " #_label))
+				(help @copyfiles-help)
+				(source #_source)
+				(dest #_destdir)
+				(files)
+			)
+		)
+	)
+)
+
+(procedure P_CopySelectedVersionedFile #_label #_source #_destdir #_filename
+	(
+		(if
+			(= @user-level 0)
+			(P_ReplaceFile #_label #_source #_destdir)
+			(if
+				(= @user-level 2)
+				(P_CopyVersionedFile #_label #_source #_destdir #_filename)
+				(if
+					(= @user-level 1)
+					(P_CopyVersionedFileAutomatic #_label #_source #_destdir)
+					(P_CopyVersionedFileAutomatic #_label #_source #_destdir)
+				)
+			)
+		)
+	)
+)
+
+(procedure P_CopySelectedPlainFile #_label #_source #_destdir #_filename
+	(
+		(if
+			(= @user-level 0)
+			(P_ReplaceFile #_label #_source #_destdir)
+			(if
+				(= @user-level 2)
+				(P_CopyPlainFile #_label #_source #_destdir #_filename)
+				(if
+					(= @user-level 1)
+					(P_CopyPlainFileAutomatic #_label #_source #_destdir)
+					(P_CopyPlainFileAutomatic #_label #_source #_destdir)
+				)
+			)
+		)
+	)
+)
+
+(procedure P_InstallCommandTool #_toolname
+	(P_CopySelectedVersionedFile (cat "Host command tool " #_toolname) (cat "C/" #_toolname) "C:" #_toolname)
+)
+
+(procedure P_InstallGuide
+	(
+		(P_CopySelectedPlainFile "Host-Tools.guide" "Help/Host-Tools.guide" #help-dest "Host-Tools.guide")
+		(P_CopySelectedPlainFile "Host-Tools.guide icon" "Help/Host-Tools.guide.info" #help-dest "Host-Tools.guide.info")
+	)
+)
+
+(procedure P_InstallAHIDriver
+	(
+		(P_CopySelectedVersionedFile "UAE AHI audio driver" "Devs/AHI/uae.audio" "DEVS:AHI" "uae.audio")
+		(P_CopySelectedPlainFile "UAE AudioMode" "Devs/AudioModes/UAE" "DEVS:AudioModes" "UAE")
+	)
+)
+
+(procedure P_InstallUAESNDDriver
+	(
+		(P_CopySelectedVersionedFile "UAESND AHI audio driver" "Devs/AHI/uaesnd.audio" "DEVS:AHI" "uaesnd.audio")
+		(P_CopySelectedPlainFile "UAESND AudioMode" "Devs/AudioModes/UAESND" "DEVS:AudioModes" "UAESND")
+	)
+)
+
+(set #help-language
+	(getenv "Language")
+)
+
+(if (= #help-language "")
+	(set #help-language "English")
+)
+
+(set #help-dest
+	(tackon "HELP:" #help-language)
+)
+
+(if
+	(= @user-level 0)
+	(set #install-components 15)
+	(set #install-components
+		(askoptions
+			(prompt
+				"Select the Host-Tools components to install.\n\n"
+				"Command tools: host commands to C:.\n"
+				"Docs: Host-Tools.guide to HELP:.\n"
+				"UAE AHI: uae.audio and UAE AudioMode.\n"
+				"UAESND AHI: uaesnd.audio and UAESND AudioMode."
+			)
+			(help
+				"All components are selected by default. Novice installs every component and replaces existing files without further questions. Intermediate lets you select components, then copies versioned files automatically and replaces unversioned files. Expert shows installed and package versions before replacing existing versioned files, and asks before replacing unversioned files. No startup files, AHI preferences, or system preferences are changed."
+			)
+			(choices
+				"Command tools"
+				"AmigaGuide documentation"
+				"UAE AHI audio driver"
+				"UAESND AHI audio driver"
+			)
+			(default 15)
+		)
+	)
+)
+
+(if (BITAND #install-components 1)
+	(
+		(P_InstallCommandTool "host-run")
+		(P_InstallCommandTool "host-multiview")
+		(P_InstallCommandTool "host-shell")
+		(P_InstallCommandTool "host-path")
+		(P_InstallCommandTool "host-reveal")
+		(P_InstallCommandTool "host-notify")
+		(P_InstallCommandTool "host-edit")
+		(P_InstallCommandTool "host-clip")
+		(P_InstallCommandTool "host-info")
+		(P_InstallCommandTool "host-download")
+	)
+)
+
+(if (BITAND #install-components 2)
+	(P_InstallGuide)
+)
+
+(if (BITAND #install-components 4)
+	(P_InstallAHIDriver)
+)
+
+(if (BITAND #install-components 8)
+	(P_InstallUAESNDDriver)
+)
+
+(exit)

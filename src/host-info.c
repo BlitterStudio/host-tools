@@ -8,7 +8,7 @@
 #include "host_capture.h"
 #include "host_info_command.h"
 
-static const char version[] = "$VER: Host-Info v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Info " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {
@@ -34,7 +34,19 @@ int main(int argc, char *argv[])
     if (argc > 1)
     {
         printf("Unexpected argument\n");
-        return print_usage();
+        print_usage();
+        return HOST_RETURN_ERROR;
+    }
+
+    if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {
+        static char command[HOST_MAX_COMMAND_LEN];
+
+        command[0] = '\0';
+        if (!host_append_info_command_windows(command, sizeof(command))) {
+            printf("Command is too long\n");
+            return HOST_RETURN_ERROR;
+        }
+        return host_print_command_output(command);
     }
 
     return host_print_command_output(HOST_INFO_COMMAND);

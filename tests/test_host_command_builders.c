@@ -6,9 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "host_base64.h"
 #include "host_clip_command.h"
 #include "host_info_command.h"
 #include "host_notify_command.h"
+#include "host_powershell.h"
 #include "host_reveal_command.h"
 
 static void require(int condition, const char *message)
@@ -49,8 +51,25 @@ static void test_reveal_command(void)
             "reveal command should build");
 
     require_contains(command, "open -R '/tmp/a b'\\''s.txt'");
+    require_contains(command, "org.freedesktop.FileManager1.ShowItems");
+    require_contains(command, "file:///tmp/a%20b%27s.txt");
     require_contains(command, "xdg-open \"$(dirname -- '/tmp/a b'\\''s.txt')\"");
     require_contains(command, "else exit 127; fi");
+    require_shell_syntax(command);
+}
+
+static void test_reveal_command_without_uri(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_reveal_command(command, sizeof(command), "relative/path.txt"),
+            "reveal command should build without a file URI");
+
+    require_contains(command, "open -R relative/path.txt");
+    require_contains(command, "xdg-open \"$(dirname -- relative/path.txt)\"");
+    require(strstr(command, "ShowItems") == NULL,
+            "reveal command should skip the file manager branch without a URI");
     require_shell_syntax(command);
 }
 
@@ -63,9 +82,12 @@ static void test_notify_command(void)
                                        "Build's Done", "Hello $USER & goodbye"),
             "notify command should build");
 
-    require_contains(command, "notify-send 'Build'\\''s Done' 'Hello $USER & goodbye'");
+    require_contains(command, "t='Build'\\''s Done'");
+    require_contains(command, "m='Hello $USER & goodbye'");
+    require_contains(command, "iconv -f ISO-8859-1 -t UTF-8");
+    require_contains(command, "notify-send \"$t\" \"$m\"");
     require_contains(command, "osascript -e 'on run argv'");
-    require_contains(command, "'Build'\\''s Done' 'Hello $USER & goodbye'; else exit 127; fi");
+    require_contains(command, "'end run' \"$t\" \"$m\"; else exit 127; fi");
     require_shell_syntax(command);
 }
 
@@ -79,10 +101,24 @@ static void test_clip_copy_command(void)
             "clipboard copy command should build");
 
     require_contains(command, "printf %s 'copy $HOME and '\\''quotes'\\''' |");
+    require_contains(command, "iconv -f ISO-8859-1 -t UTF-8");
     require_contains(command, "pbcopy");
     require_contains(command, "wl-copy");
     require_contains(command, "xclip -selection clipboard");
     require_contains(command, "xsel --clipboard --input");
+    require_shell_syntax(command);
+}
+
+static void test_clip_copy_command_multiline(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_clip_copy_command(command, sizeof(command),
+                                          "line one\nline two\n"),
+            "multiline clipboard copy command should build");
+
+    require_contains(command, "printf %s 'line one\nline two\n'");
     require_shell_syntax(command);
 }
 
@@ -92,6 +128,7 @@ static void test_clip_paste_command(void)
     require_contains(HOST_CLIP_PASTE_COMMAND, "wl-paste -n");
     require_contains(HOST_CLIP_PASTE_COMMAND, "xclip -selection clipboard -o");
     require_contains(HOST_CLIP_PASTE_COMMAND, "xsel --clipboard --output");
+    require_contains(HOST_CLIP_PASTE_COMMAND, "iconv -c -f UTF-8 -t ISO-8859-1//TRANSLIT");
     require_shell_syntax(HOST_CLIP_PASTE_COMMAND);
 }
 
@@ -103,6 +140,79 @@ static void test_info_command(void)
     require_contains(HOST_INFO_COMMAND, "printf 'Opener: '");
     require_contains(HOST_INFO_COMMAND, "printf 'Clipboard: '");
     require_shell_syntax(HOST_INFO_COMMAND);
+}
+
+static void require_ps_script(const char *command, const char *script)
+{
+    static const char prefix[] = "powershell -NoProfile -EncodedCommand ";
+    struct host_base64_state st;
+    unsigned char decoded[2048];
+    long n;
+    size_t script_len = strlen(script);
+
+    require(strncmp(command, prefix, sizeof(prefix) - 1) == 0,
+            "encoded command should start with the powershell prefix");
+
+    host_base64_init(&st);
+    n = host_base64_feed(&st, command + sizeof(prefix) - 1,
+                         (long)strlen(command + sizeof(prefix) - 1), decoded);
+    require(n == (long)(script_len * 2), "decoded UTF-16 length should match script");
+    for (size_t i = 0; i < script_len; i++) {
+        require(decoded[i * 2] == (unsigned char)script[i] && decoded[i * 2 + 1] == 0,
+                "decoded UTF-16 bytes should spell the script");
+    }
+}
+
+static void test_ps_quoting(void)
+{
+    char dest[64];
+
+    dest[0] = '\0';
+    require(host_append_ps_quoted(dest, sizeof(dest), "it's"),
+            "powershell quoting should build");
+    require(strcmp(dest, "'it''s'") == 0,
+            "powershell quoting should double embedded quotes");
+
+    dest[0] = '\0';
+    require(!host_append_ps_quoted(dest, 4, "long text"),
+            "small powershell quote buffer should fail");
+}
+
+static void test_windows_clip_commands(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_clip_paste_command_windows(command, sizeof(command)),
+            "windows paste command should build");
+    require_ps_script(command, HOST_CLIP_PASTE_PS_SCRIPT);
+
+    command[0] = '\0';
+    require(host_append_clip_copy_command_windows(command, sizeof(command), "a'b\nc"),
+            "windows copy command should build");
+    require_ps_script(command, "Set-Clipboard -Value 'a''b\nc'");
+}
+
+static void test_windows_reveal_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_reveal_command_windows(command, sizeof(command),
+                                               "C:\\My Files\\disk.adf"),
+            "windows reveal command should build");
+    require(strcmp(command, "explorer /select,\"C:\\My Files\\disk.adf\" & exit 0") == 0,
+            "windows reveal command should select the file and mask explorer's exit code");
+}
+
+static void test_windows_info_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_info_command_windows(command, sizeof(command)),
+            "windows info command should build");
+    require_ps_script(command, HOST_INFO_PS_SCRIPT);
 }
 
 static void test_small_buffer_failures(void)
@@ -125,10 +235,16 @@ static void test_small_buffer_failures(void)
 int main(void)
 {
     test_reveal_command();
+    test_reveal_command_without_uri();
     test_notify_command();
     test_clip_copy_command();
+    test_clip_copy_command_multiline();
     test_clip_paste_command();
     test_info_command();
+    test_ps_quoting();
+    test_windows_clip_commands();
+    test_windows_reveal_command();
+    test_windows_info_command();
     test_small_buffer_failures();
     return 0;
 }

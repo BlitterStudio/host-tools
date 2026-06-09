@@ -6,6 +6,23 @@
 #ifndef HOST_INFO_COMMAND_H
 #define HOST_INFO_COMMAND_H
 
+#include <stddef.h>
+#include "host_powershell.h"
+
+#define HOST_INFO_PS_SCRIPT \
+    "[Console]::OutputEncoding=[System.Text.Encoding]::GetEncoding(28591);" \
+    "'OS: Windows ' + [System.Environment]::OSVersion.Version.ToString();" \
+    "'User: ' + [System.Environment]::UserName;" \
+    "'Shell: ' + $env:ComSpec;" \
+    "'Editor: notepad';" \
+    "'Opener: explorer';" \
+    "'Clipboard: Get-Clipboard/Set-Clipboard'"
+
+static inline int host_append_info_command_windows(char *command, size_t command_size)
+{
+    return host_append_ps_encoded_command(command, command_size, HOST_INFO_PS_SCRIPT);
+}
+
 #define HOST_INFO_COMMAND \
     "printf 'OS: '; uname -srm 2>/dev/null || printf 'unknown\\n'; " \
     "printf 'User: '; id -un 2>/dev/null || whoami 2>/dev/null || printf 'unknown\\n'; " \

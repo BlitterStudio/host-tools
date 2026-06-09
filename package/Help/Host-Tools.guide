@@ -1,0 +1,192 @@
+@database
+@$VER: Host-Tools.guide 2.4 (2026-06-10)
+@index Main
+@wordwrap
+
+@node Main "Host-Tools"
+Host-Tools provides command line utilities for classic AmigaOS 68k systems running under Amiberry.
+
+Installed components:
+
+@{"Command tools" link Commands}
+@{"UAE AHI audio driver" link AHI}
+@{"UAESND AHI audio driver" link UAESND}
+@{"Installation notes" link InstallNotes}
+
+@endnode
+
+@node Commands "Command Tools"
+The command tools are installed to C: when selected in the installer.
+
+@{"host-run" link HostRun} executes host commands.
+@{"host-multiview" link HostMultiView} opens files or URLs with the host default application.
+@{"host-shell" link HostShell} opens an interactive host shell.
+@{"host-path" link HostPath} prints translated host paths.
+@{"host-reveal" link HostReveal} reveals files in the host file manager.
+@{"host-notify" link HostNotify} sends host desktop notifications.
+@{"host-edit" link HostEdit} opens files in the host text editor.
+@{"host-clip" link HostClip} exchanges text with the host clipboard.
+@{"host-info" link HostInfo} prints host integration details.
+@{"host-download" link HostDownload} downloads files through the host.
+
+@endnode
+
+@node AHI "UAE AHI Audio Driver"
+The UAE AHI audio driver is installed only when selected in the installer.
+
+Installed files:
+
+Devs/AHI/uae.audio
+Devs/AudioModes/UAE
+
+The driver exposes the classic UAE 16 bit HIFI Stereo++ AHI mode and sends mixed AHI audio to Amiberry through the classic UAE AHI v1 host interface.
+
+UAE :16 bit HIFI Stereo++ uses 16 bit stereo output with panning enabled.
+
+The installer does not change AHI preferences. Select the UAE mode in AHI preferences yourself if you want it to become the active output mode.
+
+@endnode
+
+@node UAESND "UAESND AHI Audio Driver"
+The UAESND AHI audio driver is installed only when selected in the installer.
+
+Installed files:
+
+Devs/AHI/uaesnd.audio
+Devs/AudioModes/UAESND
+
+The driver plays AHI audio through the UAESND sound board emulated by Amiberry. Each AHI channel is played by a hardware audio stream, so no Amiga-side mixing takes place. Enable the UAESND sound board in the Amiberry configuration before using these modes.
+
+Available AHI modes:
+
+uaesnd: Stereo uses 16 bit stereo output.
+uaesnd: HiFi Stereo uses 32 bit stereo output.
+uaesnd: 7.1 uses 32 bit multichannel output.
+
+The installer does not change AHI preferences. Select a uaesnd mode in AHI preferences yourself if you want it to become the active output mode.
+
+@endnode
+
+@node HostRun "host-run"
+host-run executes a command on the host operating system.
+
+Usage:
+
+host-run <command> [arguments...]
+
+Arguments that name existing Amiga paths are translated to host paths before the command is sent to the host.
+
+@endnode
+
+@node HostMultiView "host-multiview"
+host-multiview opens one or more files or URLs with the host operating system's default application.
+
+Usage:
+
+host-multiview <filename|URL> [filename2|URL2 ...]
+
+@endnode
+
+@node HostShell "host-shell"
+host-shell opens an interactive terminal session on the host operating system.
+
+Usage:
+
+host-shell [command]
+
+Without a command, the host user's default shell is opened.
+
+The host terminal is sized to match the Amiga console window, so full-screen host programs render correctly. Resize the Amiga window and restart host-shell to apply a new size.
+
+host-shell requires a Linux or macOS host.
+
+@endnode
+
+@node HostPath "host-path"
+host-path prints the host-side path for one or more existing Amiga paths.
+
+Usage:
+
+host-path <path> [path2 ...]
+
+@endnode
+
+@node HostReveal "host-reveal"
+host-reveal shows one or more translated paths in the host file manager.
+
+Usage:
+
+host-reveal <path> [path2 ...]
+
+On macOS the file is selected in Finder, and on Windows in Explorer. On Linux the file is selected in the default file manager when it supports the FileManager1 desktop interface; otherwise the containing directory is opened.
+
+@endnode
+
+@node HostNotify "host-notify"
+host-notify sends a notification through the host desktop environment.
+
+Usage:
+
+host-notify <message>
+host-notify <title> <message...>
+
+host-notify requires a Linux or macOS host.
+
+@endnode
+
+@node HostEdit "host-edit"
+host-edit opens files with the host desktop text editor.
+
+Usage:
+
+host-edit <path> [path2 ...]
+
+@endnode
+
+@node HostClip "host-clip"
+host-clip copies text to the host clipboard or prints the current host clipboard contents.
+
+Usage:
+
+host-clip [copy] <text...>
+host-clip copy < file
+host-clip paste
+
+Without text arguments, host-clip copy reads standard input verbatim, preserving line breaks. Text is converted between the Amiga ISO-8859-1 character set and the host character set automatically: through iconv on Linux and macOS, and through PowerShell on Windows hosts.
+
+@endnode
+
+@node HostInfo "host-info"
+host-info prints host integration details such as host OS, shell, opener, editor, and clipboard backend.
+
+Usage:
+
+host-info
+
+@endnode
+
+@node HostDownload "host-download"
+host-download downloads a URL on the host and saves it to an Amiga path. The host's curl or wget performs the transfer, so HTTPS and modern servers work.
+
+Usage:
+
+host-download <URL> [<destination>] [FORCE]
+
+Without a destination, the file is saved in the current directory under its URL filename. A destination naming an existing directory keeps the URL filename. An existing destination file is only overwritten when FORCE is given.
+
+The file is written through AmigaDOS, so any writable volume works, including RAM: and hardfiles. Failed or aborted downloads do not leave a partial file behind. Press Ctrl-C to abort.
+
+host-download works on Linux, macOS, and Windows hosts. On Windows a current Amiberry build is required.
+
+@endnode
+
+@node InstallNotes "Installation Notes"
+The installer copies selected files only. It shows a component checklist first. When a versioned file already exists, Installer shows the installed and package versions and asks whether to replace or skip it. Files without version strings are still checked for existence and ask before overwrite.
+
+It does not edit startup files, system settings, or existing driver configuration.
+
+Native Code execution must be enabled in Amiberry for these tools to communicate with the host.
+
+All tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, and host-info are supported with a current Amiberry; the remaining tools require a Linux or macOS host.
+
+@endnode

@@ -8,7 +8,7 @@
 #include "host_capture.h"
 #include "host_notify_command.h"
 
-static const char version[] = "$VER: Host-Notify v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Notify " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {
@@ -38,7 +38,8 @@ int main(int argc, char *argv[])
     if (argc <= 1)
     {
         printf("Missing message argument\n");
-        return print_usage();
+        print_usage();
+        return HOST_RETURN_ERROR;
     }
 
     if (strcmp(argv[1], "?") == 0)
@@ -62,6 +63,11 @@ int main(int argc, char *argv[])
             printf("Message is too long\n");
             return HOST_RETURN_ERROR;
         }
+    }
+
+    if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {
+        printf("host-notify is not supported on Windows hosts yet\n");
+        return HOST_RETURN_ERROR;
     }
 
     if (!host_append_notify_command(command, sizeof(command), title, message)) {

@@ -196,6 +196,21 @@ static ULONG UAE_UNUSED HostShell_Status(ULONG handle)
 {
     return (ULONG)calltrap(94, handle);
 }
+static int UAE_UNUSED HostShell_OpenPipe(UBYTE *command)
+{
+    return calltrap(95, command);
+}
+
+#define HOST_PLATFORM_UNKNOWN 0
+#define HOST_PLATFORM_POSIX 1
+#define HOST_PLATFORM_MACOS 2
+#define HOST_PLATFORM_WINDOWS 3
+
+/* 0 from older builds means a POSIX host can be assumed */
+static int UAE_UNUSED GetHostPlatform(void)
+{
+    return calltrap(96);
+}
 
 static int UAE_UNUSED HostShell_View(UBYTE *filename)
 {

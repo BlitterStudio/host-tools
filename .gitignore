@@ -13,8 +13,13 @@ Desktop.ini
 .idea/
 .vscode/
 
+# Local planning notes
+docs/superpowers/
+
 # Local build directories and metadata
 build/
+drivers/ahi/package/
+drivers/ahi/package-v2/
 dist/
 release/
 tmp/
@@ -79,3 +84,4 @@ host-notify
 host-edit
 host-clip
 host-info
+host-download

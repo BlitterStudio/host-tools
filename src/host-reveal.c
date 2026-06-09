@@ -9,7 +9,7 @@
 #include "host_path.h"
 #include "host_reveal_command.h"
 
-static const char version[] = "$VER: Host-Reveal v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-Reveal " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {
@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
     static char filename[HOST_MAX_PATH_LEN];
     static char command[HOST_MAX_COMMAND_LEN];
     int status = 0;
+    int platform;
 
     if (!InitUAEResource())
     {
@@ -34,13 +35,16 @@ int main(int argc, char *argv[])
     if (argc <= 1)
     {
         printf("Missing path argument\n");
-        return print_usage();
+        print_usage();
+        return HOST_RETURN_ERROR;
     }
 
     if (strcmp(argv[1], "?") == 0)
     {
         return print_usage();
     }
+
+    platform = GetHostPlatform();
 
     for (int i = 1; i < argc; i++) {
         const char *target = argv[i];
@@ -67,7 +71,9 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        if (!host_append_reveal_command(command, sizeof(command), target)) {
+        if (platform == HOST_PLATFORM_WINDOWS
+                ? !host_append_reveal_command_windows(command, sizeof(command), target)
+                : !host_append_reveal_command(command, sizeof(command), target)) {
             printf("Command is too long\n");
             status = HOST_RETURN_ERROR;
             continue;

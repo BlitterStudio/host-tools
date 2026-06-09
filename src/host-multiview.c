@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include "host_path.h"
 
-static const char version[] = "$VER: Host-MultiView v" VERSION_STR " (" DATE_STR ")";
+static const char version[] = "$VER: Host-MultiView " VERSION_STR " (" DATE_STR ")";
 
 static int print_usage(void)
 {
@@ -32,7 +32,8 @@ int main(int argc, char *argv[])
     if (argc <= 1)
     {
         printf("Missing filename or URL argument\n");
-        return print_usage();
+        print_usage();
+        return HOST_RETURN_ERROR;
     }
 
     if (strcmp(argv[1], "?") == 0)

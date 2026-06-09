@@ -6,6 +6,8 @@
 #ifndef HOST_PATH_H
 #define HOST_PATH_H
 
+#include <dos/dosextens.h>
+
 #include "host_common.h"
 #include "uae_pragmas.h"
 
@@ -18,6 +20,8 @@
 
 static inline int host_resolve_existing_path(const char *arg, char *out, size_t out_size)
 {
+    struct Process *proc;
+    APTR old_window;
     BPTR lock;
 
     if (arg == NULL || out == NULL || out_size == 0) {
@@ -32,7 +36,12 @@ static inline int host_resolve_existing_path(const char *arg, char *out, size_t 
         return HOST_PATH_URI;
     }
 
+    /* suppress "please insert volume" requesters while probing arguments */
+    proc = (struct Process *)FindTask(NULL);
+    old_window = proc->pr_WindowPtr;
+    proc->pr_WindowPtr = (APTR)-1;
     lock = Lock((STRPTR)arg, ACCESS_READ);
+    proc->pr_WindowPtr = old_window;
     if (!lock) {
         return HOST_PATH_NOT_FOUND;
     }

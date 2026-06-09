@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Host-Tools
 
-A collection of AmigaOS tools designed to bridge the gap between the Amiberry emulator and the host operating system (Linux, macOS, etc.).
+A collection of AmigaOS tools designed to bridge the gap between the Amiberry emulator and the host operating system (Linux, macOS, and Windows; see Requirements for per-tool host support).
 
 These tools allow you to execute commands, open files, launch interactive shells, inspect host paths, and use common host desktop integrations directly from the Amiga environment.
 
@@ -66,7 +66,7 @@ host-reveal <path> [path2 ...]
 
 ### 6. host-notify
 **Send host desktop notifications.**
-`host-notify` uses `notify-send` on Linux or `osascript` on macOS when available.
+`host-notify` uses `notify-send` on Linux or `osascript` on macOS when available. It is not yet available on Windows hosts.
 
 **Usage:**
 ```shell
@@ -121,7 +121,7 @@ host-download <URL> [<destination>] [FORCE]
 
 -   **Amiberry v6.0+** (or a version with updated `uaelib` support).
 -   "Native Code" execution must be enabled in Amiberry settings.
--   A **Linux or macOS host** for `host-shell` and `host-notify`; their host commands run through the host's POSIX shell. `host-download`, `host-clip`, `host-reveal`, and `host-info` also support **Windows hosts** with a current Amiberry: PowerShell and Explorer handle the Windows side, and `curl.exe` ships with Windows 10 and later.
+-   All tools work on **Linux and macOS hosts**. On **Windows hosts**, `host-path`, `host-download`, `host-clip`, `host-reveal`, and `host-info` are supported with a current Amiberry (PowerShell and Explorer handle the Windows side; `curl.exe` ships with Windows 10 and later). The remaining tools (`host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify`) currently require a Linux or macOS host, since their host commands run through the POSIX shell.
 -   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, and `host-info`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Older builds still work, but use timeout-based completion detection.
 -   Linux desktop integration uses `xdg-utils` (`xdg-open`, `xdg-mime`) and GTK's `gtk-launch` when available. Notifications use `notify-send`; clipboard support uses `wl-clipboard`, `xclip`, or `xsel`; file selection in `host-reveal` uses `gdbus` when present. Character set conversion uses `iconv` when present.
 -   `host-download` uses the host's `curl` or `wget` (`curl.exe` on Windows). Live streaming progress requires an Amiberry build with pipe-based HostShell sessions; on older Linux and macOS builds the tool falls back to a two-phase transfer that downloads on the host first.

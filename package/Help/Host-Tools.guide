@@ -98,6 +98,8 @@ Without a command, the host user's default shell is opened.
 
 The host terminal is sized to match the Amiga console window, so full-screen host programs render correctly. Resize the Amiga window and restart host-shell to apply a new size.
 
+host-shell requires a Linux or macOS host.
+
 @endnode
 
 @node HostPath "host-path"
@@ -184,5 +186,7 @@ The installer copies selected files only. It shows a component checklist first. 
 It does not edit startup files, system settings, or existing driver configuration.
 
 Native Code execution must be enabled in Amiberry for these tools to communicate with the host.
+
+All tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, and host-info are supported with a current Amiberry; the remaining tools require a Linux or macOS host.
 
 @endnode

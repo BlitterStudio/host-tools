@@ -27,6 +27,7 @@ The command tools are installed to C: when selected in the installer.
 @{"host-edit" link HostEdit} opens files in the host text editor.
 @{"host-clip" link HostClip} exchanges text with the host clipboard.
 @{"host-info" link HostInfo} prints host integration details.
+@{"host-download" link HostDownload} downloads files through the host.
 
 @endnode
 
@@ -157,6 +158,19 @@ host-info prints host integration details such as host OS, shell, opener, editor
 Usage:
 
 host-info
+
+@endnode
+
+@node HostDownload "host-download"
+host-download downloads a URL on the host and saves it to an Amiga path. The host's curl or wget performs the transfer, so HTTPS and modern servers work.
+
+Usage:
+
+host-download <URL> [<destination>] [FORCE]
+
+Without a destination, the file is saved in the current directory under its URL filename. A destination naming an existing directory keeps the URL filename. An existing destination file is only overwritten when FORCE is given.
+
+The file is written through AmigaDOS, so any writable volume works, including RAM: and hardfiles. Failed or aborted downloads do not leave a partial file behind. Press Ctrl-C to abort.
 
 @endnode
 

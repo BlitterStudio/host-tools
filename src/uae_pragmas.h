@@ -196,6 +196,10 @@ static ULONG UAE_UNUSED HostShell_Status(ULONG handle)
 {
     return (ULONG)calltrap(94, handle);
 }
+static int UAE_UNUSED HostShell_OpenPipe(UBYTE *command)
+{
+    return calltrap(95, command);
+}
 
 static int UAE_UNUSED HostShell_View(UBYTE *filename)
 {

@@ -102,7 +102,7 @@ if [ "$(drawer_window_hex "$PACKAGE_ROOT/Help.info")" != "0050002801900096" ]; t
 	exit 1
 fi
 
-for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info; do
+for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download; do
 	test -f "$PACKAGE_ROOT/C/$tool"
 done
 grep -a -q '\$VER: Host-Run 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-run"
@@ -114,6 +114,7 @@ grep -a -q '\$VER: Host-Notify 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-notify"
 grep -a -q '\$VER: Host-Edit 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-edit"
 grep -a -q '\$VER: Host-Clip 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-clip"
 grep -a -q '\$VER: Host-Info 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-info"
+grep -a -q '\$VER: Host-Download 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-download"
 if grep -a '\$VER: Host-[A-Za-z]* v[0-9]' "$PACKAGE_ROOT/C/"*; then
 	echo "Host command \$VER strings must be parseable by Installer getversion, without a v prefix before the version number" >&2
 	exit 1
@@ -216,7 +217,7 @@ if ! grep -q "^(exit)" "$PACKAGE_ROOT/Install"; then
 	exit 1
 fi
 
-for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info; do
+for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download; do
 	grep -q "(P_InstallCommandTool \"$tool\")" "$PACKAGE_ROOT/Install"
 done
 

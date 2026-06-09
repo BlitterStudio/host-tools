@@ -103,6 +103,18 @@ host-clip paste
 host-info
 ```
 
+### 10. host-download
+**Download files through the host.**
+`host-download` fetches a URL with the host's `curl` (or `wget`) and saves it to any Amiga path — `RAM:`, hardfiles, and directory mounts all work, because the file is written by the tool through AmigaDOS. The host handles HTTPS/TLS, giving classic AmigaOS access to modern servers.
+-   **Live Progress**: With a current Amiberry, the file streams to the Amiga as it downloads, with a percentage display when the server reports a size.
+-   **Safe**: Failed or aborted downloads (Ctrl-C) never leave a partial file behind, and an existing destination is only overwritten with `FORCE`.
+-   **Flexible Destination**: With no destination the file is saved in the current directory under its URL name; a directory destination keeps the URL name.
+
+**Usage:**
+```shell
+host-download <URL> [<destination>] [FORCE]
+```
+
 ---
 
 ## Requirements
@@ -112,6 +124,7 @@ host-info
 -   A **Linux or macOS host**. The host-side integration runs through the host's POSIX shell; the corresponding Amiberry traps are not yet implemented on Windows hosts.
 -   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, and `host-info`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Older builds still work, but use timeout-based completion detection.
 -   Linux desktop integration uses `xdg-utils` (`xdg-open`, `xdg-mime`) and GTK's `gtk-launch` when available. Notifications use `notify-send`; clipboard support uses `wl-clipboard`, `xclip`, or `xsel`; file selection in `host-reveal` uses `gdbus` when present. Character set conversion uses `iconv` when present.
+-   `host-download` uses the host's `curl` or `wget`. Live streaming progress requires an Amiberry build with pipe-based HostShell sessions; on older builds the tool falls back to a two-phase transfer that downloads on the host first.
 
 ## Exit Codes
 
@@ -147,6 +160,12 @@ host-run vlc "Work:Videos/My Holiday.mp4"
 Or simply:
 ```shell
 host-multiview "Work:Videos/My Holiday.mp4"
+```
+
+### Downloading Files
+Download an archive from Aminet straight to the RAM disk, with the host handling HTTPS:
+```shell
+host-download https://aminet.net/dev/misc/example.lha RAM:
 ```
 
 ### DefIcons Integration

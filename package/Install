@@ -5,7 +5,7 @@
 (set @default-dest "")
 
 (welcome
-	"Host-Tools installs command line tools and the optional UAE AHI audio driver for classic AmigaOS 68k systems running under Amiberry."
+	"Host-Tools installs command line tools and the optional UAE and UAESND AHI audio drivers for classic AmigaOS 68k systems running under Amiberry."
 )
 
 (procedure P_SetVersionFields #_source #_destfile
@@ -242,6 +242,13 @@
 	)
 )
 
+(procedure P_InstallUAESNDDriver
+	(
+		(P_CopySelectedVersionedFile "UAESND AHI audio driver" "Devs/AHI/uaesnd.audio" "DEVS:AHI" "uaesnd.audio")
+		(P_CopySelectedPlainFile "UAESND AudioMode" "Devs/AudioModes/UAESND" "DEVS:AudioModes" "UAESND")
+	)
+)
+
 (set #help-language
 	(getenv "Language")
 )
@@ -256,14 +263,15 @@
 
 (if
 	(= @user-level 0)
-	(set #install-components 7)
+	(set #install-components 15)
 	(set #install-components
 		(askoptions
 			(prompt
 				"Select the Host-Tools components to install.\n\n"
 				"Command tools: host commands to C:.\n"
 				"Docs: Host-Tools.guide to HELP:.\n"
-				"UAE AHI: uae.audio and UAE AudioMode."
+				"UAE AHI: uae.audio and UAE AudioMode.\n"
+				"UAESND AHI: uaesnd.audio and UAESND AudioMode."
 			)
 			(help
 				"All components are selected by default. Novice installs every component and replaces existing files without further questions. Intermediate lets you select components, then copies versioned files automatically and replaces unversioned files. Expert shows installed and package versions before replacing existing versioned files, and asks before replacing unversioned files. No startup files, AHI preferences, or system preferences are changed."
@@ -272,8 +280,9 @@
 				"Command tools"
 				"AmigaGuide documentation"
 				"UAE AHI audio driver"
+				"UAESND AHI audio driver"
 			)
-			(default 7)
+			(default 15)
 		)
 	)
 )
@@ -298,6 +307,10 @@
 
 (if (BITAND #install-components 4)
 	(P_InstallAHIDriver)
+)
+
+(if (BITAND #install-components 8)
+	(P_InstallUAESNDDriver)
 )
 
 (exit)

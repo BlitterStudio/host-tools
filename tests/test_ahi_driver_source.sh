@@ -52,10 +52,10 @@ if find drivers/ahi/src -iname '*uaesnd*' ! -path "$V2_SOURCE_DIR/*" | grep .; t
 	exit 1
 fi
 
-if grep -R -i 'uaesnd' "$ROOT_MAKEFILE" package; then
-	echo "UAESND must not be part of the default Host-Tools package yet" >&2
-	exit 1
-fi
+grep -q 'AHI_V2_SOURCES' "$ROOT_MAKEFILE"
+grep -q 'drivers/ahi/src/v2/UAESND.asm' "$ROOT_MAKEFILE"
+grep -q 'drivers/ahi/package-v2/Devs/AHI/uaesnd.audio' "$ROOT_MAKEFILE"
+grep -q 'drivers/ahi/package-v2/Devs/AudioModes/UAESND' "$ROOT_MAKEFILE"
 
 grep -F -q 'MINBUFFLEN EQU 2' "$DRIVER_SOURCE"
 grep -F -q 'VERSION   EQU 4' "$DRIVER_SOURCE"

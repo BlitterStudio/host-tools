@@ -13,6 +13,9 @@ PACKAGE_STAGE	= $(PACKAGE_DIR)/$(PACKAGE_ROOT)
 AHI_AUDIO	= drivers/ahi/package/Devs/AHI/uae.audio
 AHI_MODE	= drivers/ahi/package/Devs/AudioModes/UAE
 AHI_FILES	= $(AHI_AUDIO) $(AHI_MODE)
+AHI_V2_AUDIO	= drivers/ahi/package-v2/Devs/AHI/uaesnd.audio
+AHI_V2_MODE	= drivers/ahi/package-v2/Devs/AudioModes/UAESND
+AHI_V2_FILES	= $(AHI_V2_AUDIO) $(AHI_V2_MODE)
 AHI_SOURCES	= drivers/ahi/Makefile \
 	drivers/ahi/src/v1/uae.audio.asm \
 	drivers/ahi/src/v1/UAE.asm \
@@ -23,6 +26,9 @@ AHI_SOURCES	= drivers/ahi/Makefile \
 	drivers/ahi/src/v1/include/lvos/cardres_lib.i \
 	drivers/ahi/src/v1/include/lvos/ahi_sub_lib.i \
 	drivers/ahi/src/v1/include/macros.i
+AHI_V2_SOURCES	= drivers/ahi/Makefile \
+	drivers/ahi/src/v2/uaesnd.audio.asm \
+	drivers/ahi/src/v2/UAESND.asm
 HELP_GUIDE	= package/Help/Host-Tools.guide
 DRAWER_ICON	= package/icons/drawer.info
 HELP_ICON	= package/icons/Help.info
@@ -33,7 +39,7 @@ GUIDE_ICON	= package/icons/guide.info
 .SUFFIXES:
 .PHONY: all test debug package package-dir ahi ahi-v2 clean
 
-all: $(TOOLS) $(AHI_FILES)
+all: $(TOOLS) $(AHI_FILES) $(AHI_V2_FILES)
 test: $(TESTS)
 	@for test in $(TESTS); do \
 		case "$$test" in \
@@ -96,11 +102,13 @@ debug: clean all
 
 ahi: $(AHI_FILES)
 
-ahi-v2:
-	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE) ahi-v2
+ahi-v2: $(AHI_V2_FILES)
 
 $(AHI_FILES): $(AHI_SOURCES)
 	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE)
+
+$(AHI_V2_FILES): $(AHI_V2_SOURCES)
+	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE) ahi-v2
 
 package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INSTALL_ICON) $(README_ICON) $(GUIDE_ICON)
 	rm -rf $(PACKAGE_STAGE) $(PACKAGE_DIR)/$(PACKAGE_ROOT).info
@@ -119,6 +127,11 @@ package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INS
 		mkdir -p $(PACKAGE_STAGE)/Devs/AHI $(PACKAGE_STAGE)/Devs/AudioModes; \
 		cp $(AHI_AUDIO) $(PACKAGE_STAGE)/Devs/AHI/uae.audio; \
 		cp $(AHI_MODE) $(PACKAGE_STAGE)/Devs/AudioModes/UAE; \
+	fi
+	if [ -f $(AHI_V2_AUDIO) ] && [ -f $(AHI_V2_MODE) ]; then \
+		mkdir -p $(PACKAGE_STAGE)/Devs/AHI $(PACKAGE_STAGE)/Devs/AudioModes; \
+		cp $(AHI_V2_AUDIO) $(PACKAGE_STAGE)/Devs/AHI/uaesnd.audio; \
+		cp $(AHI_V2_MODE) $(PACKAGE_STAGE)/Devs/AudioModes/UAESND; \
 	fi
 
 package: package-dir

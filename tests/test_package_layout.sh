@@ -136,10 +136,9 @@ grep -q 'host-run' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-shell' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-clip' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'UAE :16 bit HIFI Stereo++' "$PACKAGE_ROOT/Help/Host-Tools.guide"
-if grep -R -i 'uaesnd' "$PACKAGE_ROOT"; then
-	echo "Package must not include UAESND; it is deferred to future AHI v2 work" >&2
-	exit 1
-fi
+grep -q 'uaesnd: Stereo' "$PACKAGE_ROOT/Help/Host-Tools.guide"
+grep -q 'uaesnd: HiFi Stereo' "$PACKAGE_ROOT/Help/Host-Tools.guide"
+grep -q 'uaesnd: 7.1' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 
 for icon in "$PACKAGE_ROOT/Help/Host-Tools.guide.info"; do
 	magic="$(od -An -tx1 -N2 "$icon" | tr -d ' \n')"
@@ -161,7 +160,7 @@ grep -q "(askoptions" "$PACKAGE_ROOT/Install"
 grep -q "(= @user-level 0)" "$PACKAGE_ROOT/Install"
 grep -q "(= @user-level 1)" "$PACKAGE_ROOT/Install"
 grep -q "(= @user-level 2)" "$PACKAGE_ROOT/Install"
-grep -q "(set #install-components 7)" "$PACKAGE_ROOT/Install"
+grep -q "(set #install-components 15)" "$PACKAGE_ROOT/Install"
 grep -q "(procedure P_ReplaceFile" "$PACKAGE_ROOT/Install"
 grep -q "(procedure P_CopyVersionedFileAutomatic" "$PACKAGE_ROOT/Install"
 grep -q "(procedure P_CopyPlainFileAutomatic" "$PACKAGE_ROOT/Install"
@@ -284,6 +283,25 @@ grep -q '"Devs/AHI/uae.audio"' "$PACKAGE_ROOT/Install"
 grep -q '"DEVS:AHI"' "$PACKAGE_ROOT/Install"
 grep -q '"Devs/AudioModes/UAE"' "$PACKAGE_ROOT/Install"
 grep -q '"DEVS:AudioModes"' "$PACKAGE_ROOT/Install"
+
+test -f "$PACKAGE_ROOT/Devs/AHI/uaesnd.audio"
+test -f "$PACKAGE_ROOT/Devs/AudioModes/UAESND"
+grep -a -q 'uaesnd.audio 4.1' "$PACKAGE_ROOT/Devs/AHI/uaesnd.audio"
+v2_mode_magic="$(od -An -tx1 -N4 "$PACKAGE_ROOT/Devs/AudioModes/UAESND" | tr -d ' \n')"
+if [ "$v2_mode_magic" != "464f524d" ]; then
+	echo "$PACKAGE_ROOT/Devs/AudioModes/UAESND is not an IFF FORM mode file" >&2
+	exit 1
+fi
+grep -a -q 'uaesnd: Stereo' "$PACKAGE_ROOT/Devs/AudioModes/UAESND"
+grep -a -q 'uaesnd: HiFi Stereo' "$PACKAGE_ROOT/Devs/AudioModes/UAESND"
+grep -a -q 'uaesnd: 7.1' "$PACKAGE_ROOT/Devs/AudioModes/UAESND"
+grep -q "UAESND AHI audio driver" "$PACKAGE_ROOT/Install"
+grep -q "(procedure P_InstallUAESNDDriver" "$PACKAGE_ROOT/Install"
+grep -q '"Devs/AHI/uaesnd.audio"' "$PACKAGE_ROOT/Install"
+grep -q '"Devs/AudioModes/UAESND"' "$PACKAGE_ROOT/Install"
+grep -q "(BITAND #install-components 8)" "$PACKAGE_ROOT/Install"
+grep -q "(default 15)" "$PACKAGE_ROOT/Install"
+grep -q "UAESND AHI: uaesnd.audio and UAESND AudioMode." "$PACKAGE_ROOT/Install"
 
 package_dry_run="$(make -n package PACKAGE_DIR="${PACKAGE_DIR}-dryrun")"
 case "$package_dry_run" in

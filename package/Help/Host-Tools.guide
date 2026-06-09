@@ -10,6 +10,7 @@ Installed components:
 
 @{"Command tools" link Commands}
 @{"UAE AHI audio driver" link AHI}
+@{"UAESND AHI audio driver" link UAESND}
 @{"Installation notes" link InstallNotes}
 
 @endnode
@@ -42,6 +43,26 @@ The driver exposes the classic UAE 16 bit HIFI Stereo++ AHI mode and sends mixed
 UAE :16 bit HIFI Stereo++ uses 16 bit stereo output with panning enabled.
 
 The installer does not change AHI preferences. Select the UAE mode in AHI preferences yourself if you want it to become the active output mode.
+
+@endnode
+
+@node UAESND "UAESND AHI Audio Driver"
+The UAESND AHI audio driver is installed only when selected in the installer.
+
+Installed files:
+
+Devs/AHI/uaesnd.audio
+Devs/AudioModes/UAESND
+
+The driver plays AHI audio through the UAESND sound board emulated by Amiberry. Each AHI channel is played by a hardware audio stream, so no Amiga-side mixing takes place. Enable the UAESND sound board in the Amiberry configuration before using these modes.
+
+Available AHI modes:
+
+uaesnd: Stereo uses 16 bit stereo output.
+uaesnd: HiFi Stereo uses 32 bit stereo output.
+uaesnd: 7.1 uses 32 bit multichannel output.
+
+The installer does not change AHI preferences. Select a uaesnd mode in AHI preferences yourself if you want it to become the active output mode.
 
 @endnode
 

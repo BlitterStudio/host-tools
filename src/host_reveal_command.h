@@ -9,6 +9,18 @@
 #include <stddef.h>
 #include "host_common.h"
 
+/*
+ * Windows: Explorer selects the file directly. Explorer's exit code
+ * is always 1, so it is masked; failures are rare and non-fatal.
+ */
+static inline int host_append_reveal_command_windows(char *command, size_t command_size,
+                                                     const char *path)
+{
+    return host_append_literal(command, command_size, "explorer /select,") &&
+           host_append_cmd_arg(command, command_size, path) &&
+           host_append_literal(command, command_size, " & exit 0");
+}
+
 static inline int host_append_show_items_branch(char *command, size_t command_size,
                                                 const char *uri)
 {

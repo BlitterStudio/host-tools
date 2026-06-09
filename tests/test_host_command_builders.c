@@ -6,9 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "host_base64.h"
 #include "host_clip_command.h"
 #include "host_info_command.h"
 #include "host_notify_command.h"
+#include "host_powershell.h"
 #include "host_reveal_command.h"
 
 static void require(int condition, const char *message)
@@ -140,6 +142,79 @@ static void test_info_command(void)
     require_shell_syntax(HOST_INFO_COMMAND);
 }
 
+static void require_ps_script(const char *command, const char *script)
+{
+    static const char prefix[] = "powershell -NoProfile -EncodedCommand ";
+    struct host_base64_state st;
+    unsigned char decoded[2048];
+    long n;
+    size_t script_len = strlen(script);
+
+    require(strncmp(command, prefix, sizeof(prefix) - 1) == 0,
+            "encoded command should start with the powershell prefix");
+
+    host_base64_init(&st);
+    n = host_base64_feed(&st, command + sizeof(prefix) - 1,
+                         (long)strlen(command + sizeof(prefix) - 1), decoded);
+    require(n == (long)(script_len * 2), "decoded UTF-16 length should match script");
+    for (size_t i = 0; i < script_len; i++) {
+        require(decoded[i * 2] == (unsigned char)script[i] && decoded[i * 2 + 1] == 0,
+                "decoded UTF-16 bytes should spell the script");
+    }
+}
+
+static void test_ps_quoting(void)
+{
+    char dest[64];
+
+    dest[0] = '\0';
+    require(host_append_ps_quoted(dest, sizeof(dest), "it's"),
+            "powershell quoting should build");
+    require(strcmp(dest, "'it''s'") == 0,
+            "powershell quoting should double embedded quotes");
+
+    dest[0] = '\0';
+    require(!host_append_ps_quoted(dest, 4, "long text"),
+            "small powershell quote buffer should fail");
+}
+
+static void test_windows_clip_commands(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_clip_paste_command_windows(command, sizeof(command)),
+            "windows paste command should build");
+    require_ps_script(command, HOST_CLIP_PASTE_PS_SCRIPT);
+
+    command[0] = '\0';
+    require(host_append_clip_copy_command_windows(command, sizeof(command), "a'b\nc"),
+            "windows copy command should build");
+    require_ps_script(command, "Set-Clipboard -Value 'a''b\nc'");
+}
+
+static void test_windows_reveal_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_reveal_command_windows(command, sizeof(command),
+                                               "C:\\My Files\\disk.adf"),
+            "windows reveal command should build");
+    require(strcmp(command, "explorer /select,\"C:\\My Files\\disk.adf\" & exit 0") == 0,
+            "windows reveal command should select the file and mask explorer's exit code");
+}
+
+static void test_windows_info_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_info_command_windows(command, sizeof(command)),
+            "windows info command should build");
+    require_ps_script(command, HOST_INFO_PS_SCRIPT);
+}
+
 static void test_small_buffer_failures(void)
 {
     char command[32];
@@ -166,6 +241,10 @@ int main(void)
     test_clip_copy_command_multiline();
     test_clip_paste_command();
     test_info_command();
+    test_ps_quoting();
+    test_windows_clip_commands();
+    test_windows_reveal_command();
+    test_windows_info_command();
     test_small_buffer_failures();
     return 0;
 }

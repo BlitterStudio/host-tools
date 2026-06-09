@@ -57,7 +57,7 @@ host-path <path> [path2 ...]
 
 ### 5. host-reveal
 **Reveal files in the host file manager.**
-`host-reveal` selects the file in Finder on macOS, or in the default Linux file manager through the `FileManager1` D-Bus interface (GNOME Files, Dolphin, Nemo, and others). When no compatible file manager is available, it opens the containing directory instead.
+`host-reveal` selects the file in Finder on macOS, in Explorer on Windows, or in the default Linux file manager through the `FileManager1` D-Bus interface (GNOME Files, Dolphin, Nemo, and others). When no compatible file manager is available, it opens the containing directory instead.
 
 **Usage:**
 ```shell
@@ -85,7 +85,7 @@ host-edit <path> [path2 ...]
 
 ### 8. host-clip
 **Use the host clipboard.**
-`host-clip` copies text to the host clipboard or prints the current host clipboard contents. Without text arguments, `host-clip copy` reads standard input verbatim, so multi-line text and command output can be piped or redirected to the host clipboard. Text is converted between the Amiga's ISO-8859-1 character set and the host's UTF-8 when `iconv` is available on the host.
+`host-clip` copies text to the host clipboard or prints the current host clipboard contents. Without text arguments, `host-clip copy` reads standard input verbatim, so multi-line text and command output can be piped or redirected to the host clipboard. Text is converted between the Amiga's ISO-8859-1 character set and the host's encoding: through `iconv` on Linux and macOS, and inherently through PowerShell's Unicode pipeline on Windows.
 
 **Usage:**
 ```shell
@@ -121,7 +121,7 @@ host-download <URL> [<destination>] [FORCE]
 
 -   **Amiberry v6.0+** (or a version with updated `uaelib` support).
 -   "Native Code" execution must be enabled in Amiberry settings.
--   A **Linux or macOS host** for the session-based tools (`host-shell`, `host-clip`, `host-notify`, `host-reveal`, `host-info`); their host commands run through the host's POSIX shell. `host-download` also supports **Windows hosts** with a current Amiberry (`curl.exe` ships with Windows 10 and later).
+-   A **Linux or macOS host** for `host-shell` and `host-notify`; their host commands run through the host's POSIX shell. `host-download`, `host-clip`, `host-reveal`, and `host-info` also support **Windows hosts** with a current Amiberry: PowerShell and Explorer handle the Windows side, and `curl.exe` ships with Windows 10 and later.
 -   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, and `host-info`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Older builds still work, but use timeout-based completion detection.
 -   Linux desktop integration uses `xdg-utils` (`xdg-open`, `xdg-mime`) and GTK's `gtk-launch` when available. Notifications use `notify-send`; clipboard support uses `wl-clipboard`, `xclip`, or `xsel`; file selection in `host-reveal` uses `gdbus` when present. Character set conversion uses `iconv` when present.
 -   `host-download` uses the host's `curl` or `wget` (`curl.exe` on Windows). Live streaming progress requires an Amiberry build with pipe-based HostShell sessions; on older Linux and macOS builds the tool falls back to a two-phase transfer that downloads on the host first.

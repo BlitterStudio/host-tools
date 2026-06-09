@@ -42,7 +42,12 @@ static inline int host_print_command_output(const char *command)
     int idle_count = 0;
     int status_supported = 0;
 
-    handle = HostShell_Open((UBYTE *)command);
+    /* prefer a pipe session: binary-safe output without terminal
+     * line-ending processing; older builds fall back to the pty */
+    handle = HostShell_OpenPipe((UBYTE *)command);
+    if (handle == 0) {
+        handle = HostShell_Open((UBYTE *)command);
+    }
     if (handle == 0) {
         printf("Failed to open host command.\n");
         return HOST_RETURN_ERROR;

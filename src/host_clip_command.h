@@ -8,6 +8,7 @@
 
 #include <stddef.h>
 #include "host_common.h"
+#include "host_powershell.h"
 
 #define HOST_CLIP_PASTE_COMMAND \
     "out=$(if command -v pbpaste >/dev/null 2>&1; then pbpaste; " \
@@ -17,6 +18,32 @@
     "else printf 'No host clipboard backend found\\n' >&2; exit 127; fi) || exit $?; " \
     "printf %s \"$out\" | if command -v iconv >/dev/null 2>&1; then " \
     "iconv -c -f UTF-8 -t ISO-8859-1//TRANSLIT 2>/dev/null || cat; else cat; fi"
+
+/*
+ * Windows clipboard access goes through PowerShell. ISO-8859-1 text
+ * converts to UTF-16 in the encoded command itself, and paste output
+ * is written with an ISO-8859-1 console encoding, so no iconv is
+ * involved on Windows.
+ */
+#define HOST_CLIP_PASTE_PS_SCRIPT \
+    "[Console]::OutputEncoding=[System.Text.Encoding]::GetEncoding(28591);" \
+    "$t=Get-Clipboard -Raw;if($t){[Console]::Out.Write($t)}"
+
+static inline int host_append_clip_paste_command_windows(char *command, size_t command_size)
+{
+    return host_append_ps_encoded_command(command, command_size, HOST_CLIP_PASTE_PS_SCRIPT);
+}
+
+static inline int host_append_clip_copy_command_windows(char *command, size_t command_size,
+                                                        const char *text)
+{
+    static char script[HOST_MAX_COMMAND_LEN];
+
+    script[0] = '\0';
+    return host_append_literal(script, sizeof(script), "Set-Clipboard -Value ") &&
+           host_append_ps_quoted(script, sizeof(script), text) &&
+           host_append_ps_encoded_command(command, command_size, script);
+}
 
 static inline int host_append_clip_copy_command(char *command, size_t command_size,
                                                 const char *text)

@@ -38,5 +38,16 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
+    if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {
+        static char command[HOST_MAX_COMMAND_LEN];
+
+        command[0] = '\0';
+        if (!host_append_info_command_windows(command, sizeof(command))) {
+            printf("Command is too long\n");
+            return HOST_RETURN_ERROR;
+        }
+        return host_print_command_output(command);
+    }
+
     return host_print_command_output(HOST_INFO_COMMAND);
 }

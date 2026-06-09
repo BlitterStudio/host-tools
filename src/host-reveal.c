@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
     static char filename[HOST_MAX_PATH_LEN];
     static char command[HOST_MAX_COMMAND_LEN];
     int status = 0;
+    int platform;
 
     if (!InitUAEResource())
     {
@@ -42,6 +43,8 @@ int main(int argc, char *argv[])
     {
         return print_usage();
     }
+
+    platform = GetHostPlatform();
 
     for (int i = 1; i < argc; i++) {
         const char *target = argv[i];
@@ -68,7 +71,9 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        if (!host_append_reveal_command(command, sizeof(command), target)) {
+        if (platform == HOST_PLATFORM_WINDOWS
+                ? !host_append_reveal_command_windows(command, sizeof(command), target)
+                : !host_append_reveal_command(command, sizeof(command), target)) {
             printf("Command is too long\n");
             status = HOST_RETURN_ERROR;
             continue;

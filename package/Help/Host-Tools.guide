@@ -116,7 +116,7 @@ Usage:
 
 host-reveal <path> [path2 ...]
 
-On macOS the file is selected in Finder. On Linux the file is selected in the default file manager when it supports the FileManager1 desktop interface; otherwise the containing directory is opened.
+On macOS the file is selected in Finder, and on Windows in Explorer. On Linux the file is selected in the default file manager when it supports the FileManager1 desktop interface; otherwise the containing directory is opened.
 
 @endnode
 
@@ -127,6 +127,8 @@ Usage:
 
 host-notify <message>
 host-notify <title> <message...>
+
+host-notify requires a Linux or macOS host.
 
 @endnode
 
@@ -148,7 +150,7 @@ host-clip [copy] <text...>
 host-clip copy < file
 host-clip paste
 
-Without text arguments, host-clip copy reads standard input verbatim, preserving line breaks. Text is converted between the Amiga ISO-8859-1 character set and the host UTF-8 character set when iconv is available on the host.
+Without text arguments, host-clip copy reads standard input verbatim, preserving line breaks. Text is converted between the Amiga ISO-8859-1 character set and the host character set automatically: through iconv on Linux and macOS, and through PowerShell on Windows hosts.
 
 @endnode
 

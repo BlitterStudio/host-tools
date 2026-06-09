@@ -145,6 +145,22 @@ static inline int host_append_shell_literal_and_arg(char *dest, size_t max_len,
            host_append_shell_arg(dest, max_len, arg, 0);
 }
 
+/*
+ * Quote an argument for the Windows command interpreter. Embedded
+ * quotes and line breaks are rejected rather than escaped.
+ */
+static inline int host_append_cmd_arg(char *command, size_t command_size, const char *arg)
+{
+    for (const char *p = arg; *p; p++) {
+        if (*p == '"' || *p == '\n' || *p == '\r') {
+            return 0;
+        }
+    }
+    return host_append_literal(command, command_size, "\"") &&
+           host_append_literal(command, command_size, arg) &&
+           host_append_literal(command, command_size, "\"");
+}
+
 static inline char host_ascii_lower(char c)
 {
     if (c >= 'A' && c <= 'Z') {

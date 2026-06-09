@@ -64,6 +64,13 @@ int main(int argc, char *argv[])
             print_usage();
             return HOST_RETURN_ERROR;
         }
+        if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {
+            if (!host_append_clip_paste_command_windows(command, sizeof(command))) {
+                printf("Command is too long\n");
+                return HOST_RETURN_ERROR;
+            }
+            return host_print_command_output(command);
+        }
         return host_print_command_output(HOST_CLIP_PASTE_COMMAND);
     }
 
@@ -87,7 +94,12 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
-    if (!host_append_clip_copy_command(command, sizeof(command), text)) {
+    if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {
+        if (!host_append_clip_copy_command_windows(command, sizeof(command), text)) {
+            printf("Command is too long\n");
+            return HOST_RETURN_ERROR;
+        }
+    } else if (!host_append_clip_copy_command(command, sizeof(command), text)) {
         printf("Command is too long\n");
         return HOST_RETURN_ERROR;
     }

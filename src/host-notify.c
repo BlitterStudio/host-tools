@@ -65,6 +65,11 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {
+        printf("host-notify is not supported on Windows hosts yet\n");
+        return HOST_RETURN_ERROR;
+    }
+
     if (!host_append_notify_command(command, sizeof(command), title, message)) {
         printf("Command is too long\n");
         return HOST_RETURN_ERROR;

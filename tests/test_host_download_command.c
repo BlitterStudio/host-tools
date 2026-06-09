@@ -174,6 +174,22 @@ static void test_base64_decode(void)
             "data after padding should fail");
 }
 
+static void test_base64_encode_utf16le(void)
+{
+    char out[64];
+
+    require(host_base64_encode_utf16le("ab", out, sizeof(out)),
+            "utf16le encoding should build");
+    require(strcmp(out, "YQBiAA==") == 0, "utf16le base64 should match");
+
+    require(host_base64_encode_utf16le("", out, sizeof(out)),
+            "empty utf16le encoding should build");
+    require(out[0] == '\0', "empty input should encode to an empty string");
+
+    require(!host_base64_encode_utf16le("hello world", out, 8),
+            "small encode buffer should fail");
+}
+
 int main(void)
 {
     test_stream_command();
@@ -182,5 +198,6 @@ int main(void)
     test_small_buffer_failures();
     test_url_filename();
     test_base64_decode();
+    test_base64_encode_utf16le();
     return 0;
 }

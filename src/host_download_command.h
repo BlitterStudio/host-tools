@@ -32,23 +32,6 @@ static inline int host_append_download_stream_command(char *command, size_t comm
 }
 
 /*
- * Quote an argument for the Windows command interpreter. Embedded
- * quotes and line breaks are rejected rather than escaped; URLs do
- * not contain them.
- */
-static inline int host_append_cmd_arg(char *command, size_t command_size, const char *arg)
-{
-    for (const char *p = arg; *p; p++) {
-        if (*p == '"' || *p == '\n' || *p == '\r') {
-            return 0;
-        }
-    }
-    return host_append_literal(command, command_size, "\"") &&
-           host_append_literal(command, command_size, arg) &&
-           host_append_literal(command, command_size, "\"");
-}
-
-/*
  * Live download via the Windows command interpreter: curl.exe ships
  * with Windows 10 and later. Same protocol as the POSIX command; the
  * exit code of "a & b" is b's.

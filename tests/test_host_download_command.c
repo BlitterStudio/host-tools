@@ -71,6 +71,25 @@ static void test_b64_command(void)
     require_shell_syntax(command);
 }
 
+static void test_windows_stream_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_download_stream_command_windows(command, sizeof(command),
+                                                        "https://example.com/file.lha"),
+            "windows stream download command should build");
+
+    require_contains(command,
+                     "(curl -sIL -o NUL -w \"%{content_length}\\n\" \"https://example.com/file.lha\" || echo 0)");
+    require_contains(command, "& curl -sfL \"https://example.com/file.lha\"");
+
+    command[0] = '\0';
+    require(!host_append_download_stream_command_windows(command, sizeof(command),
+                                                         "https://example.com/a\"b"),
+            "embedded quotes should be rejected for cmd quoting");
+}
+
 static void test_small_buffer_failures(void)
 {
     char command[32];
@@ -159,6 +178,7 @@ int main(void)
 {
     test_stream_command();
     test_b64_command();
+    test_windows_stream_command();
     test_small_buffer_failures();
     test_url_filename();
     test_base64_decode();

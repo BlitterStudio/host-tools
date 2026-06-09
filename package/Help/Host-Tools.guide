@@ -172,6 +172,8 @@ Without a destination, the file is saved in the current directory under its URL 
 
 The file is written through AmigaDOS, so any writable volume works, including RAM: and hardfiles. Failed or aborted downloads do not leave a partial file behind. Press Ctrl-C to abort.
 
+host-download works on Linux, macOS, and Windows hosts. On Windows a current Amiberry build is required.
+
 @endnode
 
 @node InstallNotes "Installation Notes"

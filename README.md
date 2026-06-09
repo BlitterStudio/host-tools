@@ -121,10 +121,10 @@ host-download <URL> [<destination>] [FORCE]
 
 -   **Amiberry v6.0+** (or a version with updated `uaelib` support).
 -   "Native Code" execution must be enabled in Amiberry settings.
--   A **Linux or macOS host**. The host-side integration runs through the host's POSIX shell; the corresponding Amiberry traps are not yet implemented on Windows hosts.
+-   A **Linux or macOS host** for the session-based tools (`host-shell`, `host-clip`, `host-notify`, `host-reveal`, `host-info`); their host commands run through the host's POSIX shell. `host-download` also supports **Windows hosts** with a current Amiberry (`curl.exe` ships with Windows 10 and later).
 -   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, and `host-info`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Older builds still work, but use timeout-based completion detection.
 -   Linux desktop integration uses `xdg-utils` (`xdg-open`, `xdg-mime`) and GTK's `gtk-launch` when available. Notifications use `notify-send`; clipboard support uses `wl-clipboard`, `xclip`, or `xsel`; file selection in `host-reveal` uses `gdbus` when present. Character set conversion uses `iconv` when present.
--   `host-download` uses the host's `curl` or `wget`. Live streaming progress requires an Amiberry build with pipe-based HostShell sessions; on older builds the tool falls back to a two-phase transfer that downloads on the host first.
+-   `host-download` uses the host's `curl` or `wget` (`curl.exe` on Windows). Live streaming progress requires an Amiberry build with pipe-based HostShell sessions; on older Linux and macOS builds the tool falls back to a two-phase transfer that downloads on the host first.
 
 ## Exit Codes
 

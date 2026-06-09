@@ -164,22 +164,32 @@ int main(int argc, char *argv[])
         }
     }
 
-    command[0] = '\0';
-    if (!host_append_download_stream_command(command, sizeof(command), url)) {
-        printf("Command is too long\n");
-        return HOST_RETURN_ERROR;
-    }
+    {
+        int platform = GetHostPlatform();
+        int built;
 
-    handle = HostShell_OpenPipe((UBYTE *)command);
-    if (handle == 0) {
-        /* older Amiberry: pty session, base64 protected transfer */
         command[0] = '\0';
-        if (!host_append_download_b64_command(command, sizeof(command), url)) {
+        if (platform == HOST_PLATFORM_WINDOWS) {
+            built = host_append_download_stream_command_windows(command, sizeof(command), url);
+        } else {
+            built = host_append_download_stream_command(command, sizeof(command), url);
+        }
+        if (!built) {
             printf("Command is too long\n");
             return HOST_RETURN_ERROR;
         }
-        handle = HostShell_Open((UBYTE *)command);
-        b64mode = 1;
+
+        handle = HostShell_OpenPipe((UBYTE *)command);
+        if (handle == 0 && platform != HOST_PLATFORM_WINDOWS) {
+            /* older Amiberry: pty session, base64 protected transfer */
+            command[0] = '\0';
+            if (!host_append_download_b64_command(command, sizeof(command), url)) {
+                printf("Command is too long\n");
+                return HOST_RETURN_ERROR;
+            }
+            handle = HostShell_Open((UBYTE *)command);
+            b64mode = 1;
+        }
     }
     if (handle == 0) {
         printf("Failed to open host download session.\n");

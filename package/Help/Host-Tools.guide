@@ -1,5 +1,5 @@
 @database
-@$VER: Host-Tools.guide 2.3 (2026-05-20)
+@$VER: Host-Tools.guide 2.4 (2026-06-10)
 @index Main
 @wordwrap
 
@@ -95,6 +95,8 @@ host-shell [command]
 
 Without a command, the host user's default shell is opened.
 
+The host terminal is sized to match the Amiga console window, so full-screen host programs render correctly. Resize the Amiga window and restart host-shell to apply a new size.
+
 @endnode
 
 @node HostPath "host-path"
@@ -107,11 +109,13 @@ host-path <path> [path2 ...]
 @endnode
 
 @node HostReveal "host-reveal"
-host-reveal opens the host file manager at one or more translated paths.
+host-reveal shows one or more translated paths in the host file manager.
 
 Usage:
 
 host-reveal <path> [path2 ...]
+
+On macOS the file is selected in Finder. On Linux the file is selected in the default file manager when it supports the FileManager1 desktop interface; otherwise the containing directory is opened.
 
 @endnode
 
@@ -140,7 +144,10 @@ host-clip copies text to the host clipboard or prints the current host clipboard
 Usage:
 
 host-clip [copy] <text...>
+host-clip copy < file
 host-clip paste
+
+Without text arguments, host-clip copy reads standard input verbatim, preserving line breaks. Text is converted between the Amiga ISO-8859-1 character set and the host UTF-8 character set when iconv is available on the host.
 
 @endnode
 

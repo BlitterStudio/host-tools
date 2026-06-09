@@ -34,7 +34,8 @@ int main(int argc, char *argv[])
     if (argc > 1)
     {
         printf("Unexpected argument\n");
-        return print_usage();
+        print_usage();
+        return HOST_RETURN_ERROR;
     }
 
     return host_print_command_output(HOST_INFO_COMMAND);

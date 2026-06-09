@@ -165,6 +165,42 @@ static inline int host_has_prefix_ci(const char *value, const char *prefix)
     return 1;
 }
 
+#define HOST_FILE_URI_MAX_LEN (HOST_MAX_PATH_LEN * 3 + 8)
+
+static inline int host_path_to_file_uri(const char *path, char *uri, size_t uri_size)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    size_t pos = 0;
+
+    if (path == NULL || uri == NULL || uri_size < 8 || path[0] != '/') {
+        return 0;
+    }
+
+    memcpy(uri, "file://", 7);
+    pos = 7;
+
+    for (const unsigned char *p = (const unsigned char *)path; *p; p++) {
+        if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+            (*p >= '0' && *p <= '9') || *p == '/' || *p == '-' ||
+            *p == '.' || *p == '_' || *p == '~') {
+            if (pos + 1 >= uri_size) {
+                return 0;
+            }
+            uri[pos++] = (char)*p;
+        } else {
+            if (pos + 3 >= uri_size) {
+                return 0;
+            }
+            uri[pos++] = '%';
+            uri[pos++] = hex[*p >> 4];
+            uri[pos++] = hex[*p & 0x0f];
+        }
+    }
+
+    uri[pos] = '\0';
+    return 1;
+}
+
 static inline int host_is_uri(const char *value)
 {
     static const char *schemes[] = {

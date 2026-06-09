@@ -48,8 +48,8 @@ test: $(TESTS)
 		esac || exit $$?; \
 	done
 
-VERSION		= 2.3
-DATE		= 2026-04-30
+VERSION		= 2.4
+DATE		= 2026-06-10
 
 ifeq ($(origin CC),default)
 CC			= m68k-amigaos-gcc

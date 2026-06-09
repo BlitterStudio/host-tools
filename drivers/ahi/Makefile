@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VERSION		?= 2.3
-DATE		?= 2026-04-30
+VERSION		?= 2.4
+DATE		?= 2026-06-10
 
 ifeq ($(origin VASMM68K),default)
 VASMM68K	= vasmm68k_mot

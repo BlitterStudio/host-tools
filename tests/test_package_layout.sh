@@ -105,15 +105,15 @@ fi
 for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info; do
 	test -f "$PACKAGE_ROOT/C/$tool"
 done
-grep -a -q '\$VER: Host-Run 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-run"
-grep -a -q '\$VER: Host-MultiView 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-multiview"
-grep -a -q '\$VER: Host-Shell 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-shell"
-grep -a -q '\$VER: Host-Path 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-path"
-grep -a -q '\$VER: Host-Reveal 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-reveal"
-grep -a -q '\$VER: Host-Notify 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-notify"
-grep -a -q '\$VER: Host-Edit 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-edit"
-grep -a -q '\$VER: Host-Clip 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-clip"
-grep -a -q '\$VER: Host-Info 2.3 (2026-04-30)' "$PACKAGE_ROOT/C/host-info"
+grep -a -q '\$VER: Host-Run 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-run"
+grep -a -q '\$VER: Host-MultiView 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-multiview"
+grep -a -q '\$VER: Host-Shell 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-shell"
+grep -a -q '\$VER: Host-Path 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-path"
+grep -a -q '\$VER: Host-Reveal 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-reveal"
+grep -a -q '\$VER: Host-Notify 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-notify"
+grep -a -q '\$VER: Host-Edit 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-edit"
+grep -a -q '\$VER: Host-Clip 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-clip"
+grep -a -q '\$VER: Host-Info 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-info"
 if grep -a '\$VER: Host-[A-Za-z]* v[0-9]' "$PACKAGE_ROOT/C/"*; then
 	echo "Host command \$VER strings must be parseable by Installer getversion, without a v prefix before the version number" >&2
 	exit 1

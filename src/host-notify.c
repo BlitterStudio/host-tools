@@ -38,7 +38,8 @@ int main(int argc, char *argv[])
     if (argc <= 1)
     {
         printf("Missing message argument\n");
-        return print_usage();
+        print_usage();
+        return HOST_RETURN_ERROR;
     }
 
     if (strcmp(argv[1], "?") == 0)

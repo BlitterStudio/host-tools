@@ -49,8 +49,25 @@ static void test_reveal_command(void)
             "reveal command should build");
 
     require_contains(command, "open -R '/tmp/a b'\\''s.txt'");
+    require_contains(command, "org.freedesktop.FileManager1.ShowItems");
+    require_contains(command, "file:///tmp/a%20b%27s.txt");
     require_contains(command, "xdg-open \"$(dirname -- '/tmp/a b'\\''s.txt')\"");
     require_contains(command, "else exit 127; fi");
+    require_shell_syntax(command);
+}
+
+static void test_reveal_command_without_uri(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_reveal_command(command, sizeof(command), "relative/path.txt"),
+            "reveal command should build without a file URI");
+
+    require_contains(command, "open -R relative/path.txt");
+    require_contains(command, "xdg-open \"$(dirname -- relative/path.txt)\"");
+    require(strstr(command, "ShowItems") == NULL,
+            "reveal command should skip the file manager branch without a URI");
     require_shell_syntax(command);
 }
 
@@ -63,9 +80,12 @@ static void test_notify_command(void)
                                        "Build's Done", "Hello $USER & goodbye"),
             "notify command should build");
 
-    require_contains(command, "notify-send 'Build'\\''s Done' 'Hello $USER & goodbye'");
+    require_contains(command, "t='Build'\\''s Done'");
+    require_contains(command, "m='Hello $USER & goodbye'");
+    require_contains(command, "iconv -f ISO-8859-1 -t UTF-8");
+    require_contains(command, "notify-send \"$t\" \"$m\"");
     require_contains(command, "osascript -e 'on run argv'");
-    require_contains(command, "'Build'\\''s Done' 'Hello $USER & goodbye'; else exit 127; fi");
+    require_contains(command, "'end run' \"$t\" \"$m\"; else exit 127; fi");
     require_shell_syntax(command);
 }
 
@@ -79,10 +99,24 @@ static void test_clip_copy_command(void)
             "clipboard copy command should build");
 
     require_contains(command, "printf %s 'copy $HOME and '\\''quotes'\\''' |");
+    require_contains(command, "iconv -f ISO-8859-1 -t UTF-8");
     require_contains(command, "pbcopy");
     require_contains(command, "wl-copy");
     require_contains(command, "xclip -selection clipboard");
     require_contains(command, "xsel --clipboard --input");
+    require_shell_syntax(command);
+}
+
+static void test_clip_copy_command_multiline(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_clip_copy_command(command, sizeof(command),
+                                          "line one\nline two\n"),
+            "multiline clipboard copy command should build");
+
+    require_contains(command, "printf %s 'line one\nline two\n'");
     require_shell_syntax(command);
 }
 
@@ -92,6 +126,7 @@ static void test_clip_paste_command(void)
     require_contains(HOST_CLIP_PASTE_COMMAND, "wl-paste -n");
     require_contains(HOST_CLIP_PASTE_COMMAND, "xclip -selection clipboard -o");
     require_contains(HOST_CLIP_PASTE_COMMAND, "xsel --clipboard --output");
+    require_contains(HOST_CLIP_PASTE_COMMAND, "iconv -c -f UTF-8 -t ISO-8859-1//TRANSLIT");
     require_shell_syntax(HOST_CLIP_PASTE_COMMAND);
 }
 
@@ -125,8 +160,10 @@ static void test_small_buffer_failures(void)
 int main(void)
 {
     test_reveal_command();
+    test_reveal_command_without_uri();
     test_notify_command();
     test_clip_copy_command();
+    test_clip_copy_command_multiline();
     test_clip_paste_command();
     test_info_command();
     test_small_buffer_failures();

@@ -7,6 +7,9 @@ V1_SOURCE_DIR="drivers/ahi/src/v1"
 DRIVER_SOURCE="$V1_SOURCE_DIR/uae.audio.asm"
 MODE_SOURCE="$V1_SOURCE_DIR/UAE.asm"
 COMPAT_INCLUDE="$V1_SOURCE_DIR/include"
+V2_SOURCE_DIR="drivers/ahi/src/v2"
+V2_DRIVER_SOURCE="$V2_SOURCE_DIR/uaesnd.audio.asm"
+V2_MODE_SOURCE="$V2_SOURCE_DIR/UAESND.asm"
 
 test -f "$MAKEFILE"
 test -f "$ROOT_MAKEFILE"
@@ -16,11 +19,18 @@ test -f "$MODE_SOURCE"
 test -f "$COMPAT_INCLUDE/hardware/all.i"
 test -f "$COMPAT_INCLUDE/lvos/ahi_sub_lib.i"
 test -f "$COMPAT_INCLUDE/macros.i"
+test -d "$V2_SOURCE_DIR"
+test -f "$V2_DRIVER_SOURCE"
+test -f "$V2_MODE_SOURCE"
 
 grep -q 'VASMM68K' "$MAKEFILE"
 grep -q 'V1_SOURCE_DIR[[:space:]]*= src/v1' "$MAKEFILE"
 grep -q 'V1_DRIVER[[:space:]]*= $(V1_SOURCE_DIR)/uae.audio.asm' "$MAKEFILE"
 grep -q 'V1_MODE[[:space:]]*= $(V1_SOURCE_DIR)/UAE.asm' "$MAKEFILE"
+grep -q 'V2_SOURCE_DIR[[:space:]]*= src/v2' "$MAKEFILE"
+grep -q 'V2_DRIVER[[:space:]]*= $(V2_SOURCE_DIR)/uaesnd.audio.asm' "$MAKEFILE"
+grep -q 'V2_MODE[[:space:]]*= $(V2_SOURCE_DIR)/UAESND.asm' "$MAKEFILE"
+grep -q '^ahi-v2:' "$MAKEFILE"
 grep -q -- '-devpac' "$MAKEFILE"
 grep -q -- '-Fhunkexe' "$MAKEFILE"
 grep -q -- '-Fbin' "$MAKEFILE"
@@ -37,13 +47,13 @@ if grep -q 'src/uae.audio.c\|src/uae-gates.S\|uae.audio.o\|uae-gates.o\|-nostart
 	exit 1
 fi
 
-if find drivers/ahi/src -path '*uaesnd*' | grep .; then
-	echo "UAESND belongs to the future AHI v2 work and must not be included in this package" >&2
+if find drivers/ahi/src -iname '*uaesnd*' ! -path "$V2_SOURCE_DIR/*" | grep .; then
+	echo "UAESND sources must stay isolated under the experimental AHI v2 source tree" >&2
 	exit 1
 fi
 
-if grep -R -i 'uaesnd' "$MAKEFILE" "$ROOT_MAKEFILE"; then
-	echo "UAESND must not be built or packaged in this pass" >&2
+if grep -R -i 'uaesnd' "$ROOT_MAKEFILE" package; then
+	echo "UAESND must not be part of the default Host-Tools package yet" >&2
 	exit 1
 fi
 
@@ -77,5 +87,74 @@ grep -F -q '$001a0000' "$MODE_SOURCE"
 grep -q 'UAE :16 bit HIFI Stereo++' "$MODE_SOURCE"
 if grep -q 'AHIDB_PingPong\|0x001a0002\|UAE: HiFi stereo' "$MODE_SOURCE"; then
 	echo "baseline UAE AudioMode should match the original single WinUAE mode" >&2
+	exit 1
+fi
+
+grep -F -q 'dc.b "uaesnd.audio",0' "$V2_DRIVER_SOURCE"
+grep -F -q 'FindConfigDev' "$V2_DRIVER_SOURCE"
+grep -F -q 'include lvo/utility_lib.i' "$V2_DRIVER_SOURCE"
+grep -F -q 'AHISF_KNOWSTEREO|AHISF_KNOWHIFI|AHISF_KNOWMULTICHANNEL' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.b #%101,set_intena(a4)' "$V2_DRIVER_SOURCE"
+if grep -F -q 'btst #AHIACB_HIFI,d0' "$V2_DRIVER_SOURCE"; then
+	echo "HiFi UAESND should use the same sample-start callback path as Stereo" >&2
+	exit 1
+fi
+grep -F -q 'UWORD p_OutputVolume' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.w #$8000,p_OutputVolume(a3)' "$V2_DRIVER_SOURCE"
+grep -F -q 'mulu.w p_OutputVolume(a2),d0' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.w d1,p_OutputVolume(a1)' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.w p_OutputVolume(a1),d0' "$V2_DRIVER_SOURCE"
+if grep -F -q 'move.w d4,set_hpan(a0)' "$V2_DRIVER_SOURCE" || grep -F -q 'move.w d4,STREAM_START+UAESNDSetCurrent+set_hpan(a0)' "$V2_DRIVER_SOURCE"; then
+	echo "UAESND v2 should not apply AHI panning until fixed even/odd stereo routing is stable" >&2
+	exit 1
+fi
+grep -F -q 'move.b #3,set_mask(a4)' "$V2_DRIVER_SOURCE"
+grep -F -q 'or.b #%101,stream_master_intena(a5)' "$V2_DRIVER_SOURCE"
+grep -F -q 'and.b #%101,d2' "$V2_DRIVER_SOURCE"
+if grep -F -q 'set_hpan(a1)' "$V2_DRIVER_SOURCE"; then
+	echo "UAESND v2 must leave sample set panning fields zeroed; the hardware rejects non-zero panning" >&2
+	exit 1
+fi
+grep -F -q 'move.w ahiac_Channels(a2),d0' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.w d0,p_StreamCnt(a3)' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.w p_StreamCnt(a1),d1' "$V2_DRIVER_SOURCE"
+grep -F -q 'ULONG p_PendingStartMask' "$V2_DRIVER_SOURCE"
+grep -F -q 'or.l d0,base_stream_enable(a0)' "$V2_DRIVER_SOURCE"
+grep -F -q 'or.l d0,base_stream_intena(a0)' "$V2_DRIVER_SOURCE"
+grep -F -q 'or.l d0,p_PendingStartMask(a3)' "$V2_DRIVER_SOURCE"
+grep -F -q 'flush_pending_starts' "$V2_DRIVER_SOURCE"
+grep -F -q 'or.l d2,base_stream_enable(a0)' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.l ch_set_current(a2),stream_sample_pointer_imm(a0)' "$V2_DRIVER_SOURCE"
+grep -F -q 'dc.b	"uaesnd",0' "$V2_MODE_SOURCE"
+grep -F -q 'AHIDB_AudioID,$003b0001' "$V2_MODE_SOURCE"
+grep -F -q 'AHIDB_AudioID,$003b0002' "$V2_MODE_SOURCE"
+grep -F -q 'AHIDB_AudioID,$003b0003' "$V2_MODE_SOURCE"
+test "$(grep -F -c 'AHIDB_Panning,0' "$V2_MODE_SOURCE")" -eq 3
+if grep -F -q 'AHIDB_Panning,1' "$V2_MODE_SOURCE"; then
+	echo "UAESND v2 modes should expose fixed even/odd stereo routing, not panning" >&2
+	exit 1
+fi
+grep -A8 -F 'AHIDB_AudioID,$003b0001' "$V2_MODE_SOURCE" | grep -F -q 'AHIDB_Bits,16'
+grep -A10 -F 'AHIDB_AudioID,$003b0002' "$V2_MODE_SOURCE" | grep -F -q 'AHIDB_Bits,32'
+grep -A10 -F 'AHIDB_AudioID,$003b0003' "$V2_MODE_SOURCE" | grep -F -q 'AHIDB_Bits,32'
+test "$(grep -F -c 'AHIDB_Bits,16' "$V2_MODE_SOURCE")" -eq 1
+test "$(grep -F -c 'AHIDB_Bits,32' "$V2_MODE_SOURCE")" -eq 2
+grep -F -q 'move.l #UAESND_SIZEOF,p_DriverDataSize(a3)' "$V2_DRIVER_SOURCE"
+grep -F -q 'bsr.w get_audioid_bits' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.l #AHIA_AudioID,d0' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.l #AHIDB_AudioID,d0' "$V2_DRIVER_SOURCE"
+grep -F -q 'cmp.l #$003b0001,d0' "$V2_DRIVER_SOURCE"
+grep -F -q 'moveq #16,d0' "$V2_DRIVER_SOURCE"
+grep -F -q 'moveq #-1,d0' "$V2_DRIVER_SOURCE"
+grep -F -q 'dc.l AHIDB_Bits, 32' "$V2_DRIVER_SOURCE"
+grep -F -q 'dc.l AHIDB_MaxChannels, 8' "$V2_DRIVER_SOURCE"
+if grep -F -q 'cmp.l #$003b0002,d0' "$V2_DRIVER_SOURCE" || grep -F -q 'bsr.w get_audioid_maxchannels' "$V2_DRIVER_SOURCE"; then
+	echo "UAESND v2 GetAttr must special-case only plain Stereo bits and leave HiFi on the static 32-bit path" >&2
+	exit 1
+fi
+grep -F -q 'DEBUG EQU 0' "$V2_DRIVER_SOURCE"
+grep -F -q 'IFNE DEBUG' "$V2_DRIVER_SOURCE"
+if grep -F -q 'IFD DEBUG=1' "$V2_DRIVER_SOURCE"; then
+	echo "UAESND v2 debug blocks must be value-gated so release builds do not write to DEBUG_ADDR" >&2
 	exit 1
 fi

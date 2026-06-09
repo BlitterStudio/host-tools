@@ -31,7 +31,7 @@ README_ICON	= package/icons/readme.info
 GUIDE_ICON	= package/icons/guide.info
 
 .SUFFIXES:
-.PHONY: all test debug package package-dir ahi clean
+.PHONY: all test debug package package-dir ahi ahi-v2 clean
 
 all: $(TOOLS) $(AHI_FILES)
 test: $(TESTS)
@@ -95,6 +95,9 @@ debug: CFLAGS += -DDEBUG -g
 debug: clean all
 
 ahi: $(AHI_FILES)
+
+ahi-v2:
+	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE) ahi-v2
 
 $(AHI_FILES): $(AHI_SOURCES)
 	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE)

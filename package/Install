@@ -299,6 +299,7 @@
 		(P_InstallCommandTool "host-clip")
 		(P_InstallCommandTool "host-info")
 		(P_InstallCommandTool "host-download")
+		(P_InstallCommandTool "host-env")
 	)
 )
 

@@ -115,13 +115,27 @@ host-info
 host-download <URL> [<destination>] [FORCE]
 ```
 
+### 11. host-env
+**Get and set host user environment variables.**
+`host-env` reads, writes, removes, and lists environment variables on the host. On Windows it updates the user's persistent environment. On Linux and macOS it writes persistent values to `$HOME/.host-tools-env`; source that file from your host shell startup files if you want future host login shells to import those values automatically.
+-   **Persistent**: Changes are intended for future host processes.
+-   **Scoped Safely**: Existing host shells, desktop apps, and Amiberry's parent process cannot have their live environment changed by a child process.
+
+**Usage:**
+```shell
+host-env get NAME
+host-env set NAME VALUE
+host-env unset NAME
+host-env list
+```
+
 ---
 
 ## Requirements
 
 -   **Amiberry v6.0+** (or a version with updated `uaelib` support).
 -   "Native Code" execution must be enabled in Amiberry settings.
--   All tools work on **Linux and macOS hosts**. On **Windows hosts**, `host-path`, `host-download`, `host-clip`, `host-reveal`, and `host-info` are supported with a current Amiberry (PowerShell and Explorer handle the Windows side; `curl.exe` ships with Windows 10 and later). The remaining tools (`host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify`) currently require a Linux or macOS host, since their host commands run through the POSIX shell.
+-   All tools work on **Linux and macOS hosts**. On **Windows hosts**, `host-path`, `host-download`, `host-clip`, `host-reveal`, `host-info`, and `host-env` are supported with a current Amiberry (PowerShell and Explorer handle the Windows side; `curl.exe` ships with Windows 10 and later). The remaining tools (`host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify`) currently require a Linux or macOS host, since their host commands run through the POSIX shell.
 -   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, and `host-info`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Older builds still work, but use timeout-based completion detection.
 -   Linux desktop integration uses `xdg-utils` (`xdg-open`, `xdg-mime`) and GTK's `gtk-launch` when available. Notifications use `notify-send`; clipboard support uses `wl-clipboard`, `xclip`, or `xsel`; file selection in `host-reveal` uses `gdbus` when present. Character set conversion uses `iconv` when present.
 -   `host-download` uses the host's `curl` or `wget` (`curl.exe` on Windows). Live streaming progress requires an Amiberry build with pipe-based HostShell sessions; on older Linux and macOS builds the tool falls back to a two-phase transfer that downloads on the host first.
@@ -138,7 +152,7 @@ All tools follow AmigaDOS conventions: `0` on success, `10` (`RETURN_ERROR`) whe
 
 The installer shows a component checklist for the command tools, AmigaGuide documentation, and the UAE and UAESND AHI audio drivers. Before replacing an existing versioned file, it shows the installed and package versions and asks whether to replace or skip it. Files without version strings are still checked for existence and ask before overwrite. It does not edit startup files, system settings, AHI preferences, or existing driver configuration.
 
-For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`) from the package `C` drawer to `C:` or anywhere in your system path. To install the UAE AHI driver manually, copy `Devs/AHI/uae.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAE` to `DEVS:AudioModes/`. To install the UAESND AHI driver manually, copy `Devs/AHI/uaesnd.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAESND` to `DEVS:AudioModes/`. The UAESND driver plays each AHI channel through a hardware audio stream and requires the UAESND sound board to be enabled in the Amiberry configuration.
+For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`, `host-download`, `host-env`) from the package `C` drawer to `C:` or anywhere in your system path. To install the UAE AHI driver manually, copy `Devs/AHI/uae.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAE` to `DEVS:AudioModes/`. To install the UAESND AHI driver manually, copy `Devs/AHI/uaesnd.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAESND` to `DEVS:AudioModes/`. The UAESND driver plays each AHI channel through a hardware audio stream and requires the UAESND sound board to be enabled in the Amiberry configuration.
 
 ## Examples
 

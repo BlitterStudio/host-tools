@@ -8,6 +8,7 @@
 #include <string.h>
 #include "host_base64.h"
 #include "host_clip_command.h"
+#include "host_env_command.h"
 #include "host_info_command.h"
 #include "host_notify_command.h"
 #include "host_powershell.h"
@@ -142,6 +143,76 @@ static void test_info_command(void)
     require_shell_syntax(HOST_INFO_COMMAND);
 }
 
+static void test_env_name_validation(void)
+{
+    require(host_env_valid_name("FOO"), "simple env name should be valid");
+    require(host_env_valid_name("_FOO_1"), "underscore env name should be valid");
+    require(!host_env_valid_name(""), "empty env name should be invalid");
+    require(!host_env_valid_name("1FOO"), "env name must not start with a digit");
+    require(!host_env_valid_name("BAD-NAME"), "env name must not contain hyphens");
+    require(!host_env_valid_name("BAD=NAME"), "env name must not contain equals");
+}
+
+static void test_env_get_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_env_get_command(command, sizeof(command), "FOO"),
+            "env get command should build");
+
+    require_contains(command, "f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "if [ \"${FOO+x}\" = x ]; then printf %s \"$FOO\"");
+    require_contains(command, ". \"$f\"");
+    require_contains(command, "else exit 1; fi");
+    require_shell_syntax(command);
+}
+
+static void test_env_set_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_env_set_command(command, sizeof(command),
+                                        "FOO", "a b's $HOME"),
+            "env set command should build");
+
+    require_contains(command, "f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "grep -v '^export FOO=' \"$f\"");
+    require_contains(command, "printf '%s\\n' 'export FOO='\\''a b'\\''\\'\\'''\\''s $HOME'\\'''");
+    require_contains(command, "mv \"$t\" \"$f\"");
+    require_shell_syntax(command);
+}
+
+static void test_env_unset_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_env_unset_command(command, sizeof(command), "FOO"),
+            "env unset command should build");
+
+    require_contains(command, "f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "grep -v '^export FOO=' \"$f\" > \"$t\"");
+    require_contains(command, "mv \"$t\" \"$f\"");
+    require_shell_syntax(command);
+}
+
+static void test_env_list_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_env_list_command(command, sizeof(command)),
+            "env list command should build");
+
+    require_contains(command, "f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "env");
+    require_contains(command, ". \"$f\"");
+    require_contains(command, "sort");
+    require_shell_syntax(command);
+}
+
 static void require_ps_script(const char *command, const char *script)
 {
     static const char prefix[] = "powershell -NoProfile -EncodedCommand ";
@@ -215,6 +286,40 @@ static void test_windows_info_command(void)
     require_ps_script(command, HOST_INFO_PS_SCRIPT);
 }
 
+static void test_windows_env_commands(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_env_get_command_windows(command, sizeof(command), "FOO"),
+            "windows env get command should build");
+    require_ps_script(command,
+                      "[Console]::OutputEncoding=[System.Text.Encoding]::GetEncoding(28591);"
+                      "$v=[Environment]::GetEnvironmentVariable('FOO','User');"
+                      "if($null -eq $v){exit 1};[Console]::Out.Write($v)");
+
+    command[0] = '\0';
+    require(host_append_env_set_command_windows(command, sizeof(command),
+                                                "FOO", "a'b"),
+            "windows env set command should build");
+    require_ps_script(command,
+                      "[Environment]::SetEnvironmentVariable('FOO','a''b','User')");
+
+    command[0] = '\0';
+    require(host_append_env_unset_command_windows(command, sizeof(command), "FOO"),
+            "windows env unset command should build");
+    require_ps_script(command,
+                      "[Environment]::SetEnvironmentVariable('FOO',$null,'User')");
+
+    command[0] = '\0';
+    require(host_append_env_list_command_windows(command, sizeof(command)),
+            "windows env list command should build");
+    require_ps_script(command,
+                      "[Console]::OutputEncoding=[System.Text.Encoding]::GetEncoding(28591);"
+                      "[Environment]::GetEnvironmentVariables('User').GetEnumerator()|"
+                      "Sort-Object Name|ForEach-Object{[Console]::Out.WriteLine(($_.Name)+'='+($_.Value))}");
+}
+
 static void test_small_buffer_failures(void)
 {
     char command[32];
@@ -230,6 +335,10 @@ static void test_small_buffer_failures(void)
     command[0] = '\0';
     require(!host_append_clip_copy_command(command, sizeof(command), "Text"),
             "small clipboard copy command buffer should fail");
+
+    command[0] = '\0';
+    require(!host_append_env_set_command(command, sizeof(command), "FOO", "Text"),
+            "small env set command buffer should fail");
 }
 
 int main(void)
@@ -241,10 +350,16 @@ int main(void)
     test_clip_copy_command_multiline();
     test_clip_paste_command();
     test_info_command();
+    test_env_name_validation();
+    test_env_get_command();
+    test_env_set_command();
+    test_env_unset_command();
+    test_env_list_command();
     test_ps_quoting();
     test_windows_clip_commands();
     test_windows_reveal_command();
     test_windows_info_command();
+    test_windows_env_commands();
     test_small_buffer_failures();
     return 0;
 }

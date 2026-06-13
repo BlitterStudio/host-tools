@@ -28,6 +28,7 @@ The command tools are installed to C: when selected in the installer.
 @{"host-clip" link HostClip} exchanges text with the host clipboard.
 @{"host-info" link HostInfo} prints host integration details.
 @{"host-download" link HostDownload} downloads files through the host.
+@{"host-env" link HostEnv} gets and sets host environment variables.
 
 @endnode
 
@@ -180,6 +181,26 @@ host-download works on Linux, macOS, and Windows hosts. On Windows a current Ami
 
 @endnode
 
+@node HostEnv "host-env"
+host-env gets, sets, removes, and lists host user environment variables.
+
+Usage:
+
+host-env get NAME
+host-env set NAME VALUE
+host-env unset NAME
+host-env list
+
+On Windows, host-env updates the user's persistent environment through PowerShell and the Windows user environment store. New host processes see the changed values.
+
+On Linux and macOS, host-env writes persistent values to $HOME/.host-tools-env. Source that file from your host shell startup files if you want future host login shells to import those values automatically.
+
+host-env cannot change the live environment of already-running host shells, desktop apps, or Amiberry's parent process.
+
+Variable names must use ASCII letters, digits, and underscores, and must not start with a digit.
+
+@endnode
+
 @node InstallNotes "Installation Notes"
 The installer copies selected files only. It shows a component checklist first. When a versioned file already exists, Installer shows the installed and package versions and asks whether to replace or skip it. Files without version strings are still checked for existence and ask before overwrite.
 
@@ -187,6 +208,6 @@ It does not edit startup files, system settings, or existing driver configuratio
 
 Native Code execution must be enabled in Amiberry for these tools to communicate with the host.
 
-All tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, and host-info are supported with a current Amiberry; the remaining tools require a Linux or macOS host.
+All tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, host-info, and host-env are supported with a current Amiberry; the remaining tools require a Linux or macOS host.
 
 @endnode

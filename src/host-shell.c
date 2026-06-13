@@ -11,6 +11,7 @@
 
 #include "host_capture.h"
 #include "host_common.h"
+#include "host_shell_command.h"
 
 #define OUTBUFSIZE 4095
 
@@ -194,21 +195,11 @@ int main(int argc, char *argv[])
      */
     if (query_console_size(in, out, &term_rows, &term_cols,
                            pending, sizeof(pending), &pending_len) &&
-        append_size_prefix(session_command, sizeof(session_command), term_rows, term_cols)) {
-        if (command[0] != '\0') {
-            if (!host_append_literal(session_command, sizeof(session_command), command)) {
-                session_command[0] = '\0';
-            }
-        } else if (!host_append_literal(session_command, sizeof(session_command),
-                                        "exec \"${SHELL:-/bin/sh}\"")) {
-            session_command[0] = '\0';
-        }
-    } else {
+        !append_size_prefix(session_command, sizeof(session_command), term_rows, term_cols)) {
         session_command[0] = '\0';
     }
 
-    if (session_command[0] == '\0' &&
-        !host_append_literal(session_command, sizeof(session_command), command)) {
+    if (!host_append_shell_login_command(session_command, sizeof(session_command), command)) {
         printf("Command is too long\n");
         return_code = HOST_RETURN_ERROR;
         goto cleanup;

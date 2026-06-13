@@ -37,7 +37,7 @@ host-multiview <filename|URL> [filename2|URL2 ...]
 **Interactive Host Terminal.**
 Opens a fully interactive terminal session on the host system, right inside your Amiga CLI.
 -   **Interactive**: Supports `vi`, `htop`, and other interactive TUI applications.
--   **Shell Support**: Respects your host's default shell (Bash, Zsh, Fish, etc.).
+-   **Shell Support**: Starts your host user's login shell (Bash, Zsh, Fish, etc.) so profile files can set paths and environment variables.
 -   **Raw Mode**: Provides a true terminal experience.
 -   **Terminal Size**: The host terminal is sized to match the Amiga console window, so full-screen programs render correctly.
 

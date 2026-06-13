@@ -95,7 +95,7 @@ Usage:
 
 host-shell [command]
 
-Without a command, the host user's default shell is opened.
+The host user's login shell is used, so shell profile files can set paths and environment variables. This applies both to interactive sessions and to commands passed on the host-shell command line.
 
 The host terminal is sized to match the Amiga console window, so full-screen host programs render correctly. Resize the Amiga window and restart host-shell to apply a new size.
 

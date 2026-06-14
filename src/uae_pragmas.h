@@ -217,4 +217,65 @@ static int UAE_UNUSED HostShell_View(UBYTE *filename)
     return calltrap(89, filename);
 }
 
+#define UAE_MHI_TRAP_ALLOC 110
+#define UAE_MHI_TRAP_FREE 111
+#define UAE_MHI_TRAP_QUEUE 112
+#define UAE_MHI_TRAP_GET_EMPTY 113
+#define UAE_MHI_TRAP_STATUS 114
+#define UAE_MHI_TRAP_PLAY 115
+#define UAE_MHI_TRAP_STOP 116
+#define UAE_MHI_TRAP_PAUSE 117
+#define UAE_MHI_TRAP_SET_PARAM 118
+#define UAE_MHI_TRAP_QUERY 119
+
+static ULONG UAE_UNUSED UaeMHIAlloc(APTR task, ULONG sigmask)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_ALLOC, task, sigmask);
+}
+
+static ULONG UAE_UNUSED UaeMHIFree(ULONG handle)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_FREE, handle);
+}
+
+static ULONG UAE_UNUSED UaeMHIQueue(ULONG handle, APTR buffer, ULONG size, ULONG token)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_QUEUE, handle, buffer, size, token);
+}
+
+static ULONG UAE_UNUSED UaeMHIGetEmpty(ULONG handle)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_GET_EMPTY, handle);
+}
+
+static ULONG UAE_UNUSED UaeMHIStatus(ULONG handle)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_STATUS, handle);
+}
+
+static ULONG UAE_UNUSED UaeMHIPlay(ULONG handle)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_PLAY, handle);
+}
+
+static ULONG UAE_UNUSED UaeMHIStop(ULONG handle)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_STOP, handle);
+}
+
+static ULONG UAE_UNUSED UaeMHIPause(ULONG handle)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_PAUSE, handle);
+}
+
+static ULONG UAE_UNUSED UaeMHISetParam(ULONG handle, ULONG param, ULONG value)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_SET_PARAM, handle, param, value);
+}
+
+static ULONG UAE_UNUSED UaeMHIQuery(ULONG query)
+{
+    return (ULONG)calltrap(UAE_MHI_TRAP_QUERY, query);
+}
+
 #endif

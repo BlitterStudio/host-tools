@@ -5,7 +5,7 @@
 (set @default-dest "")
 
 (welcome
-	"Host-Tools installs command line tools and the optional UAE and UAESND AHI audio drivers for classic AmigaOS 68k systems running under Amiberry."
+	"Host-Tools installs command line tools and the optional UAE and UAESND AHI audio drivers and UAE MHI MP3 decoder library for classic AmigaOS 68k systems running under Amiberry."
 )
 
 (procedure P_SetVersionFields #_source #_destfile
@@ -125,6 +125,16 @@
 		(source #_source)
 		(dest #_destdir)
 		(files)
+	)
+)
+
+(procedure P_EnsureDir #_destdir
+	(if
+		(NOT (exists #_destdir))
+		(makedir #_destdir
+			(prompt (cat "Create " #_destdir))
+			(help @makedir-help)
+		)
 	)
 )
 
@@ -249,6 +259,13 @@
 	)
 )
 
+(procedure P_InstallMHILibrary
+	(
+		(P_EnsureDir "LIBS:MHI")
+		(P_CopySelectedVersionedFile "UAE MHI MP3 decoder library" "Libs/MHI/mhiuae.library" "LIBS:MHI" "mhiuae.library")
+	)
+)
+
 (set #help-language
 	(getenv "Language")
 )
@@ -263,7 +280,7 @@
 
 (if
 	(= @user-level 0)
-	(set #install-components 15)
+	(set #install-components 31)
 	(set #install-components
 		(askoptions
 			(prompt
@@ -271,7 +288,8 @@
 				"Command tools: host commands to C:.\n"
 				"Docs: Host-Tools.guide to HELP:.\n"
 				"UAE AHI: uae.audio and UAE AudioMode.\n"
-				"UAESND AHI: uaesnd.audio and UAESND AudioMode."
+				"UAESND AHI: uaesnd.audio and UAESND AudioMode.\n"
+				"MHI MP3: mhiuae.library to LIBS:MHI."
 			)
 			(help
 				"All components are selected by default. Novice installs every component and replaces existing files without further questions. Intermediate lets you select components, then copies versioned files automatically and replaces unversioned files. Expert shows installed and package versions before replacing existing versioned files, and asks before replacing unversioned files. No startup files, AHI preferences, or system preferences are changed."
@@ -281,8 +299,9 @@
 				"AmigaGuide documentation"
 				"UAE AHI audio driver"
 				"UAESND AHI audio driver"
+				"UAE MHI MP3 decoder"
 			)
-			(default 15)
+			(default 31)
 		)
 	)
 )
@@ -313,6 +332,10 @@
 
 (if (BITAND #install-components 8)
 	(P_InstallUAESNDDriver)
+)
+
+(if (BITAND #install-components 16)
+	(P_InstallMHILibrary)
 )
 
 (exit)

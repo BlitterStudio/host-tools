@@ -26,6 +26,17 @@ DEBUG_ADDR EQU $bfff00
 VERSION EQU 4
 REVISION EQU 1
 VERSION_STRUCT EQU 1
+UAESND_CAP_CAPTURE EQU 8
+UAESND_CAP_CAPTURE_BLOCK EQU 16
+UAESND_CAPTURE_CONTROL_ENABLE EQU 1
+UAESND_CAPTURE_CONTROL_IRQ_ENABLE EQU 2
+UAESND_CAPTURE_BLOCK_COMMAND_COPY EQU 1
+UAESND_RECORD_FRAMES EQU 2048
+UAESND_RECORD_BYTES EQU UAESND_RECORD_FRAMES*4
+base_capture_block_address EQU $900
+base_capture_block_frames EQU $904
+base_capture_block_done EQU $908
+base_capture_block_command EQU $90c
 
 call MACRO
 	jsr	_LVO\1(a6)
@@ -42,7 +53,17 @@ call MACRO
 	UBYTE base_pad1
 	ULONG base_ram_offset
 	ULONG base_ram_size
-	STRUCT base_reserved1,$48
+	ULONG base_capabilities
+	ULONG base_diag_version
+	STRUCT base_diagnostics,$20
+	ULONG base_capture_data
+	ULONG base_capture_overruns
+	ULONG base_capture_intreq
+	ULONG base_capture_threshold
+	ULONG base_capture_control
+	ULONG base_capture_status
+	ULONG base_capture_frequency
+	ULONG base_capture_available
 	ULONG base_stream_allocate
 	ULONG base_stream_latch
 	ULONG base_stream_unlatch
@@ -146,7 +167,13 @@ STREAM_OFFSET = $100
 	UWORD p_StreamCnt
 	UWORD p_Pad1
 	ULONG p_PendingStartMask
+	ULONG p_Capabilities
+	APTR p_RecordBuffer
+	ULONG p_RecordBufferSize
+	UWORD p_Input
+	UWORD p_RecordActive
 	STRUCT p_Interrupt,IS_SIZE
+	STRUCT p_RecordMessage,AHIRecordMessage_SIZEOF
 	LABEL UAESND_SIZEOF	
 
 Start:
@@ -269,7 +296,7 @@ update_channel_volumes
 	; ULONG Flags D3
 
 AHIsub_SetVol
-	movem.l d2/a2,-(sp)
+	movem.l d2/d4/a2,-(sp)
 
 	IFNE DEBUG
 	lea DEBUG_ADDR,a0
@@ -283,6 +310,7 @@ AHIsub_SetVol
 
 	move.l ahiac_DriverData(a2),a2
 
+	move.l d2,d4
 	move.w d0,d2
 	mulu #channel_SIZEOF,d0
 	move.l p_Channels(a2),a1
@@ -301,6 +329,17 @@ AHIsub_SetVol
 	bsr.w scale_output_volume
 	move.l ch_set_current(a1),a0
 	move.w d0,set_volume(a0)
+	move.l d4,d1
+	sub.l #$8000,d1
+	cmp.l #-32767,d1
+	bge.s .pan_min_ok
+	move.l #-32767,d1
+.pan_min_ok
+	cmp.l #32767,d1
+	ble.s .pan_ok
+	move.l #32767,d1
+.pan_ok
+	move.w d1,set_hpan(a0)
 	btst #AHISB_IMM,d3
 	beq.s .noimm
 
@@ -308,8 +347,9 @@ AHIsub_SetVol
 	mulu #STREAM_OFFSET,d2
 	add.l d2,a0
 	move.w d0,STREAM_START+UAESNDSetCurrent+set_volume(a0)
+	move.w d1,STREAM_START+UAESNDSetCurrent+set_hpan(a0)
 .noimm
-	movem.l (sp)+,d2/a2
+	movem.l (sp)+,d2/d4/a2
 	moveq #0,d0
 
 	IFNE DEBUG
@@ -721,12 +761,15 @@ AHIsub_Disable
 
 AHIsub_Enable
 	move.l ahiac_DriverData(a2),a1
+	tst.w p_DisableCount(a1)
+	beq.s .already_enabled
 	subq.w	#1,p_DisableCount(a1)
 	bne.s .exit
 	bsr.w flush_pending_starts
 	move.l p_Base(a1),a0
 	bsr uaesnd_enable
 .exit
+.already_enabled
 	rts
 
 flush_pending_starts
@@ -783,6 +826,9 @@ debug_start
 
 AHIsub_Start
 
+	movem.l d2,-(sp)
+	move.l d0,d2
+
 	IFNE DEBUG
 	lea DEBUG_ADDR,a0
 	move.l d0,(a0)
@@ -790,28 +836,24 @@ AHIsub_Start
 	move.l #debug_start,4(a0)
 	ENDC
 
+	btst #AHISB_PLAY,d2
+	beq.s .noplay
+	bsr.w start_playback
+.noplay
+
+	btst #AHISB_RECORD,d2
+	beq.s .norecord
 	move.l ahiac_DriverData(a2),a1
 	move.l p_Base(a1),a0
-	bsr reset_hw
-
-	move.l a2,a0
-	bsr.w update_playerfunc
-
-	move.l ahiac_DriverData(a2),a1
-	move.l p_Base(a1),a0
-	moveq #1,d0
-	moveq #0,d1
-	move.w p_StreamCnt(a1),d1
-	lsl.l d1,d0
-	subq.l #1,d0
-	move.l d0,base_stream_enable(a0)
-	move.l d0,base_stream_intena(a0)
+	bsr.w start_recording
+.norecord
 	moveq #AHIE_OK,d0
 
 	IFNE DEBUG
 	bsr debugreturn
 	ENDC
 
+	movem.l (sp)+,d2
 	rts	
 
 	IFNE DEBUG
@@ -825,6 +867,9 @@ debug_stop
 
 AHIsub_Stop:
 
+	movem.l d2,-(sp)
+	move.l d0,d2
+
 	IFNE DEBUG
 	lea DEBUG_ADDR,a0
 	move.l d0,(a0)
@@ -832,15 +877,123 @@ AHIsub_Stop:
 	move.l #debug_stop,4(a0)
 	ENDC
 
-	move.l ahiac_DriverData(a2),a0
-	move.l p_Base(a0),a0
-	bsr reset_hw
+	btst #AHISB_PLAY,d2
+	beq.s .noplay
+	bsr.w stop_playback
+.noplay
 
 	move.l ahiac_DriverData(a2),a0
-	clr.l p_PendingStartMask(a0)
-	bsr.w reset_ch
-
+	btst #AHISB_RECORD,d2
+	beq.s .norecord
+	move.l a0,a1
+	move.l p_Base(a1),a0
+	bsr.w stop_recording
+.norecord
 	moveq #AHIE_OK,d0
+	movem.l (sp)+,d2
+	rts
+
+	; a2 = AHIAudioCtrlDrv
+start_playback
+	move.l ahiac_DriverData(a2),a1
+	move.l p_Base(a1),a0
+	bsr reset_hw
+	move.l a2,a0
+	bsr.w update_playerfunc
+	move.l ahiac_DriverData(a2),a1
+	move.l p_Base(a1),a0
+	moveq #1,d0
+	moveq #0,d1
+	move.w p_StreamCnt(a1),d1
+	lsl.l d1,d0
+	subq.l #1,d0
+	move.l d0,base_stream_enable(a0)
+	move.l d0,base_stream_intena(a0)
+	rts
+
+	; a2 = AHIAudioCtrlDrv
+stop_playback
+	move.l ahiac_DriverData(a2),a1
+	move.l p_Base(a1),a0
+	bsr reset_hw
+	clr.l p_PendingStartMask(a1)
+	move.l a1,a0
+	bsr.w reset_ch
+	rts
+
+	; a1 = UAESND
+	; a0 = UAESNDHW
+	; a2 = AHIAudioCtrlDrv
+start_recording
+	tst.l p_RecordBuffer(a1)
+	beq.s .done
+	move.l #AHIST_S16S,p_RecordMessage+ahirm_Type(a1)
+	move.l p_RecordBuffer(a1),p_RecordMessage+ahirm_Buffer(a1)
+	move.l #UAESND_RECORD_FRAMES,p_RecordMessage+ahirm_Length(a1)
+	move.l ahiac_MixFreq(a2),base_capture_frequency(a0)
+	move.l #UAESND_RECORD_BYTES,base_capture_threshold(a0)
+	move.l #UAESND_CAPTURE_CONTROL_ENABLE|UAESND_CAPTURE_CONTROL_IRQ_ENABLE,base_capture_control(a0)
+	btst #0,base_capture_status+3(a0)
+	bne.s .unavailable
+	move.w #1,p_RecordActive(a1)
+.done
+	rts
+.unavailable
+	clr.l base_capture_control(a0)
+	clr.l base_capture_intreq(a0)
+	clr.l base_capture_threshold(a0)
+	bra.s .done
+
+	; a1 = UAESND
+	; a0 = UAESNDHW
+stop_recording
+	clr.l base_capture_control(a0)
+	clr.l base_capture_intreq(a0)
+	clr.l base_capture_threshold(a0)
+	clr.w p_RecordActive(a1)
+	rts
+
+	; a5 = UAESND
+	; a2 = AHIAudioCtrlDrv
+process_recording
+	movem.l d0-d2/a0-a1/a6,-(sp)
+	tst.w p_RecordActive(a5)
+	beq.s .done
+	move.l ahiac_SamplerFunc(a2),a0
+	move.l a0,d0
+	beq.s .done
+	move.l p_Base(a5),a0
+	move.l base_capture_available(a0),d0
+	cmp.l #UAESND_RECORD_BYTES,d0
+	blo.s .done
+	move.l p_Capabilities(a5),d1
+	and.l #UAESND_CAP_CAPTURE_BLOCK,d1
+	beq.s .bytecopy
+	move.l p_RecordBuffer(a5),base_capture_block_address(a0)
+	move.l #UAESND_RECORD_FRAMES,base_capture_block_frames(a0)
+	move.l #UAESND_CAPTURE_BLOCK_COMMAND_COPY,base_capture_block_command(a0)
+	move.l base_capture_block_done(a0),d0
+	cmp.l #UAESND_RECORD_FRAMES,d0
+	bne.s .done
+	bra.s .copied
+.bytecopy
+	move.l p_RecordBuffer(a5),a1
+	move.l #UAESND_RECORD_BYTES,d0
+	subq.l #1,d0
+.copy
+	move.b base_capture_data(a0),(a1)+
+	dbf d0,.copy
+	swap d0
+	subq.w #1,d0
+	bpl.s .copy
+.copied
+	clr.l base_capture_intreq(a0)
+	lea p_RecordMessage(a5),a1
+	move.l ahiac_SamplerFunc(a2),a0
+	move.l h_Entry(a0),a6
+	jsr (a6)
+.done
+	movem.l (sp)+,d0-d2/a0-a1/a6
 	rts
 
 	IFNE DEBUG
@@ -881,12 +1034,13 @@ AHIsub_AllocAudio
 	move.l ub_Base(a5),a4
 	move.w #$8000,p_OutputVolume(a3)
 	move.l a4,p_Base(a3)
+	move.l base_capabilities(a4),p_Capabilities(a3)
 	move.l a2,p_AudioCtrl(a3)
 	
 	moveq #0,d0
 	move.b base_max_streams(a4),d0
 	cmp.w ahiac_Channels(a2),d0
-	bcs .error
+	bcs .alloc_error
 
 	moveq #0,d0
 	move.w ahiac_Channels(a2),d0
@@ -896,7 +1050,7 @@ AHIsub_AllocAudio
 	move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
 	call AllocMem
 	move.l d0,p_Channels(a3)
-	beq	.error
+	beq	.alloc_error
 
 	move.l d0,a1
 	move.w ahiac_Channels(a2),d1
@@ -914,7 +1068,18 @@ AHIsub_AllocAudio
 	move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
 	call AllocMem
 	move.l d0,p_Sounds(a3)
-	beq	.error
+	beq	.alloc_error
+
+	move.l p_Capabilities(a3),d0
+	btst #3,d0
+	beq.s .norecordbuffer
+	move.l #UAESND_RECORD_BYTES,d0
+	move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
+	call AllocMem
+	move.l d0,p_RecordBuffer(a3)
+	beq .alloc_error
+	move.l #UAESND_RECORD_BYTES,p_RecordBufferSize(a3)
+.norecordbuffer
 
 	move.l a3,a0
 	bsr.w reset_ch
@@ -942,6 +1107,16 @@ AHIsub_AllocAudio
 	move.l d0,base_stream_allocate(a0)
 
 	move.l #AHISF_KNOWSTEREO|AHISF_KNOWHIFI|AHISF_KNOWMULTICHANNEL,d7
+	move.l p_Capabilities(a3),d0
+	btst #3,d0
+	beq.s .nocanrecord
+	or.l #AHISF_CANRECORD,d7
+.nocanrecord
+
+.alloc_error
+	cmp.l #AHISF_ERROR,d7
+	bne.s .error
+	bsr.w cleanup_allocaudio_error
 
 .error
 	move.l d7,d0
@@ -951,6 +1126,37 @@ AHIsub_AllocAudio
 	ENDC
 
 	movem.l (sp)+,d2-d3/d7/a3-a6
+	rts
+
+cleanup_allocaudio_error
+	movem.l d0/a1/a3,-(sp)
+	move.l ahiac_DriverData(a2),d0
+	beq.s .done
+	move.l d0,a3
+	move.l p_Sounds(a3),d0
+	beq.s .nosounds
+	move.l d0,a1
+	move.l p_SoundSize(a3),d0
+	call FreeMem
+.nosounds
+	move.l p_Channels(a3),d0
+	beq.s .nochannels
+	move.l d0,a1
+	move.l p_ChannelSize(a3),d0
+	call FreeMem
+.nochannels
+	move.l p_RecordBuffer(a3),d0
+	beq.s .norecordbuffer
+	move.l d0,a1
+	move.l p_RecordBufferSize(a3),d0
+	call FreeMem
+.norecordbuffer
+	move.l a3,a1
+	move.l p_DriverDataSize(a3),d0
+	call FreeMem
+	clr.l ahiac_DriverData(a2)
+.done
+	movem.l (sp)+,d0/a1/a3
 	rts
 
 	IFNE DEBUG
@@ -981,6 +1187,9 @@ AHIsub_FreeAudio
 	call RemIntServer	
 
 	move.l p_Base(a3),a0
+	move.l a3,a1
+	bsr.w stop_recording
+	move.l p_Base(a3),a0
 	bsr.w reset_hw
 	clr.l base_stream_allocate(a0)
 .noint
@@ -998,6 +1207,12 @@ AHIsub_FreeAudio
 	move.l p_ChannelSize(a3),d0
 	call FreeMem
 .nochannels
+	move.l p_RecordBuffer(a3),d0
+	beq.s .norecordbuffer
+	move.l d0,a1
+	move.l p_RecordBufferSize(a3),d0
+	call FreeMem
+.norecordbuffer
 	
 	move.l a3,a1
 	move.l p_DriverDataSize(a3),d0
@@ -1038,7 +1253,7 @@ AHIsub_GetAttr
 	bne.s .notfreq
 	lea tag_frequencies(pc),a0
 	move.l 0(a0,d1.w*4),d2
-	bra.s .exit
+	bra.w .exit
 .notfreq
 	cmp.l #AHIDB_Index,d0
 	bne.s .notindex
@@ -1048,12 +1263,12 @@ AHIsub_GetAttr
 	tst.l (a0)
 	beq.s .freqexit
 	cmp.l (a0)+,d1
-	bls.s .exit
+	bls.w .exit
 	addq.l #1,d2
 	bra.s .freqnext
 .freqexit
 	moveq #FREQUENCIES-1,d2
-	bra.s .exit
+	bra.w .exit
 .notindex
 	cmp.l #AHIDB_Bits,d0
 	bne.s .notbits
@@ -1061,8 +1276,60 @@ AHIsub_GetAttr
 	tst.l d0
 	bmi.s .notbits
 	move.l d0,d2
-	bra.s .exit
+	bra.w .exit
 .notbits
+	cmp.l #AHIDB_MaxChannels,d0
+	bne.s .notmaxchannels
+	bsr.w get_maxchannels
+	bra.w .exit
+.notmaxchannels
+	cmp.l #AHIDB_Record,d0
+	beq.s .capturebool
+	cmp.l #AHIDB_FullDuplex,d0
+	beq.s .capturebool
+	cmp.l #AHIDB_MaxRecordSamples,d0
+	beq.s .capturerecordsamples
+	cmp.l #AHIDB_MinInputGain,d0
+	beq.s .capturegain
+	cmp.l #AHIDB_MaxInputGain,d0
+	beq.s .capturegain
+	cmp.l #AHIDB_Inputs,d0
+	beq.s .captureinputs
+	cmp.l #AHIDB_Input,d0
+	beq.s .captureinput
+	bra.s .staticattr
+.capturebool
+	bsr.w has_capture
+	move.l d0,d2
+	bra.s .exit
+.capturerecordsamples
+	bsr.w has_capture
+	tst.l d0
+	beq.s .nocaptureattr
+	move.l #UAESND_RECORD_FRAMES,d2
+	bra.s .exit
+.capturegain
+	bsr.w has_capture
+	tst.l d0
+	beq.s .nocaptureattr
+	moveq #1,d2
+	swap d2
+	bra.s .exit
+.captureinputs
+	bsr.w has_capture
+	move.l d0,d2
+	bra.s .exit
+.captureinput
+	bsr.w has_capture
+	tst.l d0
+	beq.s .nocaptureattr
+	lea tag_input(pc),a0
+	move.l a0,d2
+	bra.s .exit
+.nocaptureattr
+	moveq #0,d2
+	bra.s .exit
+.staticattr
 
 	lea GetAttrTags(pc),a0
 .next
@@ -1113,6 +1380,47 @@ get_audioid_bits
 	moveq #-1,d0
 	rts
 
+get_maxchannels
+	movem.l d0/a0,-(sp)
+	move.l a2,d0
+	beq.s .library_base
+	move.l ahiac_DriverData(a2),d0
+	beq.s .library_base
+	move.l d0,a0
+	move.l p_Base(a0),a0
+	bra.s .got_base
+.library_base
+	move.l ub_Base(a6),a0
+.got_base
+	moveq #0,d2
+	move.b base_max_streams(a0),d2
+	bne.s .done
+	moveq #8,d2
+.done
+	movem.l (sp)+,d0/a0
+	rts
+
+has_capture
+	movem.l d1/a0,-(sp)
+	move.l a2,d1
+	beq.s .library_base
+	move.l ahiac_DriverData(a2),d1
+	beq.s .library_base
+	move.l d1,a0
+	move.l p_Capabilities(a0),d1
+	bra.s .got_capabilities
+.library_base
+	move.l ub_Base(a6),a0
+	move.l base_capabilities(a0),d1
+.got_capabilities
+	moveq #0,d0
+	btst #3,d1
+	beq.s .done
+	moveq #1,d0
+.done
+	movem.l (sp)+,d1/a0
+	rts
+
 
 tag_frequencies
 	dc.l 4410	; CD/10
@@ -1151,7 +1459,13 @@ GetAttrTags
 	dc.l AHIDB_Author, tag_author
 	dc.l AHIDB_Copyright, tag_copyright
 	dc.l AHIDB_Version, IDString
-	dc.l AHIDB_Record, 0
+	dc.l AHIDB_Record, 1
+	dc.l AHIDB_FullDuplex, 1
+	dc.l AHIDB_MaxRecordSamples, UAESND_RECORD_FRAMES
+	dc.l AHIDB_MinInputGain, $10000
+	dc.l AHIDB_MaxInputGain, $10000
+	dc.l AHIDB_Inputs, 1
+	dc.l AHIDB_Input, tag_input
 	dc.l AHIDB_Outputs, 1
 	dc.l AHIDB_Output, tag_output
 	dc.l AHIDB_PingPong, 1
@@ -1166,6 +1480,8 @@ tag_copyright
 	dc.b "(C) 2020 Toni Wilen",0
 tag_output
 	dc.b "UAE",0
+tag_input
+	dc.b "UAE host capture",0
 	even
 
 	IFNE DEBUG
@@ -1241,12 +1557,13 @@ AHIsub_HardwareControl
 .dontgetinputgain
 	cmp.l #AHIC_Input,d0
 	bne.s .dontsetinput
-	nop
+	move.w d1,p_Input(a1)
 	bra.s .done
 .dontsetinput
 	cmp.l #AHIC_Input_Query,d0
 	bne.b .dontgetinput
 	moveq #0,d0
+	move.w p_Input(a1),d0
 	bra.s .doneout
 .dontgetinput
 	cmp.l #AHIC_Output,d0
@@ -1292,7 +1609,12 @@ callsoundfunc:
 interrupt_code
 	move.l p_Base(a1),a0
 	move.l base_stream_intreq(a0),d0
+	bne.s .gotirq
+	tst.w p_RecordActive(a1)
 	beq.w .notours
+	tst.l base_capture_intreq(a0)
+	beq.w .notours
+.gotirq
 
 	movem.l d2-d7/a2-a4,-(sp)
 	move.l d0,d7
@@ -1362,6 +1684,8 @@ interrupt_code
 	cmp.w p_StreamCnt(a3),d6
 	bne.s .cont
 	
+	move.l a3,a5
+	bsr.w process_recording
 	movem.l (sp)+,d2-d7/a2-a4
 	moveq #0,d0
 	rts

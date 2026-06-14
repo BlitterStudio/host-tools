@@ -11,6 +11,7 @@ Installed components:
 @{"Command tools" link Commands}
 @{"UAE AHI audio driver" link AHI}
 @{"UAESND AHI audio driver" link UAESND}
+@{"UAE MHI MP3 decoder" link MHI}
 @{"Installation notes" link InstallNotes}
 
 @endnode
@@ -68,6 +69,19 @@ The installer does not change AHI preferences. Select a uaesnd mode in AHI prefe
 
 @endnode
 
+@node MHI "UAE MHI MP3 Decoder"
+The UAE MHI MP3 decoder library is installed only when selected in the installer.
+
+Installed file:
+
+Libs/MHI/mhiuae.library
+
+The library implements the classic MHI decoder ABI and forwards MP3 buffers to Amiberry through uae.resource. Amiberry decodes the stream with its host mpg123 decoder and feeds the result into the emulator audio mixer, so MP3 playback does not consume Amiga CPU time.
+
+The library does not require or configure an AHI mode. It can be used alongside Paula, UAE AHI, UAESND AHI, or another selected AHI driver.
+
+@endnode
+
 @node HostRun "host-run"
 host-run executes a command on the host operating system.
 
@@ -95,7 +109,7 @@ Usage:
 
 host-shell [command]
 
-Without a command, the host user's default shell is opened.
+The host user's login shell is used, so shell profile files can set paths and environment variables. This applies both to interactive sessions and to commands passed on the host-shell command line.
 
 The host terminal is sized to match the Amiga console window, so full-screen host programs render correctly. Resize the Amiga window and restart host-shell to apply a new size.
 

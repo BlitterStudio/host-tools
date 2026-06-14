@@ -20,6 +20,8 @@ docs/superpowers/
 build/
 drivers/ahi/package/
 drivers/ahi/package-v2/
+drivers/mhi/build/
+drivers/mhi/package/
 dist/
 release/
 tmp/

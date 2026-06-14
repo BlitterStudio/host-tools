@@ -13,6 +13,7 @@
 #include "host_notify_command.h"
 #include "host_powershell.h"
 #include "host_reveal_command.h"
+#include "host_shell_command.h"
 
 static void require(int condition, const char *message)
 {
@@ -27,6 +28,14 @@ static void require_contains(const char *value, const char *needle)
     if (strstr(value, needle) == NULL) {
         fprintf(stderr, "missing substring: %s\n", needle);
         fprintf(stderr, "value: %s\n", value);
+        exit(1);
+    }
+}
+
+static void require_string(const char *actual, const char *expected, const char *message)
+{
+    if (strcmp(actual, expected) != 0) {
+        fprintf(stderr, "%s\nexpected: %s\nactual:   %s\n", message, expected, actual);
         exit(1);
     }
 }
@@ -213,6 +222,33 @@ static void test_env_list_command(void)
     require_shell_syntax(command);
 }
 
+static void test_shell_login_interactive_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_shell_login_command(command, sizeof(command), ""),
+            "interactive shell login command should build");
+
+    require_string(command, "h=\"${SHELL:-/bin/sh}\"; exec \"$h\" -l",
+                   "interactive shell should exec the user's login shell");
+    require_shell_syntax(command);
+}
+
+static void test_shell_login_explicit_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_shell_login_command(command, sizeof(command), "printf '%s\\n' \"$PATH\""),
+            "explicit shell login command should build");
+
+    require_string(command,
+                   "h=\"${SHELL:-/bin/sh}\"; exec \"$h\" -l -c 'printf '\\''%s\\n'\\'' \"$PATH\"'",
+                   "explicit command should run through the user's login shell");
+    require_shell_syntax(command);
+}
+
 static void require_ps_script(const char *command, const char *script)
 {
     static const char prefix[] = "powershell -NoProfile -EncodedCommand ";
@@ -355,6 +391,8 @@ int main(void)
     test_env_set_command();
     test_env_unset_command();
     test_env_list_command();
+    test_shell_login_interactive_command();
+    test_shell_login_explicit_command();
     test_ps_quoting();
     test_windows_clip_commands();
     test_windows_reveal_command();

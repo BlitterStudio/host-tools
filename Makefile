@@ -5,7 +5,7 @@ TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify ho
 TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out tests/test_host_download_command.out
 TEST_SCRIPTS	= tests/test_package_layout.sh tests/test_ahi_driver_source.sh
 TESTS		= $(TEST_BINS) $(TEST_SCRIPTS)
-COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_base64.h src/host_clip_command.h src/host_download_command.h src/host_edit_command.h src/host_env_command.h src/host_info_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h src/uae_pragmas.h
+COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_base64.h src/host_clip_command.h src/host_download_command.h src/host_edit_command.h src/host_env_command.h src/host_info_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h src/host_shell_command.h src/uae_pragmas.h
 PACKAGE		= Host-Tools-$(VERSION).lha
 PACKAGE_ROOT	= Host-Tools
 PACKAGE_DIR	?= build/package
@@ -16,6 +16,8 @@ AHI_FILES	= $(AHI_AUDIO) $(AHI_MODE)
 AHI_V2_AUDIO	= drivers/ahi/package-v2/Devs/AHI/uaesnd.audio
 AHI_V2_MODE	= drivers/ahi/package-v2/Devs/AudioModes/UAESND
 AHI_V2_FILES	= $(AHI_V2_AUDIO) $(AHI_V2_MODE)
+MHI_LIBRARY	= drivers/mhi/package/Libs/MHI/mhiuae.library
+MHI_FILES	= $(MHI_LIBRARY)
 AHI_SOURCES	= drivers/ahi/Makefile \
 	drivers/ahi/src/v1/uae.audio.asm \
 	drivers/ahi/src/v1/UAE.asm \
@@ -29,6 +31,11 @@ AHI_SOURCES	= drivers/ahi/Makefile \
 AHI_V2_SOURCES	= drivers/ahi/Makefile \
 	drivers/ahi/src/v2/uaesnd.audio.asm \
 	drivers/ahi/src/v2/UAESND.asm
+MHI_SOURCES	= drivers/mhi/Makefile \
+	drivers/mhi/src/mhiuae.h \
+	drivers/mhi/src/mhiuae_startup.c \
+	drivers/mhi/src/mhiuae.c \
+	src/uae_pragmas.h
 HELP_GUIDE	= package/Help/Host-Tools.guide
 DRAWER_ICON	= package/icons/drawer.info
 HELP_ICON	= package/icons/Help.info
@@ -37,9 +44,9 @@ README_ICON	= package/icons/readme.info
 GUIDE_ICON	= package/icons/guide.info
 
 .SUFFIXES:
-.PHONY: all test debug package package-dir ahi ahi-v2 clean
+.PHONY: all test debug package package-dir ahi ahi-v2 mhi clean
 
-all: $(TOOLS) $(AHI_FILES) $(AHI_V2_FILES)
+all: $(TOOLS) $(AHI_FILES) $(AHI_V2_FILES) $(MHI_FILES)
 test: $(TESTS)
 	@for test in $(TESTS); do \
 		case "$$test" in \
@@ -97,7 +104,7 @@ host-env: src/host-env.c $(COMMON_HEADERS)
 tests/test_host_common.out: tests/test_host_common.c src/host_common.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_common.c -o $@
 
-tests/test_host_command_builders.out: tests/test_host_command_builders.c src/host_base64.h src/host_clip_command.h src/host_common.h src/host_env_command.h src/host_info_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h
+tests/test_host_command_builders.out: tests/test_host_command_builders.c src/host_base64.h src/host_clip_command.h src/host_common.h src/host_env_command.h src/host_info_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h src/host_shell_command.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_command_builders.c -o $@
 
 tests/test_host_edit_command.out: tests/test_host_edit_command.c src/host_edit_command.h src/host_common.h
@@ -113,11 +120,16 @@ ahi: $(AHI_FILES)
 
 ahi-v2: $(AHI_V2_FILES)
 
+mhi: $(MHI_FILES)
+
 $(AHI_FILES): $(AHI_SOURCES)
 	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE)
 
 $(AHI_V2_FILES): $(AHI_V2_SOURCES)
 	$(MAKE) -C drivers/ahi VERSION=$(VERSION) DATE=$(DATE) ahi-v2
+
+$(MHI_FILES): $(MHI_SOURCES)
+	$(MAKE) -C drivers/mhi VERSION=$(VERSION) DATE=$(DATE)
 
 package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INSTALL_ICON) $(README_ICON) $(GUIDE_ICON)
 	rm -rf $(PACKAGE_STAGE) $(PACKAGE_DIR)/$(PACKAGE_ROOT).info
@@ -142,6 +154,10 @@ package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INS
 		cp $(AHI_V2_AUDIO) $(PACKAGE_STAGE)/Devs/AHI/uaesnd.audio; \
 		cp $(AHI_V2_MODE) $(PACKAGE_STAGE)/Devs/AudioModes/UAESND; \
 	fi
+	if [ -f $(MHI_LIBRARY) ]; then \
+		mkdir -p $(PACKAGE_STAGE)/Libs/MHI; \
+		cp $(MHI_LIBRARY) $(PACKAGE_STAGE)/Libs/MHI/mhiuae.library; \
+	fi
 
 package: package-dir
 	rm -f $(PACKAGE)
@@ -150,3 +166,4 @@ package: package-dir
 clean:
 	rm -f $(TOOLS) $(TEST_BINS)
 	$(MAKE) -C drivers/ahi clean
+	$(MAKE) -C drivers/mhi clean

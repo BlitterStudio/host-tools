@@ -27,10 +27,16 @@ VERSION EQU 4
 REVISION EQU 1
 VERSION_STRUCT EQU 1
 UAESND_CAP_CAPTURE EQU 8
+UAESND_CAP_CAPTURE_BLOCK EQU 16
 UAESND_CAPTURE_CONTROL_ENABLE EQU 1
 UAESND_CAPTURE_CONTROL_IRQ_ENABLE EQU 2
+UAESND_CAPTURE_BLOCK_COMMAND_COPY EQU 1
 UAESND_RECORD_FRAMES EQU 2048
 UAESND_RECORD_BYTES EQU UAESND_RECORD_FRAMES*4
+base_capture_block_address EQU $900
+base_capture_block_frames EQU $904
+base_capture_block_done EQU $908
+base_capture_block_command EQU $90c
 
 call MACRO
 	jsr	_LVO\1(a6)
@@ -960,6 +966,17 @@ process_recording
 	move.l base_capture_available(a0),d0
 	cmp.l #UAESND_RECORD_BYTES,d0
 	blo.s .done
+	move.l p_Capabilities(a5),d1
+	and.l #UAESND_CAP_CAPTURE_BLOCK,d1
+	beq.s .bytecopy
+	move.l p_RecordBuffer(a5),base_capture_block_address(a0)
+	move.l #UAESND_RECORD_FRAMES,base_capture_block_frames(a0)
+	move.l #UAESND_CAPTURE_BLOCK_COMMAND_COPY,base_capture_block_command(a0)
+	move.l base_capture_block_done(a0),d0
+	cmp.l #UAESND_RECORD_FRAMES,d0
+	bne.s .done
+	bra.s .copied
+.bytecopy
 	move.l p_RecordBuffer(a5),a1
 	move.l #UAESND_RECORD_BYTES,d0
 	subq.l #1,d0
@@ -969,6 +986,7 @@ process_recording
 	swap d0
 	subq.w #1,d0
 	bpl.s .copy
+.copied
 	clr.l base_capture_intreq(a0)
 	lea p_RecordMessage(a5),a1
 	move.l ahiac_SamplerFunc(a2),a0

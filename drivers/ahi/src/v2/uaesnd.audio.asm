@@ -269,7 +269,7 @@ update_channel_volumes
 	; ULONG Flags D3
 
 AHIsub_SetVol
-	movem.l d2/a2,-(sp)
+	movem.l d2/d4/a2,-(sp)
 
 	IFNE DEBUG
 	lea DEBUG_ADDR,a0
@@ -283,6 +283,7 @@ AHIsub_SetVol
 
 	move.l ahiac_DriverData(a2),a2
 
+	move.l d2,d4
 	move.w d0,d2
 	mulu #channel_SIZEOF,d0
 	move.l p_Channels(a2),a1
@@ -301,6 +302,17 @@ AHIsub_SetVol
 	bsr.w scale_output_volume
 	move.l ch_set_current(a1),a0
 	move.w d0,set_volume(a0)
+	move.l d4,d1
+	sub.l #$8000,d1
+	cmp.l #-32767,d1
+	bge.s .pan_min_ok
+	move.l #-32767,d1
+.pan_min_ok
+	cmp.l #32767,d1
+	ble.s .pan_ok
+	move.l #32767,d1
+.pan_ok
+	move.w d1,set_hpan(a0)
 	btst #AHISB_IMM,d3
 	beq.s .noimm
 
@@ -308,8 +320,9 @@ AHIsub_SetVol
 	mulu #STREAM_OFFSET,d2
 	add.l d2,a0
 	move.w d0,STREAM_START+UAESNDSetCurrent+set_volume(a0)
+	move.w d1,STREAM_START+UAESNDSetCurrent+set_hpan(a0)
 .noimm
-	movem.l (sp)+,d2/a2
+	movem.l (sp)+,d2/d4/a2
 	moveq #0,d0
 
 	IFNE DEBUG
@@ -721,12 +734,15 @@ AHIsub_Disable
 
 AHIsub_Enable
 	move.l ahiac_DriverData(a2),a1
+	tst.w p_DisableCount(a1)
+	beq.s .already_enabled
 	subq.w	#1,p_DisableCount(a1)
 	bne.s .exit
 	bsr.w flush_pending_starts
 	move.l p_Base(a1),a0
 	bsr uaesnd_enable
 .exit
+.already_enabled
 	rts
 
 flush_pending_starts
@@ -886,7 +902,7 @@ AHIsub_AllocAudio
 	moveq #0,d0
 	move.b base_max_streams(a4),d0
 	cmp.w ahiac_Channels(a2),d0
-	bcs .error
+	bcs .alloc_error
 
 	moveq #0,d0
 	move.w ahiac_Channels(a2),d0
@@ -896,7 +912,7 @@ AHIsub_AllocAudio
 	move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
 	call AllocMem
 	move.l d0,p_Channels(a3)
-	beq	.error
+	beq	.alloc_error
 
 	move.l d0,a1
 	move.w ahiac_Channels(a2),d1
@@ -914,7 +930,7 @@ AHIsub_AllocAudio
 	move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
 	call AllocMem
 	move.l d0,p_Sounds(a3)
-	beq	.error
+	beq	.alloc_error
 
 	move.l a3,a0
 	bsr.w reset_ch
@@ -943,6 +959,11 @@ AHIsub_AllocAudio
 
 	move.l #AHISF_KNOWSTEREO|AHISF_KNOWHIFI|AHISF_KNOWMULTICHANNEL,d7
 
+.alloc_error
+	cmp.l #AHISF_ERROR,d7
+	bne.s .error
+	bsr.w cleanup_allocaudio_error
+
 .error
 	move.l d7,d0
 
@@ -951,6 +972,31 @@ AHIsub_AllocAudio
 	ENDC
 
 	movem.l (sp)+,d2-d3/d7/a3-a6
+	rts
+
+cleanup_allocaudio_error
+	movem.l d0/a1/a3,-(sp)
+	move.l ahiac_DriverData(a2),d0
+	beq.s .done
+	move.l d0,a3
+	move.l p_Sounds(a3),d0
+	beq.s .nosounds
+	move.l d0,a1
+	move.l p_SoundSize(a3),d0
+	call FreeMem
+.nosounds
+	move.l p_Channels(a3),d0
+	beq.s .nochannels
+	move.l d0,a1
+	move.l p_ChannelSize(a3),d0
+	call FreeMem
+.nochannels
+	move.l a3,a1
+	move.l p_DriverDataSize(a3),d0
+	call FreeMem
+	clr.l ahiac_DriverData(a2)
+.done
+	movem.l (sp)+,d0/a1/a3
 	rts
 
 	IFNE DEBUG
@@ -1063,6 +1109,11 @@ AHIsub_GetAttr
 	move.l d0,d2
 	bra.s .exit
 .notbits
+	cmp.l #AHIDB_MaxChannels,d0
+	bne.s .notmaxchannels
+	bsr.w get_maxchannels
+	bra.s .exit
+.notmaxchannels
 
 	lea GetAttrTags(pc),a0
 .next
@@ -1111,6 +1162,26 @@ get_audioid_bits
 	rts
 .not_stereo_bits
 	moveq #-1,d0
+	rts
+
+get_maxchannels
+	movem.l d0/a0,-(sp)
+	move.l a2,d0
+	beq.s .library_base
+	move.l ahiac_DriverData(a2),d0
+	beq.s .library_base
+	move.l d0,a0
+	move.l p_Base(a0),a0
+	bra.s .got_base
+.library_base
+	move.l ub_Base(a6),a0
+.got_base
+	moveq #0,d2
+	move.b base_max_streams(a0),d2
+	bne.s .done
+	moveq #8,d2
+.done
+	movem.l (sp)+,d0/a0
 	rts
 
 

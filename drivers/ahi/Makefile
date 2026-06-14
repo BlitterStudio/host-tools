@@ -4,10 +4,11 @@
 VERSION		?= 2.4
 DATE		?= 2026-06-10
 
-ifeq ($(origin VASMM68K),default)
-VASMM68K	= vasmm68k_mot
+VASMM68K_FALLBACK := $(shell command -v vasmm68k_mot 2>/dev/null || { test -x /opt/m68k-amigaos/bin/vasmm68k_mot && printf /opt/m68k-amigaos/bin/vasmm68k_mot; } || printf vasmm68k_mot)
+ifeq ($(origin VASMM68K),undefined)
+VASMM68K	:= $(VASMM68K_FALLBACK)
 endif
-VASMM68K_CMD	= $(if $(VASMM68K),$(VASMM68K),vasmm68k_mot)
+VASMM68K_CMD	= $(if $(strip $(VASMM68K)),$(VASMM68K),$(VASMM68K_FALLBACK))
 
 BUILD_DIR	= build
 AHI_PACKAGE_DIR	= package

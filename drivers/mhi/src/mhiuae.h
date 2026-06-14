@@ -7,6 +7,7 @@
 #define MHIUAE_H
 
 #include <exec/libraries.h>
+#include <exec/semaphores.h>
 #include <exec/tasks.h>
 #include <exec/types.h>
 
@@ -21,6 +22,7 @@ struct MHIUAEBase {
     struct Library lib;
     BPTR seg_list;
     struct ExecBase *sys_base;
+    struct SignalSemaphore allocation_lock;
     ULONG allocated_decoders;
 };
 

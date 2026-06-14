@@ -32,7 +32,9 @@ APTR i_MHIAllocDecoder(struct Task *task __asm("a0"), ULONG sigmask __asm("d0"),
     struct MHIUAEPlayer *player;
     ULONG host_handle;
 
+    ObtainSemaphore(&base->allocation_lock);
     if (base->allocated_decoders != 0) {
+        ReleaseSemaphore(&base->allocation_lock);
         return NULL;
     }
 
@@ -42,12 +44,14 @@ APTR i_MHIAllocDecoder(struct Task *task __asm("a0"), ULONG sigmask __asm("d0"),
 
     host_handle = UaeMHIAlloc(task, sigmask);
     if (host_handle == 0) {
+        ReleaseSemaphore(&base->allocation_lock);
         return NULL;
     }
 
     player = AllocVec(sizeof(*player), MEMF_PUBLIC | MEMF_CLEAR);
     if (player == NULL) {
         UaeMHIFree(host_handle);
+        ReleaseSemaphore(&base->allocation_lock);
         return NULL;
     }
 
@@ -56,6 +60,7 @@ APTR i_MHIAllocDecoder(struct Task *task __asm("a0"), ULONG sigmask __asm("d0"),
     player->host_handle = host_handle;
     player->status = MHIF_STOPPED;
     base->allocated_decoders++;
+    ReleaseSemaphore(&base->allocation_lock);
     return player;
 }
 
@@ -67,10 +72,12 @@ void i_MHIFreeDecoder(APTR handle __asm("a3"), struct MHIUAEBase *base __asm("a6
         return;
     }
 
+    ObtainSemaphore(&base->allocation_lock);
     UaeMHIFree(player->host_handle);
     if (base->allocated_decoders > 0) {
         base->allocated_decoders--;
     }
+    ReleaseSemaphore(&base->allocation_lock);
     FreeVec(player);
 }
 

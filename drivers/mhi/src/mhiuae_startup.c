@@ -113,6 +113,7 @@ struct MHIUAEBase *InitLib(struct ExecBase *sysbase __asm("a6"), BPTR seglist __
     SysBase = sysbase;
     base->sys_base = sysbase;
     base->seg_list = seglist;
+    InitSemaphore(&base->allocation_lock);
     base->allocated_decoders = 0;
 
     if (mhiuae_open_uae()) {

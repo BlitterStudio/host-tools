@@ -150,9 +150,9 @@ All tools follow AmigaDOS conventions: `0` on success, `10` (`RETURN_ERROR`) whe
 2.  Extract the `Host-Tools-<version>.lha` archive.
 3.  Open the `Host-Tools` drawer and run `Install`.
 
-The installer shows a component checklist for the command tools, AmigaGuide documentation, and the UAE and UAESND AHI audio drivers. Before replacing an existing versioned file, it shows the installed and package versions and asks whether to replace or skip it. Files without version strings are still checked for existence and ask before overwrite. It does not edit startup files, system settings, AHI preferences, or existing driver configuration.
+The installer shows a component checklist for the command tools, AmigaGuide documentation, the UAE and UAESND AHI audio drivers, and the UAE MHI MP3 decoder library. Before replacing an existing versioned file, it shows the installed and package versions and asks whether to replace or skip it. Files without version strings are still checked for existence and ask before overwrite. It does not edit startup files, system settings, AHI preferences, or existing driver configuration.
 
-For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`, `host-download`, `host-env`) from the package `C` drawer to `C:` or anywhere in your system path. To install the UAE AHI driver manually, copy `Devs/AHI/uae.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAE` to `DEVS:AudioModes/`. To install the UAESND AHI driver manually, copy `Devs/AHI/uaesnd.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAESND` to `DEVS:AudioModes/`. The UAESND driver plays each AHI channel through a hardware audio stream and requires the UAESND sound board to be enabled in the Amiberry configuration.
+For manual installation, copy the binaries (`host-run`, `host-multiview`, `host-shell`, `host-path`, `host-reveal`, `host-notify`, `host-edit`, `host-clip`, `host-info`, `host-download`, `host-env`) from the package `C` drawer to `C:` or anywhere in your system path. To install the UAE AHI driver manually, copy `Devs/AHI/uae.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAE` to `DEVS:AudioModes/`. To install the UAESND AHI driver manually, copy `Devs/AHI/uaesnd.audio` to `DEVS:AHI/` and `Devs/AudioModes/UAESND` to `DEVS:AudioModes/`. To install the UAE MHI MP3 decoder manually, copy `Libs/MHI/mhiuae.library` to `LIBS:MHI/`. The UAESND driver plays each AHI channel through a hardware audio stream and requires the UAESND sound board to be enabled in the Amiberry configuration. The MHI library is independent of the selected AHI output mode and forwards MP3 decoding to Amiberry through `uae.resource`.
 
 ## Examples
 
@@ -213,7 +213,7 @@ To build a release archive:
 make package
 ```
 
-The package target creates `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, AmigaGuide documentation, and the UAE and UAESND AHI driver files.
+The package target creates `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, AmigaGuide documentation, the UAE and UAESND AHI driver files, and the UAE MHI MP3 decoder library.
 
 Native package builds also require `lha`. The Docker build image contains this tool.
 

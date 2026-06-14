@@ -11,6 +11,7 @@ Installed components:
 @{"Command tools" link Commands}
 @{"UAE AHI audio driver" link AHI}
 @{"UAESND AHI audio driver" link UAESND}
+@{"UAE MHI MP3 decoder" link MHI}
 @{"Installation notes" link InstallNotes}
 
 @endnode
@@ -65,6 +66,19 @@ uaesnd: HiFi Stereo uses 32 bit stereo output.
 uaesnd: 7.1 uses 32 bit multichannel output.
 
 The installer does not change AHI preferences. Select a uaesnd mode in AHI preferences yourself if you want it to become the active output mode.
+
+@endnode
+
+@node MHI "UAE MHI MP3 Decoder"
+The UAE MHI MP3 decoder library is installed only when selected in the installer.
+
+Installed file:
+
+Libs/MHI/mhiuae.library
+
+The library implements the classic MHI decoder ABI and forwards MP3 buffers to Amiberry through uae.resource. Amiberry decodes the stream with its host mpg123 decoder and feeds the result into the emulator audio mixer, so MP3 playback does not consume Amiga CPU time.
+
+The library does not require or configure an AHI mode. It can be used alongside Paula, UAE AHI, UAESND AHI, or another selected AHI driver.
 
 @endnode
 

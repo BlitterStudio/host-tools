@@ -142,6 +142,8 @@ grep -q 'UAE :16 bit HIFI Stereo++' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'uaesnd: Stereo' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'uaesnd: HiFi Stereo' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'uaesnd: 7.1' "$PACKAGE_ROOT/Help/Host-Tools.guide"
+grep -q 'UAE MHI MP3 Decoder' "$PACKAGE_ROOT/Help/Host-Tools.guide"
+grep -q 'Libs/MHI/mhiuae.library' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 
 for icon in "$PACKAGE_ROOT/Help/Host-Tools.guide.info"; do
 	magic="$(od -An -tx1 -N2 "$icon" | tr -d ' \n')"
@@ -163,16 +165,19 @@ grep -q "(askoptions" "$PACKAGE_ROOT/Install"
 grep -q "(= @user-level 0)" "$PACKAGE_ROOT/Install"
 grep -q "(= @user-level 1)" "$PACKAGE_ROOT/Install"
 grep -q "(= @user-level 2)" "$PACKAGE_ROOT/Install"
-grep -q "(set #install-components 15)" "$PACKAGE_ROOT/Install"
+grep -q "(set #install-components 31)" "$PACKAGE_ROOT/Install"
 grep -q "(procedure P_ReplaceFile" "$PACKAGE_ROOT/Install"
+grep -q "(procedure P_EnsureDir" "$PACKAGE_ROOT/Install"
 grep -q "(procedure P_CopyVersionedFileAutomatic" "$PACKAGE_ROOT/Install"
 grep -q "(procedure P_CopyPlainFileAutomatic" "$PACKAGE_ROOT/Install"
 grep -q '"Command tools"' "$PACKAGE_ROOT/Install"
 grep -q '"AmigaGuide documentation"' "$PACKAGE_ROOT/Install"
 grep -q '"UAE AHI audio driver"' "$PACKAGE_ROOT/Install"
+grep -q '"UAE MHI MP3 decoder"' "$PACKAGE_ROOT/Install"
 grep -q "Command tools: host commands to C:" "$PACKAGE_ROOT/Install"
 grep -q "Docs: Host-Tools.guide to HELP:" "$PACKAGE_ROOT/Install"
 grep -q "UAE AHI: uae.audio and UAE AudioMode." "$PACKAGE_ROOT/Install"
+grep -q "MHI MP3: mhiuae.library to LIBS:MHI." "$PACKAGE_ROOT/Install"
 if grep -q "Intermediate installs selected components automatically" "$PACKAGE_ROOT/Install"; then
 	echo "Installer component checklist prompt should not explain standard Intermediate/Expert behavior" >&2
 	exit 1
@@ -180,6 +185,7 @@ fi
 grep -q "(BITAND #install-components 1)" "$PACKAGE_ROOT/Install"
 grep -q "(BITAND #install-components 2)" "$PACKAGE_ROOT/Install"
 grep -q "(BITAND #install-components 4)" "$PACKAGE_ROOT/Install"
+grep -q "(BITAND #install-components 16)" "$PACKAGE_ROOT/Install"
 if grep -q "(IN #install-components" "$PACKAGE_ROOT/Install"; then
 	echo "Installer component checks should use BITAND for compatibility with common Installer scripts" >&2
 	exit 1
@@ -303,8 +309,17 @@ grep -q "(procedure P_InstallUAESNDDriver" "$PACKAGE_ROOT/Install"
 grep -q '"Devs/AHI/uaesnd.audio"' "$PACKAGE_ROOT/Install"
 grep -q '"Devs/AudioModes/UAESND"' "$PACKAGE_ROOT/Install"
 grep -q "(BITAND #install-components 8)" "$PACKAGE_ROOT/Install"
-grep -q "(default 15)" "$PACKAGE_ROOT/Install"
+grep -q "(default 31)" "$PACKAGE_ROOT/Install"
 grep -q "UAESND AHI: uaesnd.audio and UAESND AudioMode." "$PACKAGE_ROOT/Install"
+
+test -f "$PACKAGE_ROOT/Libs/MHI/mhiuae.library"
+grep -a -q '\$VER: mhiuae.library 2.4 (2026-06-10)' "$PACKAGE_ROOT/Libs/MHI/mhiuae.library"
+grep -q "UAE MHI MP3 decoder library" "$PACKAGE_ROOT/Install"
+grep -q "(procedure P_InstallMHILibrary" "$PACKAGE_ROOT/Install"
+grep -q '"Libs/MHI/mhiuae.library"' "$PACKAGE_ROOT/Install"
+grep -q '"LIBS:MHI"' "$PACKAGE_ROOT/Install"
+grep -q '(P_EnsureDir "LIBS:MHI")' "$PACKAGE_ROOT/Install"
+grep -q "(makedir #_destdir" "$PACKAGE_ROOT/Install"
 
 package_dry_run="$(make -n package PACKAGE_DIR="${PACKAGE_DIR}-dryrun")"
 case "$package_dry_run" in

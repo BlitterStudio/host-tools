@@ -927,9 +927,16 @@ start_recording
 	move.l ahiac_MixFreq(a2),base_capture_frequency(a0)
 	move.l #UAESND_RECORD_BYTES,base_capture_threshold(a0)
 	move.l #UAESND_CAPTURE_CONTROL_ENABLE|UAESND_CAPTURE_CONTROL_IRQ_ENABLE,base_capture_control(a0)
+	btst #0,base_capture_status+3(a0)
+	bne.s .unavailable
 	move.w #1,p_RecordActive(a1)
 .done
 	rts
+.unavailable
+	clr.l base_capture_control(a0)
+	clr.l base_capture_intreq(a0)
+	clr.l base_capture_threshold(a0)
+	bra.s .done
 
 	; a1 = UAESND
 	; a0 = UAESNDHW

@@ -28,6 +28,7 @@ REVISION EQU 1
 VERSION_STRUCT EQU 1
 UAESND_CAP_CAPTURE EQU 8
 UAESND_CAPTURE_CONTROL_ENABLE EQU 1
+UAESND_CAPTURE_CONTROL_IRQ_ENABLE EQU 2
 UAESND_RECORD_FRAMES EQU 2048
 UAESND_RECORD_BYTES EQU UAESND_RECORD_FRAMES*4
 
@@ -51,7 +52,8 @@ call MACRO
 	STRUCT base_diagnostics,$20
 	ULONG base_capture_data
 	ULONG base_capture_overruns
-	STRUCT base_capture_reserved,$08
+	ULONG base_capture_intreq
+	ULONG base_capture_threshold
 	ULONG base_capture_control
 	ULONG base_capture_status
 	ULONG base_capture_frequency
@@ -923,7 +925,8 @@ start_recording
 	move.l p_RecordBuffer(a1),p_RecordMessage+ahirm_Buffer(a1)
 	move.l #UAESND_RECORD_FRAMES,p_RecordMessage+ahirm_Length(a1)
 	move.l ahiac_MixFreq(a2),base_capture_frequency(a0)
-	move.l #UAESND_CAPTURE_CONTROL_ENABLE,base_capture_control(a0)
+	move.l #UAESND_RECORD_BYTES,base_capture_threshold(a0)
+	move.l #UAESND_CAPTURE_CONTROL_ENABLE|UAESND_CAPTURE_CONTROL_IRQ_ENABLE,base_capture_control(a0)
 	move.w #1,p_RecordActive(a1)
 .done
 	rts
@@ -932,6 +935,8 @@ start_recording
 	; a0 = UAESNDHW
 stop_recording
 	clr.l base_capture_control(a0)
+	clr.l base_capture_intreq(a0)
+	clr.l base_capture_threshold(a0)
 	clr.w p_RecordActive(a1)
 	rts
 
@@ -957,6 +962,7 @@ process_recording
 	swap d0
 	subq.w #1,d0
 	bpl.s .copy
+	clr.l base_capture_intreq(a0)
 	lea p_RecordMessage(a5),a1
 	move.l ahiac_SamplerFunc(a2),a0
 	move.l h_Entry(a0),a6
@@ -1578,7 +1584,12 @@ callsoundfunc:
 interrupt_code
 	move.l p_Base(a1),a0
 	move.l base_stream_intreq(a0),d0
+	bne.s .gotirq
+	tst.w p_RecordActive(a1)
 	beq.w .notours
+	tst.l base_capture_intreq(a0)
+	beq.w .notours
+.gotirq
 
 	movem.l d2-d7/a2-a4,-(sp)
 	move.l d0,d7

@@ -828,25 +828,15 @@ AHIsub_Start
 	move.l #debug_start,4(a0)
 	ENDC
 
-	move.l ahiac_DriverData(a2),a1
-	move.l p_Base(a1),a0
-	bsr reset_hw
-
-	move.l a2,a0
-	bsr.w update_playerfunc
-
-	move.l ahiac_DriverData(a2),a1
-	move.l p_Base(a1),a0
-	moveq #1,d0
-	moveq #0,d1
-	move.w p_StreamCnt(a1),d1
-	lsl.l d1,d0
-	subq.l #1,d0
-	move.l d0,base_stream_enable(a0)
-	move.l d0,base_stream_intena(a0)
+	btst #AHISB_PLAY,d2
+	beq.s .noplay
+	bsr.w start_playback
+.noplay
 
 	btst #AHISB_RECORD,d2
 	beq.s .norecord
+	move.l ahiac_DriverData(a2),a1
+	move.l p_Base(a1),a0
 	bsr.w start_recording
 .norecord
 	moveq #AHIE_OK,d0
@@ -879,9 +869,10 @@ AHIsub_Stop:
 	move.l #debug_stop,4(a0)
 	ENDC
 
-	move.l ahiac_DriverData(a2),a0
-	move.l p_Base(a0),a0
-	bsr reset_hw
+	btst #AHISB_PLAY,d2
+	beq.s .noplay
+	bsr.w stop_playback
+.noplay
 
 	move.l ahiac_DriverData(a2),a0
 	btst #AHISB_RECORD,d2
@@ -890,12 +881,36 @@ AHIsub_Stop:
 	move.l p_Base(a1),a0
 	bsr.w stop_recording
 .norecord
-	move.l ahiac_DriverData(a2),a0
-	clr.l p_PendingStartMask(a0)
-	bsr.w reset_ch
-
 	moveq #AHIE_OK,d0
 	movem.l (sp)+,d2
+	rts
+
+	; a2 = AHIAudioCtrlDrv
+start_playback
+	move.l ahiac_DriverData(a2),a1
+	move.l p_Base(a1),a0
+	bsr reset_hw
+	move.l a2,a0
+	bsr.w update_playerfunc
+	move.l ahiac_DriverData(a2),a1
+	move.l p_Base(a1),a0
+	moveq #1,d0
+	moveq #0,d1
+	move.w p_StreamCnt(a1),d1
+	lsl.l d1,d0
+	subq.l #1,d0
+	move.l d0,base_stream_enable(a0)
+	move.l d0,base_stream_intena(a0)
+	rts
+
+	; a2 = AHIAudioCtrlDrv
+stop_playback
+	move.l ahiac_DriverData(a2),a1
+	move.l p_Base(a1),a0
+	bsr reset_hw
+	clr.l p_PendingStartMask(a1)
+	move.l a1,a0
+	bsr.w reset_ch
 	rts
 
 	; a1 = UAESND

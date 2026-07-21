@@ -66,10 +66,23 @@ static inline int host_terminal_filter_process(struct host_terminal_filter *filt
 
         switch (filter->state) {
             case HOST_TERMINAL_TEXT:
-                if (c == 0x1B) {
-                    filter->state = HOST_TERMINAL_ESCAPE;
-                } else if (!host_terminal_filter_put(output, output_size, &output_len, c)) {
-                    return -1;
+                if (filter->utf8_remaining > 0 && c >= 0x80 && c <= 0xBF) {
+                    filter->utf8_remaining--;
+                    if (!host_terminal_filter_put(output, output_size, &output_len, c)) {
+                        return -1;
+                    }
+                } else {
+                    filter->utf8_remaining = 0;
+                    if (c == 0x1B) {
+                        filter->state = HOST_TERMINAL_ESCAPE;
+                    } else if (c == 0x9D) {
+                        filter->state = HOST_TERMINAL_OSC;
+                    } else {
+                        filter->utf8_remaining = host_terminal_filter_utf8_continuations(c);
+                        if (!host_terminal_filter_put(output, output_size, &output_len, c)) {
+                            return -1;
+                        }
+                    }
                 }
                 break;
 
@@ -88,6 +101,7 @@ static inline int host_terminal_filter_process(struct host_terminal_filter *filt
                         return -1;
                     }
                     filter->state = HOST_TERMINAL_TEXT;
+                    filter->utf8_remaining = host_terminal_filter_utf8_continuations(c);
                 }
                 break;
 

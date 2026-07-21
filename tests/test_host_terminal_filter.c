@@ -105,6 +105,22 @@ static void test_osc_c1_st_filtering(void)
                                     "OSC terminated by C1 ST should be discarded");
 }
 
+static void test_c1_osc_filtering(void)
+{
+    static const unsigned char st_input[] =
+        "left\x9D" "0;window title\x9C" "right";
+    static const unsigned char bel_input[] =
+        "left\x9D" "0;window title\x07right";
+    static const unsigned char expected[] = "leftright";
+
+    require_filtered_at_every_split(st_input, sizeof(st_input) - 1,
+                                    expected, sizeof(expected) - 1,
+                                    "C1 OSC terminated by C1 ST should be discarded");
+    require_filtered_at_every_split(bel_input, sizeof(bel_input) - 1,
+                                    expected, sizeof(expected) - 1,
+                                    "C1 OSC terminated by BEL should be discarded");
+}
+
 static void test_utf8_output(void)
 {
     static const unsigned char input[] =
@@ -157,6 +173,7 @@ int main(void)
     test_osc_st_filtering();
     test_osc_bel_filtering();
     test_osc_c1_st_filtering();
+    test_c1_osc_filtering();
     test_utf8_output();
     test_utf8_osc_payload();
     test_incomplete_sequences();

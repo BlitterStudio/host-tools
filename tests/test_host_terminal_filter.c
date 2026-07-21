@@ -95,6 +95,26 @@ static void test_osc_bel_filtering(void)
                                     "OSC terminated by BEL should be discarded");
 }
 
+static void test_utf8_output(void)
+{
+    static const unsigned char input[] =
+        "UTF-8 quotes: \xE2\x80\x9C" "left\xE2\x80\x9D" " right";
+
+    require_filtered_at_every_split(input, sizeof(input) - 1, input, sizeof(input) - 1,
+                                    "UTF-8 continuation bytes should be unchanged");
+}
+
+static void test_utf8_osc_payload(void)
+{
+    static const unsigned char input[] =
+        "before\x1B]0;UTF-8 \xE2\x80\x9C" "title\xE2\x80\x9D\x1B\\after";
+    static const unsigned char expected[] = "beforeafter";
+
+    require_filtered_at_every_split(input, sizeof(input) - 1,
+                                    expected, sizeof(expected) - 1,
+                                    "UTF-8 OSC payload should remain filtered");
+}
+
 static void test_incomplete_sequences(void)
 {
     static const unsigned char dangling_escape[] = "text\x1B";
@@ -126,6 +146,8 @@ int main(void)
     test_csi_conversion();
     test_osc_st_filtering();
     test_osc_bel_filtering();
+    test_utf8_output();
+    test_utf8_osc_payload();
     test_incomplete_sequences();
     test_unknown_escape();
     return 0;

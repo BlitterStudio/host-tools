@@ -53,8 +53,6 @@ static inline int host_terminal_filter_process(struct host_terminal_filter *filt
             case HOST_TERMINAL_TEXT:
                 if (c == 0x1B) {
                     filter->state = HOST_TERMINAL_ESCAPE;
-                } else if (c == 0x9D) {
-                    filter->state = HOST_TERMINAL_OSC;
                 } else if (!host_terminal_filter_put(output, output_size, &output_len, c)) {
                     return -1;
                 }
@@ -78,7 +76,7 @@ static inline int host_terminal_filter_process(struct host_terminal_filter *filt
                 break;
 
             case HOST_TERMINAL_OSC:
-                if (c == 0x07 || c == 0x9C) {
+                if (c == 0x07) {
                     filter->state = HOST_TERMINAL_TEXT;
                 } else if (c == 0x1B) {
                     filter->state = HOST_TERMINAL_OSC_ESCAPE;
@@ -86,7 +84,7 @@ static inline int host_terminal_filter_process(struct host_terminal_filter *filt
                 break;
 
             case HOST_TERMINAL_OSC_ESCAPE:
-                if (c == '\\' || c == 0x07 || c == 0x9C) {
+                if (c == '\\' || c == 0x07) {
                     filter->state = HOST_TERMINAL_TEXT;
                 } else if (c != 0x1B) {
                     filter->state = HOST_TERMINAL_OSC;

@@ -20,7 +20,7 @@ static void require(int condition, const char *message)
 static int process_chunks(const unsigned char *input, int input_len, int split,
                           unsigned char *output, int output_size)
 {
-    struct host_terminal_filter filter = { HOST_TERMINAL_TEXT };
+    struct host_terminal_filter filter = { HOST_TERMINAL_TEXT, 0 };
     int first;
     int second;
     int tail;
@@ -95,6 +95,16 @@ static void test_osc_bel_filtering(void)
                                     "OSC terminated by BEL should be discarded");
 }
 
+static void test_osc_c1_st_filtering(void)
+{
+    static const unsigned char input[] = "left\x1B]0;window title\x9C" "right";
+    static const unsigned char expected[] = "leftright";
+
+    require_filtered_at_every_split(input, sizeof(input) - 1,
+                                    expected, sizeof(expected) - 1,
+                                    "OSC terminated by C1 ST should be discarded");
+}
+
 static void test_utf8_output(void)
 {
     static const unsigned char input[] =
@@ -146,6 +156,7 @@ int main(void)
     test_csi_conversion();
     test_osc_st_filtering();
     test_osc_bel_filtering();
+    test_osc_c1_st_filtering();
     test_utf8_output();
     test_utf8_osc_payload();
     test_incomplete_sequences();

@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
     BPTR out = 0;
     long handle = 0;
     BOOL raw_mode = FALSE;
-    struct host_terminal_filter terminal_filter = { HOST_TERMINAL_TEXT };
+    struct host_terminal_filter terminal_filter = { HOST_TERMINAL_TEXT, 0 };
     long actual;
     ULONG status;
     int status_supported = 0;

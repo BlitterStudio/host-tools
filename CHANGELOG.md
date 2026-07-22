@@ -8,7 +8,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Notable user-visible changes are recorded here. This project follows semantic
 versioning for release tags.
 
-## [2.6] - Unreleased
+## [2.6] - 2026-07-22
 
 ### Added
 
@@ -29,6 +29,8 @@ versioning for release tags.
 
 ### Fixed
 
+- Filter unsupported OSC terminal control sequences from `host-shell` output
+  without corrupting UTF-8 text.
 - Keep the `host-shell` login wrapper within the HostShell command trap limit.
 - Signal MHI buffer completion only after Amiberry has consumed a buffer.
 - Close `utility.library` when UAESND AHI driver initialization fails.
@@ -42,5 +44,5 @@ versioning for release tags.
 - Added `host-env` and the UAE MHI MP3 decoder library.
 - Added UAESND recording support and driver refinements.
 
-[2.6]: https://github.com/BlitterStudio/host-tools/compare/v2.5...HEAD
+[2.6]: https://github.com/BlitterStudio/host-tools/compare/v2.5...v2.6
 [2.5]: https://github.com/BlitterStudio/host-tools/releases/tag/v2.5

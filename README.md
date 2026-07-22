@@ -227,7 +227,7 @@ To build a release archive:
 make package
 ```
 
-The package target creates and verifies `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, AmigaGuide documentation, the UAE and UAESND AHI driver files, and the UAE MHI MP3 decoder library.
+The package target creates and verifies `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, license, changelog, AmigaGuide documentation, the UAE and UAESND AHI driver files, and the UAE MHI MP3 decoder library.
 
 Native package builds also require `lha`. The Docker build image contains this tool.
 

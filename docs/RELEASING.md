@@ -12,7 +12,8 @@ exact version; CI rejects a mismatch before building.
 
 1. Update `VERSION` and `DATE` in `version.mk`.
 2. Update the `$VER` line in `package/Help/Host-Tools.guide`.
-3. Move the pending changelog entry from `Unreleased` to the release date.
+3. Move the pending changelog entry from `Unreleased` to the release date and
+   update its comparison link to end at the release tag instead of `HEAD`.
 4. Run the complete release build from a clean tree:
 
    ```shell

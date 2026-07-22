@@ -146,7 +146,7 @@ $(AHI_V2_FILES): $(AHI_V2_SOURCES)
 $(MHI_FILES): $(MHI_SOURCES)
 	$(MAKE) -C drivers/mhi VERSION=$(VERSION) DATE=$(DATE)
 
-package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INSTALL_ICON) $(README_ICON) $(GUIDE_ICON)
+package-dir: all package/Install README.md LICENSE CHANGELOG.md $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INSTALL_ICON) $(README_ICON) $(GUIDE_ICON)
 	rm -rf $(PACKAGE_STAGE) $(PACKAGE_DIR)/$(PACKAGE_ROOT).info
 	mkdir -p $(PACKAGE_STAGE)/C
 	mkdir -p $(PACKAGE_STAGE)/Help
@@ -155,6 +155,8 @@ package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INS
 	cp $(INSTALL_ICON) $(PACKAGE_STAGE)/Install.info
 	cp README.md $(PACKAGE_STAGE)/README
 	cp $(README_ICON) $(PACKAGE_STAGE)/README.info
+	cp LICENSE $(PACKAGE_STAGE)/LICENSE
+	cp CHANGELOG.md $(PACKAGE_STAGE)/CHANGELOG
 	cp $(HELP_GUIDE) $(PACKAGE_STAGE)/Help/Host-Tools.guide
 	cp $(GUIDE_ICON) $(PACKAGE_STAGE)/Help/Host-Tools.guide.info
 	cp $(HELP_ICON) $(PACKAGE_STAGE)/Help.info

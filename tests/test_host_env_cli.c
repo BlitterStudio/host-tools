@@ -50,6 +50,8 @@ static void test_get_dispatch(void)
     require(captured_command != NULL, "get should execute a host command");
     require(strstr(captured_command, "HOST_TOOLS_TEST") != NULL,
             "get command should contain the requested variable name");
+    require(strstr(captured_command, "printf '%s\\n'") != NULL,
+            "get should terminate the value with a newline");
 }
 
 static void test_set_dispatch(void)

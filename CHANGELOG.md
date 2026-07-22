@@ -30,7 +30,7 @@ versioning for release tags.
 ### Fixed
 
 - Allow `host-env get` to read a variable without treating its absent value
-  argument as invalid input.
+  argument as invalid input, and end the displayed value with a newline.
 - Filter unsupported OSC terminal control sequences from `host-shell` output
   without corrupting UTF-8 text.
 - Keep the `host-shell` login wrapper within the HostShell command trap limit.

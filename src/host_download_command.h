@@ -86,25 +86,39 @@ static inline int host_append_download_b64_command(char *command, size_t command
                                " wc -c < \"$t\"; base64 < \"$t\"; rm -f \"$t\"");
 }
 
-static inline int host_download_sidecar_path(const char *destination, const char *kind,
+/* Keep the sibling component short enough for classic 30-character FFS names. */
+static inline int host_download_sidecar_path(const char *destination, char kind,
                                              unsigned long token, unsigned int attempt,
                                              char *path, size_t path_size)
 {
-    char suffix[48];
-    int suffix_len;
+    const char *filename;
+    char sidecar[16];
+    size_t prefix_len;
+    int sidecar_len;
 
-    if (destination == NULL || kind == NULL || path == NULL || path_size == 0) {
+    if (destination == NULL || path == NULL || path_size == 0 ||
+        (kind != 'p' && kind != 'b') || attempt >= 100) {
         return 0;
     }
 
-    suffix_len = snprintf(suffix, sizeof(suffix), ".%s.%08lx.%u",
-                          kind, token, attempt);
-    if (suffix_len < 0 || (size_t)suffix_len >= sizeof(suffix)) {
+    filename = destination;
+    for (const char *p = destination; *p; p++) {
+        if (*p == '/' || *p == ':') {
+            filename = p + 1;
+        }
+    }
+    prefix_len = (size_t)(filename - destination);
+
+    sidecar_len = snprintf(sidecar, sizeof(sidecar), ".ht%c%06lx%02u",
+                           kind, token & 0xffffffUL, attempt);
+    if (sidecar_len < 0 || (size_t)sidecar_len >= sizeof(sidecar) ||
+        prefix_len + (size_t)sidecar_len >= path_size) {
         return 0;
     }
-    path[0] = '\0';
-    return host_append_literal(path, path_size, destination) &&
-           host_append_literal(path, path_size, suffix);
+
+    memcpy(path, destination, prefix_len);
+    memcpy(path + prefix_len, sidecar, (size_t)sidecar_len + 1);
+    return 1;
 }
 
 /*

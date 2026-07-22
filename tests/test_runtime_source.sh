@@ -13,7 +13,7 @@ grep -F -q 'Aborted host command.' "$CAPTURE_HEADER"
 
 grep -F -q 'static char session_command[HOST_MAX_COMMAND_LEN];' "$SHELL_SOURCE"
 
-grep -F -q 'make_unused_sidecar_path(destpath, "part"' "$DOWNLOAD_SOURCE"
+grep -F -q "make_unused_sidecar_path(destpath, 'p'" "$DOWNLOAD_SOURCE"
 grep -F -q 'install_download(temp_path, destpath, force' "$DOWNLOAD_SOURCE"
 if grep -F -q 'Open((STRPTR)destpath, MODE_NEWFILE)' "$DOWNLOAD_SOURCE"; then
 	echo "host-download must write to a sidecar before replacing the destination" >&2

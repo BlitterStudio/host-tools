@@ -152,15 +152,38 @@ static void test_supported_urls(void)
 static void test_sidecar_path(void)
 {
     char path[128];
+    const char *component;
 
-    require(host_download_sidecar_path("RAM:archive.lha", "part", 0x12, 3,
+    require(host_download_sidecar_path("RAM:Host-Tools-2.6.lha", 'p', 0x12, 3,
                                        path, sizeof(path)),
             "sidecar path should build");
-    require(strcmp(path, "RAM:archive.lha.part.00000012.3") == 0,
-            "sidecar path should be adjacent and unique");
-    require(!host_download_sidecar_path("RAM:archive.lha", "part", 0x12, 3,
-                                        path, 12),
+    require(strcmp(path, "RAM:.htp00001203") == 0,
+            "sidecar path should use a short sibling filename");
+    component = strrchr(path, ':');
+    require(component != NULL && strlen(component + 1) == 12,
+            "sidecar component should fit classic FFS limits");
+
+    require(host_download_sidecar_path("Work:Downloads/very-long-destination-name.lha",
+                                       'b', 0xabcdef, 99, path, sizeof(path)),
+            "nested backup sidecar path should build");
+    require(strcmp(path, "Work:Downloads/.htbabcdef99") == 0,
+            "backup sidecar should preserve only the destination directory");
+
+    require(host_download_sidecar_path("relative-name-with-thirty-chars.bin",
+                                       'p', 1, 0, path, sizeof(path)),
+            "relative sidecar path should build");
+    require(strcmp(path, ".htp00000100") == 0,
+            "relative sidecar should remain in the current directory");
+
+    require(!host_download_sidecar_path("RAM:archive.lha", 'p', 0x12, 3,
+                                        path, 16),
             "small sidecar path buffer should fail");
+    require(!host_download_sidecar_path("RAM:archive.lha", 'x', 0x12, 3,
+                                        path, sizeof(path)),
+            "unknown sidecar kind should fail");
+    require(!host_download_sidecar_path("RAM:archive.lha", 'p', 0x12, 100,
+                                        path, sizeof(path)),
+            "sidecar attempt outside the two-digit range should fail");
 }
 
 static void require_decoded(const char *encoded, const char *expected, long expected_len)

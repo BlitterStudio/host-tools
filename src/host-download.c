@@ -51,7 +51,7 @@ static int lock_is_directory(BPTR lock)
     return fib.fib_DirEntryType > 0;
 }
 
-static int make_unused_sidecar_path(const char *destination, const char *kind,
+static int make_unused_sidecar_path(const char *destination, char kind,
                                     char *path, size_t path_size)
 {
     unsigned long token = (unsigned long)FindTask(NULL);
@@ -97,7 +97,7 @@ static int install_download(const char *temp_path, const char *destpath, int for
         *failure = "Destination appeared during download";
         return 0;
     }
-    if (!make_unused_sidecar_path(destpath, "backup", backup_path, backup_size)) {
+    if (!make_unused_sidecar_path(destpath, 'b', backup_path, backup_size)) {
         *failure = "Cannot reserve a destination backup";
         return 0;
     }
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
-    if (!make_unused_sidecar_path(destpath, "part", temp_path, sizeof(temp_path))) {
+    if (!make_unused_sidecar_path(destpath, 'p', temp_path, sizeof(temp_path))) {
         HostShell_Close(handle);
         printf("Cannot reserve a temporary destination file\n");
         return HOST_RETURN_ERROR;

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env
-TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out tests/test_host_download_command.out tests/test_host_terminal_filter.out
+TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out tests/test_host_download_command.out tests/test_host_terminal_filter.out tests/test_host_env_cli.out
 TEST_SCRIPTS	= tests/test_package_layout.sh tests/test_ahi_driver_source.sh tests/test_runtime_source.sh
 include version.mk
 COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_base64.h src/host_clip_command.h src/host_download_command.h src/host_edit_command.h src/host_env_command.h src/host_info_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h src/host_shell_command.h src/uae_pragmas.h
@@ -127,6 +127,9 @@ tests/test_host_download_command.out: tests/test_host_download_command.c src/hos
 
 tests/test_host_terminal_filter.out: tests/test_host_terminal_filter.c src/host_terminal_filter.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_terminal_filter.c -o $@
+
+tests/test_host_env_cli.out: tests/test_host_env_cli.c src/host-env.c src/host_env_command.h src/host_common.h src/host_powershell.h
+	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) $(VERFLAGS) tests/test_host_env_cli.c -o $@
 
 debug: CFLAGS += -DDEBUG -g
 debug: clean all

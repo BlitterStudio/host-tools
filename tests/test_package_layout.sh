@@ -3,6 +3,8 @@ set -eu
 
 PACKAGE_DIR="${PACKAGE_DIR:-build/package-test}"
 PACKAGE_ROOT="${PACKAGE_DIR}/Host-Tools"
+: "${VERSION:?VERSION must be set}"
+: "${DATE:?DATE must be set}"
 
 clean_dry_run="$(make -n clean)"
 case "$clean_dry_run" in
@@ -12,8 +14,10 @@ case "$clean_dry_run" in
 		;;
 esac
 
-rm -rf "$PACKAGE_DIR"
-make package-dir PACKAGE_DIR="$PACKAGE_DIR"
+if [ "${PACKAGE_READY:-0}" != "1" ]; then
+	rm -rf "$PACKAGE_DIR"
+	make package-dir PACKAGE_DIR="$PACKAGE_DIR" VERSION="$VERSION" DATE="$DATE"
+fi
 
 test -d "$PACKAGE_ROOT"
 test -f "${PACKAGE_ROOT}.info"
@@ -105,17 +109,27 @@ fi
 for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env; do
 	test -f "$PACKAGE_ROOT/C/$tool"
 done
-grep -a -q '\$VER: Host-Run 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-run"
-grep -a -q '\$VER: Host-MultiView 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-multiview"
-grep -a -q '\$VER: Host-Shell 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-shell"
-grep -a -q '\$VER: Host-Path 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-path"
-grep -a -q '\$VER: Host-Reveal 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-reveal"
-grep -a -q '\$VER: Host-Notify 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-notify"
-grep -a -q '\$VER: Host-Edit 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-edit"
-grep -a -q '\$VER: Host-Clip 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-clip"
-grep -a -q '\$VER: Host-Info 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-info"
-grep -a -q '\$VER: Host-Download 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-download"
-grep -a -q '\$VER: Host-Env 2.4 (2026-06-10)' "$PACKAGE_ROOT/C/host-env"
+assert_ver() {
+	label="$1"
+	file="$2"
+	expected="\$VER: $label $VERSION ($DATE)"
+	if ! grep -a -F -q "$expected" "$file"; then
+		echo "$file does not contain expected version string: $expected" >&2
+		exit 1
+	fi
+}
+
+assert_ver "Host-Run" "$PACKAGE_ROOT/C/host-run"
+assert_ver "Host-MultiView" "$PACKAGE_ROOT/C/host-multiview"
+assert_ver "Host-Shell" "$PACKAGE_ROOT/C/host-shell"
+assert_ver "Host-Path" "$PACKAGE_ROOT/C/host-path"
+assert_ver "Host-Reveal" "$PACKAGE_ROOT/C/host-reveal"
+assert_ver "Host-Notify" "$PACKAGE_ROOT/C/host-notify"
+assert_ver "Host-Edit" "$PACKAGE_ROOT/C/host-edit"
+assert_ver "Host-Clip" "$PACKAGE_ROOT/C/host-clip"
+assert_ver "Host-Info" "$PACKAGE_ROOT/C/host-info"
+assert_ver "Host-Download" "$PACKAGE_ROOT/C/host-download"
+assert_ver "Host-Env" "$PACKAGE_ROOT/C/host-env"
 if grep -a '\$VER: Host-[A-Za-z]* v[0-9]' "$PACKAGE_ROOT/C/"*; then
 	echo "Host command \$VER strings must be parseable by Installer getversion, without a v prefix before the version number" >&2
 	exit 1
@@ -128,6 +142,7 @@ fi
 
 test -f "$PACKAGE_ROOT/Help/Host-Tools.guide"
 test -f "$PACKAGE_ROOT/Help/Host-Tools.guide.info"
+assert_ver "Host-Tools.guide" "$PACKAGE_ROOT/Help/Host-Tools.guide"
 if [ -e "$PACKAGE_ROOT/Help/English" ]; then
 	echo "Package Help drawer must contain the guide directly, not an English subdrawer" >&2
 	exit 1
@@ -313,7 +328,7 @@ grep -q "(default 31)" "$PACKAGE_ROOT/Install"
 grep -q "UAESND AHI: uaesnd.audio and UAESND AudioMode." "$PACKAGE_ROOT/Install"
 
 test -f "$PACKAGE_ROOT/Libs/MHI/mhiuae.library"
-grep -a -q '\$VER: mhiuae.library 2.4 (2026-06-10)' "$PACKAGE_ROOT/Libs/MHI/mhiuae.library"
+assert_ver "mhiuae.library" "$PACKAGE_ROOT/Libs/MHI/mhiuae.library"
 grep -q "UAE MHI MP3 decoder library" "$PACKAGE_ROOT/Install"
 grep -q "(procedure P_InstallMHILibrary" "$PACKAGE_ROOT/Install"
 grep -q '"Libs/MHI/mhiuae.library"' "$PACKAGE_ROOT/Install"

@@ -27,8 +27,6 @@ struct MHIUAEBase {
 };
 
 struct MHIUAEPlayer {
-    struct Task *task;
-    ULONG sigmask;
     ULONG host_handle;
     UBYTE status;
 };

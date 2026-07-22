@@ -85,7 +85,7 @@ host-edit <path> [path2 ...]
 
 ### 8. host-clip
 **Use the host clipboard.**
-`host-clip` copies text to the host clipboard or prints the current host clipboard contents. Without text arguments, `host-clip copy` reads standard input verbatim, so multi-line text and command output can be piped or redirected to the host clipboard. Text is converted between the Amiga's ISO-8859-1 character set and the host's encoding: through `iconv` on Linux and macOS, and inherently through PowerShell's Unicode pipeline on Windows.
+`host-clip` copies text to the host clipboard or prints the current host clipboard contents. Without text arguments, `host-clip copy` reads standard input verbatim, so multi-line text and command output can be piped or redirected to the host clipboard. Paste also preserves trailing line breaks. Text is converted between the Amiga's ISO-8859-1 character set and the host's encoding: through `iconv` on Linux and macOS, and inherently through PowerShell's Unicode pipeline on Windows.
 
 **Usage:**
 ```shell
@@ -105,9 +105,9 @@ host-info
 
 ### 10. host-download
 **Download files through the host.**
-`host-download` fetches a URL with the host's `curl` (or `wget`) and saves it to any Amiga path — `RAM:`, hardfiles, and directory mounts all work, because the file is written by the tool through AmigaDOS. The host handles HTTPS/TLS, giving classic AmigaOS access to modern servers.
+`host-download` fetches an HTTP, HTTPS, FTP, or FTPS URL with the host's `curl` (or `wget`) and saves it to any Amiga path — `RAM:`, hardfiles, and directory mounts all work, because the file is written by the tool through AmigaDOS. The host handles HTTPS/TLS, giving classic AmigaOS access to modern servers.
 -   **Live Progress**: With a current Amiberry, the file streams to the Amiga as it downloads, with a percentage display when the server reports a size.
--   **Safe**: Failed or aborted downloads (Ctrl-C) never leave a partial file behind, and an existing destination is only overwritten with `FORCE`.
+-   **Transactional**: Data is written to a temporary file beside the destination. Failed, stalled, or aborted downloads (Ctrl-C) never leave a partial result, and `FORCE` preserves the previous file until the replacement is complete.
 -   **Flexible Destination**: With no destination the file is saved in the current directory under its URL name; a directory destination keeps the URL name.
 
 **Usage:**
@@ -119,6 +119,7 @@ host-download <URL> [<destination>] [FORCE]
 **Get and set host user environment variables.**
 `host-env` reads, writes, removes, and lists environment variables on the host. On Windows it updates the user's persistent environment. On Linux and macOS it writes persistent values to `$HOME/.host-tools-env`; source that file from your host shell startup files if you want future host login shells to import those values automatically.
 -   **Persistent**: Changes are intended for future host processes.
+-   **Private by Default**: On Linux and macOS, the managed file is written atomically with mode `0600`. Values must fit on one line.
 -   **Scoped Safely**: Existing host shells, desktop apps, and Amiberry's parent process cannot have their live environment changed by a child process.
 
 **Usage:**
@@ -135,10 +136,18 @@ host-env list
 
 -   **Amiberry v6.0+** (or a version with updated `uaelib` support).
 -   "Native Code" execution must be enabled in Amiberry settings.
--   All tools work on **Linux and macOS hosts**. On **Windows hosts**, `host-path`, `host-download`, `host-clip`, `host-reveal`, `host-info`, and `host-env` are supported with a current Amiberry (PowerShell and Explorer handle the Windows side; `curl.exe` ships with Windows 10 and later). The remaining tools (`host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify`) currently require a Linux or macOS host, since their host commands run through the POSIX shell.
--   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, and `host-info`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Older builds still work, but use timeout-based completion detection.
+-   All tools work on **Linux and macOS hosts**. Current Windows support is summarized below.
+
+| Tool | Linux | macOS | Windows |
+| --- | :---: | :---: | :---: |
+| `host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify` | Yes | Yes | — |
+| `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env` | Yes | Yes | Yes |
+
+Windows integrations require a current Amiberry. PowerShell and Explorer handle desktop operations, and `curl.exe` ships with Windows 10 and later.
+
+-   For status-aware tools (`host-reveal`, `host-notify`, `host-clip`, `host-info`, and `host-env`), a newer Amiberry build with the `HostShell_Status` trap reports host command failures immediately. Press Ctrl-C to cancel a stuck host command. An idle command times out after approximately 30 seconds on status-aware builds or 5 seconds on older builds.
 -   Linux desktop integration uses `xdg-utils` (`xdg-open`, `xdg-mime`) and GTK's `gtk-launch` when available. Notifications use `notify-send`; clipboard support uses `wl-clipboard`, `xclip`, or `xsel`; file selection in `host-reveal` uses `gdbus` when present. Character set conversion uses `iconv` when present.
--   `host-download` uses the host's `curl` or `wget` (`curl.exe` on Windows). Live streaming progress requires an Amiberry build with pipe-based HostShell sessions; on older Linux and macOS builds the tool falls back to a two-phase transfer that downloads on the host first.
+-   `host-download` uses the host's `curl` or `wget` (`curl.exe` on Windows) and accepts HTTP, HTTPS, FTP, and FTPS URLs. Live streaming progress requires an Amiberry build with pipe-based HostShell sessions; on older Linux and macOS builds the tool falls back to a two-phase transfer that downloads on the host first.
 
 ## Exit Codes
 
@@ -203,9 +212,14 @@ To build locally with the same Docker image used by CI:
 docker run --rm -v "$PWD":/work -w /work sacredbanana/amiga-compiler:m68k-amigaos make all
 ```
 
-To run the host-side command-builder tests:
+To run only the native command-builder tests:
 ```shell
-make test
+make test-unit
+```
+
+To run the complete test suite, including a fresh cross-build and package verification, use the CI image:
+```shell
+docker run --rm -v "$PWD":/work -w /work sacredbanana/amiga-compiler:m68k-amigaos make clean test
 ```
 
 To build a release archive:
@@ -213,9 +227,11 @@ To build a release archive:
 make package
 ```
 
-The package target creates `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, AmigaGuide documentation, the UAE and UAESND AHI driver files, and the UAE MHI MP3 decoder library.
+The package target creates and verifies `Host-Tools-<version>.lha`, containing a structured `Host-Tools` drawer with the Installer script, command tools, README, AmigaGuide documentation, the UAE and UAESND AHI driver files, and the UAE MHI MP3 decoder library.
 
 Native package builds also require `lha`. The Docker build image contains this tool.
+
+Release metadata is defined once in [`version.mk`](version.mk). See [`docs/RELEASING.md`](docs/RELEASING.md) for the release checklist and [`CHANGELOG.md`](CHANGELOG.md) for user-visible changes.
 
 To build with debug output enabled:
 ```shell

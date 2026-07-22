@@ -3,8 +3,8 @@
 
 TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env
 TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out tests/test_host_download_command.out tests/test_host_terminal_filter.out
-TEST_SCRIPTS	= tests/test_package_layout.sh tests/test_ahi_driver_source.sh
-TESTS		= $(TEST_BINS) $(TEST_SCRIPTS)
+TEST_SCRIPTS	= tests/test_package_layout.sh tests/test_ahi_driver_source.sh tests/test_runtime_source.sh
+include version.mk
 COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_base64.h src/host_clip_command.h src/host_download_command.h src/host_edit_command.h src/host_env_command.h src/host_info_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h src/host_shell_command.h src/uae_pragmas.h
 PACKAGE		= Host-Tools-$(VERSION).lha
 PACKAGE_ROOT	= Host-Tools
@@ -44,19 +44,27 @@ README_ICON	= package/icons/readme.info
 GUIDE_ICON	= package/icons/guide.info
 
 .SUFFIXES:
-.PHONY: all test debug package package-dir ahi ahi-v2 mhi clean
+.PHONY: all test test-unit test-package debug package package-dir verify-package print-version print-date ahi ahi-v2 mhi clean
 
 all: $(TOOLS) $(AHI_FILES) $(AHI_V2_FILES) $(MHI_FILES)
-test: $(TESTS)
-	@for test in $(TESTS); do \
-		case "$$test" in \
-			*.sh) sh "$$test" ;; \
-			*) ./$$test ;; \
-		esac || exit $$?; \
+
+test: test-unit test-package
+
+test-unit: $(TEST_BINS)
+	@for test in $(TEST_BINS); do \
+		./$$test || exit $$?; \
 	done
 
-VERSION		= 2.4
-DATE		= 2026-06-10
+test-package: $(TEST_SCRIPTS)
+	@for test in $(TEST_SCRIPTS); do \
+		VERSION="$(VERSION)" DATE="$(DATE)" sh "$$test" || exit $$?; \
+	done
+
+print-version:
+	@printf '%s\n' '$(VERSION)'
+
+print-date:
+	@printf '%s\n' '$(DATE)'
 
 ifeq ($(origin CC),default)
 CC			= m68k-amigaos-gcc
@@ -64,8 +72,12 @@ endif
 INCLUDES	= -Isrc
 CFLAGS		= -mcpu=68020 -noixemul -Os -fomit-frame-pointer -std=c99 -Wall -Wextra -Wstrict-prototypes
 VERFLAGS	= -DVERSION_STR="\"$(VERSION)\"" -DDATE_STR="\"$(DATE)\""
-HOST_CC		?= $(shell command -v x86_64-linux-gnu-gcc 2>/dev/null || command -v cc 2>/dev/null || printf cc)
-HOST_NATIVE_FLAGS = $(if $(findstring x86_64-linux-gnu-gcc,$(notdir $(HOST_CC))),-B/usr/bin/x86_64-linux-gnu- -fuse-ld=bfd,)
+HOST_ARCH	= $(shell uname -m)
+HOST_GNU_ARCH	= $(if $(filter arm64,$(HOST_ARCH)),aarch64,$(HOST_ARCH))
+HOST_CC		?= $(shell command -v $(HOST_GNU_ARCH)-linux-gnu-gcc 2>/dev/null || command -v cc 2>/dev/null || printf cc)
+HOST_CC_NAME	= $(notdir $(HOST_CC))
+HOST_GNU_PREFIX	= $(patsubst %-gcc,%,$(HOST_CC_NAME))
+HOST_NATIVE_FLAGS = $(if $(findstring -linux-gnu-gcc,$(HOST_CC_NAME)),-B/usr/bin/$(HOST_GNU_PREFIX)- -fuse-ld=bfd,)
 HOST_CFLAGS	= -std=c99 -Wall -Wextra -Wstrict-prototypes -Isrc
 
 host-run: src/host-run.c $(COMMON_HEADERS)
@@ -162,7 +174,10 @@ package-dir: all package/Install $(HELP_GUIDE) $(DRAWER_ICON) $(HELP_ICON) $(INS
 		cp $(MHI_LIBRARY) $(PACKAGE_STAGE)/Libs/MHI/mhiuae.library; \
 	fi
 
-package: package-dir
+verify-package: package-dir
+	PACKAGE_READY=1 PACKAGE_DIR="$(PACKAGE_DIR)" VERSION="$(VERSION)" DATE="$(DATE)" sh tests/test_package_layout.sh
+
+package: verify-package
 	rm -f $(PACKAGE)
 	cd $(PACKAGE_DIR) && lha a $(CURDIR)/$(PACKAGE) $(PACKAGE_ROOT) $(PACKAGE_ROOT).info
 

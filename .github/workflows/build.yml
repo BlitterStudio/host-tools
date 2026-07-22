@@ -17,46 +17,67 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     container: sacredbanana/amiga-compiler:m68k-amigaos
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+    - name: Resolve release metadata
+      shell: sh
+      run: |
+        version="$(make -s print-version)"
+        date="$(make -s print-date)"
+        if [ "${{ github.ref_type }}" = "tag" ]; then
+          tag_version="${{ github.ref_name }}"
+          tag_version="${tag_version#v}"
+          if [ "$tag_version" != "$version" ]; then
+            echo "Tag version $tag_version does not match version.mk ($version)" >&2
+            exit 1
+          fi
+        fi
+        echo "VERSION=$version" >> "$GITHUB_ENV"
+        echo "DATE=$date" >> "$GITHUB_ENV"
 
     - name: Build tools
-      run: make all
+      run: make VERSION="$VERSION" DATE="$DATE" all
 
     - name: Run tests
-      run: make test
+      run: make VERSION="$VERSION" DATE="$DATE" test
 
     - name: Package tools
-      run: |
-        if [ "${{ github.ref_type }}" = "tag" ]; then
-          VERSION="${{ github.ref_name }}"
-        else
-          VERSION="latest"
-        fi
-        make package PACKAGE="Host-Tools-${VERSION}.lha"
+      run: make VERSION="$VERSION" DATE="$DATE" package
+
+    - name: Generate checksum
+      run: sha256sum "Host-Tools-${VERSION}.lha" > "Host-Tools-${VERSION}.lha.sha256"
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
         name: host-tools-package
-        path: "*.lha"
+        path: |
+          *.lha
+          *.lha.sha256
 
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
 
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: host-tools-package
 
@@ -64,4 +85,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create ${{ github.ref_name }} *.lha --title "Host-Tools ${{ github.ref_name }}" --generate-notes
+        run: gh release create ${{ github.ref_name }} *.lha *.lha.sha256 --title "Host-Tools ${{ github.ref_name }}" --generate-notes

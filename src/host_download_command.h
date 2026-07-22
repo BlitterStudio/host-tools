@@ -7,8 +7,18 @@
 #define HOST_DOWNLOAD_COMMAND_H
 
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include "host_common.h"
+
+static inline int host_download_url_supported(const char *url)
+{
+    return url != NULL &&
+           (host_has_prefix_ci(url, "http://") ||
+            host_has_prefix_ci(url, "https://") ||
+            host_has_prefix_ci(url, "ftp://") ||
+            host_has_prefix_ci(url, "ftps://"));
+}
 
 /*
  * Live download for binary-safe pipe sessions: the first line reports
@@ -20,10 +30,12 @@ static inline int host_append_download_stream_command(char *command, size_t comm
 {
     return host_append_literal(command, command_size,
                               "if command -v curl >/dev/null 2>&1; then"
-                              " curl -sfIL -o /dev/null -w '%{content_length}\\n' ") &&
+                              " curl --proto '=http,https,ftp,ftps' --proto-redir '=http,https,ftp,ftps'"
+                              " -sfIL -o /dev/null -w '%{content_length}\\n' ") &&
            host_append_shell_arg(command, command_size, url, 0) &&
            host_append_literal(command, command_size,
-                               " 2>/dev/null || echo 0; curl -sfL ") &&
+                               " 2>/dev/null || echo 0; curl --proto '=http,https,ftp,ftps'"
+                               " --proto-redir '=http,https,ftp,ftps' -sfL ") &&
            host_append_shell_arg(command, command_size, url, 0) &&
            host_append_literal(command, command_size,
                                "; elif command -v wget >/dev/null 2>&1; then echo 0; wget -q -O - ") &&
@@ -40,9 +52,13 @@ static inline int host_append_download_stream_command_windows(char *command, siz
                                                               const char *url)
 {
     return host_append_literal(command, command_size,
-                              "(curl -sIL -o NUL -w \"%{content_length}\\n\" ") &&
+                              "(curl --proto \"=http,https,ftp,ftps\""
+                              " --proto-redir \"=http,https,ftp,ftps\""
+                              " -sIL -o NUL -w \"%{content_length}\\n\" ") &&
            host_append_cmd_arg(command, command_size, url) &&
-           host_append_literal(command, command_size, " || echo 0) & curl -sfL ") &&
+           host_append_literal(command, command_size,
+                               " || echo 0) & curl --proto \"=http,https,ftp,ftps\""
+                               " --proto-redir \"=http,https,ftp,ftps\" -sfL ") &&
            host_append_cmd_arg(command, command_size, url);
 }
 
@@ -57,7 +73,9 @@ static inline int host_append_download_b64_command(char *command, size_t command
 {
     return host_append_literal(command, command_size,
                               "t=$(mktemp) || exit 1;"
-                              " if command -v curl >/dev/null 2>&1; then curl -sfL -o \"$t\" ") &&
+                              " if command -v curl >/dev/null 2>&1; then"
+                              " curl --proto '=http,https,ftp,ftps'"
+                              " --proto-redir '=http,https,ftp,ftps' -sfL -o \"$t\" ") &&
            host_append_shell_arg(command, command_size, url, 0) &&
            host_append_literal(command, command_size,
                                "; elif command -v wget >/dev/null 2>&1; then wget -q -O \"$t\" ") &&
@@ -66,6 +84,27 @@ static inline int host_append_download_b64_command(char *command, size_t command
                                "; else rm -f \"$t\"; exit 127; fi"
                                " || { rm -f \"$t\"; exit 22; };"
                                " wc -c < \"$t\"; base64 < \"$t\"; rm -f \"$t\"");
+}
+
+static inline int host_download_sidecar_path(const char *destination, const char *kind,
+                                             unsigned long token, unsigned int attempt,
+                                             char *path, size_t path_size)
+{
+    char suffix[48];
+    int suffix_len;
+
+    if (destination == NULL || kind == NULL || path == NULL || path_size == 0) {
+        return 0;
+    }
+
+    suffix_len = snprintf(suffix, sizeof(suffix), ".%s.%08lx.%u",
+                          kind, token, attempt);
+    if (suffix_len < 0 || (size_t)suffix_len >= sizeof(suffix)) {
+        return 0;
+    }
+    path[0] = '\0';
+    return host_append_literal(path, path_size, destination) &&
+           host_append_literal(path, path_size, suffix);
 }
 
 /*

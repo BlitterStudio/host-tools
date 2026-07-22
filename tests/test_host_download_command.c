@@ -47,8 +47,9 @@ static void test_stream_command(void)
                                                 "https://example.com/file's.lha"),
             "stream download command should build");
 
-    require_contains(command, "curl -sfIL -o /dev/null -w '%{content_length}\\n'");
-    require_contains(command, "curl -sfL 'https://example.com/file'\\''s.lha'");
+    require_contains(command, "curl --proto '=http,https,ftp,ftps' --proto-redir '=http,https,ftp,ftps'");
+    require_contains(command, "-sfIL -o /dev/null -w '%{content_length}\\n'");
+    require_contains(command, "-sfL 'https://example.com/file'\\''s.lha'");
     require_contains(command, "echo 0; wget -q -O - 'https://example.com/file'\\''s.lha'");
     require_contains(command, "else exit 127; fi");
     require_shell_syntax(command);
@@ -64,7 +65,7 @@ static void test_b64_command(void)
             "base64 download command should build");
 
     require_contains(command, "t=$(mktemp) || exit 1");
-    require_contains(command, "curl -sfL -o \"$t\" 'https://example.com/a b.adf'");
+    require_contains(command, "--proto-redir '=http,https,ftp,ftps' -sfL -o \"$t\"");
     require_contains(command, "wget -q -O \"$t\" 'https://example.com/a b.adf'");
     require_contains(command, "|| { rm -f \"$t\"; exit 22; }");
     require_contains(command, "wc -c < \"$t\"; base64 < \"$t\"; rm -f \"$t\"");
@@ -80,9 +81,9 @@ static void test_windows_stream_command(void)
                                                         "https://example.com/file.lha"),
             "windows stream download command should build");
 
-    require_contains(command,
-                     "(curl -sIL -o NUL -w \"%{content_length}\\n\" \"https://example.com/file.lha\" || echo 0)");
-    require_contains(command, "& curl -sfL \"https://example.com/file.lha\"");
+    require_contains(command, "--proto \"=http,https,ftp,ftps\"");
+    require_contains(command, "-sIL -o NUL -w \"%{content_length}\\n\" \"https://example.com/file.lha\" || echo 0)");
+    require_contains(command, "-sfL \"https://example.com/file.lha\"");
 
     command[0] = '\0';
     require(!host_append_download_stream_command_windows(command, sizeof(command),
@@ -128,6 +129,38 @@ static void test_url_filename(void)
         host_url_filename("https://example.com/verylongname.bin", name, sizeof(name));
         require(strcmp(name, "verylon") == 0, "long filenames should truncate");
     }
+}
+
+static void test_supported_urls(void)
+{
+    require(host_download_url_supported("https://example.com/file.lha"),
+            "HTTPS should be supported");
+    require(host_download_url_supported("HTTP://example.com/file.lha"),
+            "URL scheme matching should be case-insensitive");
+    require(host_download_url_supported("ftp://example.com/file.lha"),
+            "FTP should be supported");
+    require(host_download_url_supported("ftps://example.com/file.lha"),
+            "FTPS should be supported");
+    require(!host_download_url_supported("file:///etc/passwd"),
+            "local file URLs should be rejected");
+    require(!host_download_url_supported("data:text/plain,hello"),
+            "data URLs should be rejected");
+    require(!host_download_url_supported("ssh://example.com/file"),
+            "arbitrary URL schemes should be rejected");
+}
+
+static void test_sidecar_path(void)
+{
+    char path[128];
+
+    require(host_download_sidecar_path("RAM:archive.lha", "part", 0x12, 3,
+                                       path, sizeof(path)),
+            "sidecar path should build");
+    require(strcmp(path, "RAM:archive.lha.part.00000012.3") == 0,
+            "sidecar path should be adjacent and unique");
+    require(!host_download_sidecar_path("RAM:archive.lha", "part", 0x12, 3,
+                                        path, 12),
+            "small sidecar path buffer should fail");
 }
 
 static void require_decoded(const char *encoded, const char *expected, long expected_len)
@@ -197,6 +230,8 @@ int main(void)
     test_windows_stream_command();
     test_small_buffer_failures();
     test_url_filename();
+    test_supported_urls();
+    test_sidecar_path();
     test_base64_decode();
     test_base64_encode_utf16le();
     return 0;

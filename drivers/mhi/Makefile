@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VERSION		?= 2.4
-DATE		?= 2026-06-10
+include ../../version.mk
 VERSION_WORDS	= $(subst ., ,$(VERSION))
 LIB_VERSION	= $(word 1,$(VERSION_WORDS))
 LIB_REVISION	= $(word 2,$(VERSION_WORDS))
@@ -13,8 +12,8 @@ CC		= m68k-amigaos-gcc
 endif
 
 BUILD_DIR	= build
-PACKAGE_DIR	= package
-LIB_OUT		= $(PACKAGE_DIR)/Libs/MHI/mhiuae.library
+MHI_PACKAGE_DIR = package
+LIB_OUT		= $(MHI_PACKAGE_DIR)/Libs/MHI/mhiuae.library
 SOURCES		= src/mhiuae_startup.c src/mhiuae.c
 HEADERS		= src/mhi_abi.h src/mhiuae.h ../../src/uae_pragmas.h
 CFLAGS		= -mcpu=68020 -noixemul -Os -fomit-frame-pointer -std=c99 -Wall -Wextra -Wstrict-prototypes -I../../src
@@ -29,14 +28,14 @@ all: $(LIB_OUT)
 $(BUILD_DIR)/mhiuae.library: $(SOURCES) $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(VERFLAGS) $(LDFLAGS) $(SOURCES) -o $@
 
-$(LIB_OUT): $(BUILD_DIR)/mhiuae.library | $(PACKAGE_DIR)/Libs/MHI
+$(LIB_OUT): $(BUILD_DIR)/mhiuae.library | $(MHI_PACKAGE_DIR)/Libs/MHI
 	cp $< $@
 
 $(BUILD_DIR):
 	mkdir -p $@
 
-$(PACKAGE_DIR)/Libs/MHI:
+$(MHI_PACKAGE_DIR)/Libs/MHI:
 	mkdir -p $@
 
 clean:
-	rm -rf $(BUILD_DIR) $(PACKAGE_DIR)
+	rm -rf $(BUILD_DIR) $(MHI_PACKAGE_DIR)

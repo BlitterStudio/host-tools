@@ -10,7 +10,8 @@
 #include "host_common.h"
 #include "uae_pragmas.h"
 
-#define HOST_CAPTURE_IDLE_LIMIT 250
+#define HOST_CAPTURE_LEGACY_IDLE_LIMIT 250
+#define HOST_CAPTURE_STATUS_IDLE_LIMIT 1500
 #ifndef HOST_SHELL_STATUS_INVALID
 #define HOST_SHELL_STATUS_INVALID 0UL
 #endif
@@ -53,7 +54,16 @@ static inline int host_print_command_output(const char *command)
         return HOST_RETURN_ERROR;
     }
 
-    while (idle_count < HOST_CAPTURE_IDLE_LIMIT) {
+    for (;;) {
+        int idle_limit;
+
+        if (SetSignal(0, 0) & SIGBREAKF_CTRL_C) {
+            SetSignal(0, SIGBREAKF_CTRL_C);
+            HostShell_Close(handle);
+            printf("\nAborted host command.\n");
+            return HOST_RETURN_ERROR;
+        }
+
         actual = HostShell_Read(handle, (UBYTE *)buffer, sizeof(buffer));
         if (actual > 0) {
             fwrite(buffer, 1, actual, stdout);
@@ -81,12 +91,13 @@ static inline int host_print_command_output(const char *command)
                 fflush(stdout);
                 return HOST_RETURN_ERROR;
             }
-            if (status_supported) {
-                Delay(1);
-                continue;
-            }
             Delay(1);
             idle_count++;
+            idle_limit = status_supported ? HOST_CAPTURE_STATUS_IDLE_LIMIT
+                                          : HOST_CAPTURE_LEGACY_IDLE_LIMIT;
+            if (idle_count >= idle_limit) {
+                break;
+            }
         }
     }
 

@@ -25,11 +25,21 @@ test -f "$PACKAGE_ROOT/Install"
 test -f "$PACKAGE_ROOT/Install.info"
 test -f "$PACKAGE_ROOT/README"
 test -f "$PACKAGE_ROOT/README.info"
+test -f "$PACKAGE_ROOT/LICENSE"
+test -f "$PACKAGE_ROOT/CHANGELOG"
 test -f "$PACKAGE_ROOT/Help.info"
+cmp LICENSE "$PACKAGE_ROOT/LICENSE"
+cmp CHANGELOG.md "$PACKAGE_ROOT/CHANGELOG"
 cmp package/icons/drawer.info "${PACKAGE_ROOT}.info"
 cmp package/icons/Help.info "$PACKAGE_ROOT/Help.info"
 cmp package/icons/Install.info "$PACKAGE_ROOT/Install.info"
 cmp package/icons/readme.info "$PACKAGE_ROOT/README.info"
+
+grep -F -q "## [$VERSION] - $DATE" "$PACKAGE_ROOT/CHANGELOG"
+if ! grep -E -q "^\\[$VERSION\\]: .*/compare/.*\\.\\.\\.v${VERSION}$" "$PACKAGE_ROOT/CHANGELOG"; then
+	echo "Current changelog comparison link must end at the release tag" >&2
+	exit 1
+fi
 
 if ! strings "$PACKAGE_ROOT/Install.info" | grep -q '^MINUSER=NOVICE$'; then
 	echo "Installer icon must allow Novice mode" >&2

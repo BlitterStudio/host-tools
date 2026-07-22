@@ -1847,6 +1847,7 @@ p_base  dc.l 0
 buffoffset dc.l 0
 EndCode:
 check        Dc.b 0
+  Even
 noplay       dc.l 0
 labname: Dc.b "ahi_winuae",0
 resname: dc.b "uae.resource",0

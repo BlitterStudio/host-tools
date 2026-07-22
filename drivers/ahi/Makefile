@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VERSION		?= 2.4
-DATE		?= 2026-06-10
+include ../../version.mk
 
 VASMM68K_FALLBACK := $(shell command -v vasmm68k_mot 2>/dev/null || { test -x /opt/m68k-amigaos/bin/vasmm68k_mot && printf /opt/m68k-amigaos/bin/vasmm68k_mot; } || printf vasmm68k_mot)
 ifeq ($(origin VASMM68K),undefined)

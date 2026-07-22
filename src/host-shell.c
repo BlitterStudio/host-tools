@@ -123,7 +123,7 @@ static int append_size_prefix(char *dest, size_t dest_size, int rows, int cols)
 int main(int argc, char *argv[])
 {
     static char command[HOST_MAX_COMMAND_LEN];
-    static char session_command[HOST_MAX_COMMAND_LEN + 64];
+    static char session_command[HOST_MAX_COMMAND_LEN];
     static char pending[128];
     static char buffer[4096];
     BPTR in = 0;

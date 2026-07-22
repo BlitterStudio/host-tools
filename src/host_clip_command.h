@@ -11,13 +11,16 @@
 #include "host_powershell.h"
 
 #define HOST_CLIP_PASTE_COMMAND \
-    "out=$(if command -v pbpaste >/dev/null 2>&1; then pbpaste; " \
-    "elif command -v wl-paste >/dev/null 2>&1; then wl-paste -n; " \
-    "elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard -o; " \
-    "elif command -v xsel >/dev/null 2>&1; then xsel --clipboard --output; " \
-    "else printf 'No host clipboard backend found\\n' >&2; exit 127; fi) || exit $?; " \
-    "printf %s \"$out\" | if command -v iconv >/dev/null 2>&1; then " \
-    "iconv -c -f UTF-8 -t ISO-8859-1//TRANSLIT 2>/dev/null || cat; else cat; fi"
+    "t=$(mktemp) || exit 1; c=\"${t}.converted\"; " \
+    "trap 'rm -f \"$t\" \"$c\"' 0 1 2 15; " \
+    "if command -v pbpaste >/dev/null 2>&1; then pbpaste >\"$t\"; " \
+    "elif command -v wl-paste >/dev/null 2>&1; then wl-paste -n >\"$t\"; " \
+    "elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard -o >\"$t\"; " \
+    "elif command -v xsel >/dev/null 2>&1; then xsel --clipboard --output >\"$t\"; " \
+    "else printf 'No host clipboard backend found\\n' >&2; exit 127; fi || exit $?; " \
+    "if command -v iconv >/dev/null 2>&1 && " \
+    "iconv -c -f UTF-8 -t ISO-8859-1//TRANSLIT <\"$t\" >\"$c\" 2>/dev/null; " \
+    "then cat \"$c\"; else cat \"$t\"; fi"
 
 /*
  * Windows clipboard access goes through PowerShell. ISO-8859-1 text

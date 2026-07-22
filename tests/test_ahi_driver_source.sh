@@ -205,6 +205,9 @@ if grep -F -q 'cmp.l #$003b0002,d0' "$V2_DRIVER_SOURCE" || grep -F -q 'bsr.w get
 fi
 grep -F -q 'DEBUG EQU 0' "$V2_DRIVER_SOURCE"
 grep -F -q 'IFNE DEBUG' "$V2_DRIVER_SOURCE"
+grep -F -q 'beq.s .init_failed' "$V2_DRIVER_SOURCE"
+grep -A7 -F '.init_failed' "$V2_DRIVER_SOURCE" | grep -F -q 'call CloseLibrary'
+grep -A8 -F '.init_failed' "$V2_DRIVER_SOURCE" | grep -F -q 'clr.l ub_UtilBase(a5)'
 if grep -F -q 'IFD DEBUG=1' "$V2_DRIVER_SOURCE"; then
 	echo "UAESND v2 debug blocks must be value-gated so release builds do not write to DEBUG_ADDR" >&2
 	exit 1

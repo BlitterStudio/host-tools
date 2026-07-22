@@ -66,6 +66,10 @@ int main(int argc, char *argv[])
         if (!require_name(argv[2])) {
             return HOST_RETURN_ERROR;
         }
+        if (!host_env_valid_value(argv[3])) {
+            printf("Environment variable values cannot contain line breaks\n");
+            return HOST_RETURN_ERROR;
+        }
         if (windows) {
             if (!host_append_env_get_command_windows(command, sizeof(command), argv[2])) {
                 printf("Command is too long\n");

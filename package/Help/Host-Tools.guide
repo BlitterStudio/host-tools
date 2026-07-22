@@ -1,5 +1,5 @@
 @database
-@$VER: Host-Tools.guide 2.4 (2026-06-10)
+@$VER: Host-Tools.guide 2.6 (2026-07-22)
 @index Main
 @wordwrap
 
@@ -167,7 +167,7 @@ host-clip [copy] <text...>
 host-clip copy < file
 host-clip paste
 
-Without text arguments, host-clip copy reads standard input verbatim, preserving line breaks. Text is converted between the Amiga ISO-8859-1 character set and the host character set automatically: through iconv on Linux and macOS, and through PowerShell on Windows hosts.
+Without text arguments, host-clip copy reads standard input verbatim, preserving line breaks. Pasted text also preserves trailing line breaks. Text is converted between the Amiga ISO-8859-1 character set and the host character set automatically: through iconv on Linux and macOS, and through PowerShell on Windows hosts.
 
 @endnode
 
@@ -181,7 +181,7 @@ host-info
 @endnode
 
 @node HostDownload "host-download"
-host-download downloads a URL on the host and saves it to an Amiga path. The host's curl or wget performs the transfer, so HTTPS and modern servers work.
+host-download downloads an HTTP, HTTPS, FTP, or FTPS URL on the host and saves it to an Amiga path. The host's curl or wget performs the transfer, so HTTPS and modern servers work.
 
 Usage:
 
@@ -189,7 +189,7 @@ host-download <URL> [<destination>] [FORCE]
 
 Without a destination, the file is saved in the current directory under its URL filename. A destination naming an existing directory keeps the URL filename. An existing destination file is only overwritten when FORCE is given.
 
-The file is written through AmigaDOS, so any writable volume works, including RAM: and hardfiles. Failed or aborted downloads do not leave a partial file behind. Press Ctrl-C to abort.
+The file is written through AmigaDOS, so any writable volume works, including RAM: and hardfiles. It is first written to a temporary file beside the destination and moved into place only after a successful transfer. Failed, stalled, or aborted downloads do not leave a partial file behind. With FORCE, the old destination is preserved until the replacement is ready. Press Ctrl-C to abort.
 
 host-download works on Linux, macOS, and Windows hosts. On Windows a current Amiberry build is required.
 
@@ -207,11 +207,11 @@ host-env list
 
 On Windows, host-env updates the user's persistent environment through PowerShell and the Windows user environment store. New host processes see the changed values.
 
-On Linux and macOS, host-env writes persistent values to $HOME/.host-tools-env. Source that file from your host shell startup files if you want future host login shells to import those values automatically.
+On Linux and macOS, host-env writes persistent values to $HOME/.host-tools-env. The file is replaced atomically and restricted to the host user with mode 0600. Source that file from your host shell startup files if you want future host login shells to import those values automatically.
 
 host-env cannot change the live environment of already-running host shells, desktop apps, or Amiberry's parent process.
 
-Variable names must use ASCII letters, digits, and underscores, and must not start with a digit.
+Variable names must use ASCII letters, digits, and underscores, and must not start with a digit. Values must not contain line breaks.
 
 @endnode
 
@@ -223,5 +223,7 @@ It does not edit startup files, system settings, or existing driver configuratio
 Native Code execution must be enabled in Amiberry for these tools to communicate with the host.
 
 All tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, host-info, and host-env are supported with a current Amiberry; the remaining tools require a Linux or macOS host.
+
+Host commands used by host-reveal, host-notify, host-clip, host-info, and host-env can be cancelled with Ctrl-C. Idle commands time out after approximately 30 seconds on status-aware Amiberry builds or 5 seconds on older builds.
 
 @endnode

@@ -11,7 +11,7 @@
 #include "host_capture.h"
 #include "host_download_command.h"
 
-#define DOWNLOAD_STALL_LIMIT 1500 /* ticks without data on builds without the status trap */
+#define DOWNLOAD_STALL_LIMIT 1500 /* ticks without data */
 
 static const char version[] = "$VER: Host-Download " VERSION_STR " (" DATE_STR ")";
 
@@ -51,6 +51,74 @@ static int lock_is_directory(BPTR lock)
     return fib.fib_DirEntryType > 0;
 }
 
+static int make_unused_sidecar_path(const char *destination, char kind,
+                                    char *path, size_t path_size)
+{
+    unsigned long token = (unsigned long)FindTask(NULL);
+
+    for (unsigned int attempt = 0; attempt < 100; attempt++) {
+        BPTR lock;
+
+        if (!host_download_sidecar_path(destination, kind, token, attempt,
+                                        path, path_size)) {
+            return 0;
+        }
+        lock = quiet_lock(path);
+        if (lock == 0) {
+            return 1;
+        }
+        UnLock(lock);
+    }
+    return 0;
+}
+
+static int install_download(const char *temp_path, const char *destpath, int force,
+                            char *backup_path, size_t backup_size,
+                            const char **failure)
+{
+    BPTR lock = quiet_lock(destpath);
+
+    if (lock == 0) {
+        if (Rename((STRPTR)temp_path, (STRPTR)destpath)) {
+            return 1;
+        }
+        *failure = "Cannot move download to destination";
+        return 0;
+    }
+
+    if (lock_is_directory(lock)) {
+        UnLock(lock);
+        *failure = "Destination path is a directory";
+        return 0;
+    }
+    UnLock(lock);
+
+    if (!force) {
+        *failure = "Destination appeared during download";
+        return 0;
+    }
+    if (!make_unused_sidecar_path(destpath, 'b', backup_path, backup_size)) {
+        *failure = "Cannot reserve a destination backup";
+        return 0;
+    }
+    if (!Rename((STRPTR)destpath, (STRPTR)backup_path)) {
+        *failure = "Cannot preserve the existing destination";
+        return 0;
+    }
+    if (Rename((STRPTR)temp_path, (STRPTR)destpath)) {
+        if (!DeleteFile((STRPTR)backup_path)) {
+            printf("\nWarning: old destination remains at %s\n", backup_path);
+        }
+        return 1;
+    }
+
+    if (!Rename((STRPTR)backup_path, (STRPTR)destpath)) {
+        printf("\nOriginal destination remains at %s\n", backup_path);
+    }
+    *failure = "Cannot replace destination";
+    return 0;
+}
+
 static void show_progress(unsigned long received, long expected)
 {
     if (expected > 0) {
@@ -69,6 +137,8 @@ int main(int argc, char *argv[])
 {
     static char command[HOST_MAX_COMMAND_LEN];
     static char destpath[HOST_MAX_PATH_LEN];
+    static char temp_path[HOST_MAX_PATH_LEN];
+    static char backup_path[HOST_MAX_PATH_LEN];
     static char urlname[108];
     static char buffer[4096];
     static unsigned char decoded[(sizeof(buffer) * 3) / 4 + 3];
@@ -89,6 +159,7 @@ int main(int argc, char *argv[])
     unsigned long shown = (unsigned long)-1;
     BPTR out_file = 0;
     BPTR lock;
+    int temp_exists = 0;
     int rc = HOST_RETURN_ERROR;
     const char *failure = NULL;
 
@@ -123,8 +194,8 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
-    if (!host_is_uri(url)) {
-        printf("Not a URL: %s\n", url);
+    if (!host_download_url_supported(url)) {
+        printf("Unsupported URL scheme (use HTTP, HTTPS, FTP, or FTPS): %s\n", url);
         return HOST_RETURN_ERROR;
     }
 
@@ -196,6 +267,19 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
+    if (!make_unused_sidecar_path(destpath, 'p', temp_path, sizeof(temp_path))) {
+        HostShell_Close(handle);
+        printf("Cannot reserve a temporary destination file\n");
+        return HOST_RETURN_ERROR;
+    }
+    out_file = Open((STRPTR)temp_path, MODE_NEWFILE);
+    if (out_file == 0) {
+        HostShell_Close(handle);
+        printf("Cannot open temporary destination file\n");
+        return HOST_RETURN_ERROR;
+    }
+    temp_exists = 1;
+
     host_base64_init(&b64);
 
     for (;;)
@@ -247,13 +331,6 @@ int main(int argc, char *argv[])
             }
 
             if (data_len > 0) {
-                if (out_file == 0) {
-                    out_file = Open((STRPTR)destpath, MODE_NEWFILE);
-                    if (out_file == 0) {
-                        failure = "Cannot open destination file";
-                        break;
-                    }
-                }
                 if (Write(out_file, (APTR)data, data_len) != data_len) {
                     failure = "Write to destination failed";
                     break;
@@ -284,7 +361,7 @@ int main(int argc, char *argv[])
                 break;
             }
             Delay(1);
-            if (!status_supported && ++idle_count > DOWNLOAD_STALL_LIMIT) {
+            if (++idle_count > DOWNLOAD_STALL_LIMIT) {
                 failure = "Timed out waiting for download data";
                 break;
             }
@@ -313,21 +390,23 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (failure == NULL && out_file == 0) {
-        /* zero length download: still create the destination file */
-        out_file = Open((STRPTR)destpath, MODE_NEWFILE);
-        if (out_file == 0) {
-            failure = "Cannot open destination file";
+    if (out_file != 0) {
+        if (!Close(out_file) && failure == NULL) {
+            failure = "Cannot finish temporary destination file";
+        }
+        out_file = 0;
+    }
+
+    if (failure == NULL) {
+        if (install_download(temp_path, destpath, force,
+                             backup_path, sizeof(backup_path), &failure)) {
+            temp_exists = 0;
         }
     }
 
-    if (out_file != 0) {
-        Close(out_file);
-    }
-
     if (failure != NULL) {
-        if (out_file != 0) {
-            DeleteFile((STRPTR)destpath);
+        if (temp_exists && !DeleteFile((STRPTR)temp_path)) {
+            printf("\nWarning: partial download remains at %s\n", temp_path);
         }
         printf("\n%s: %s\n", failure, url);
     } else {

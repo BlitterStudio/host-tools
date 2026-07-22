@@ -3,9 +3,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#define _POSIX_C_SOURCE 200809L
+#define _DARWIN_C_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "host_base64.h"
 #include "host_clip_command.h"
 #include "host_env_command.h"
@@ -134,12 +139,33 @@ static void test_clip_copy_command_multiline(void)
 
 static void test_clip_paste_command(void)
 {
+    char command[HOST_MAX_COMMAND_LEN * 2];
+    char output[32];
+    FILE *pipe;
+    size_t output_len;
+
     require_contains(HOST_CLIP_PASTE_COMMAND, "pbpaste");
     require_contains(HOST_CLIP_PASTE_COMMAND, "wl-paste -n");
     require_contains(HOST_CLIP_PASTE_COMMAND, "xclip -selection clipboard -o");
     require_contains(HOST_CLIP_PASTE_COMMAND, "xsel --clipboard --output");
     require_contains(HOST_CLIP_PASTE_COMMAND, "iconv -c -f UTF-8 -t ISO-8859-1//TRANSLIT");
+    require_contains(HOST_CLIP_PASTE_COMMAND, "t=$(mktemp)");
+    require(strstr(HOST_CLIP_PASTE_COMMAND, "out=$(") == NULL,
+            "clipboard paste must not use command substitution for clipboard data");
     require_shell_syntax(HOST_CLIP_PASTE_COMMAND);
+
+    command[0] = '\0';
+    require(host_append_literal(command, sizeof(command),
+                                "pbpaste() { printf 'line\\n\\n'; }; "),
+            "clipboard behavior prefix should fit");
+    require(host_append_literal(command, sizeof(command), HOST_CLIP_PASTE_COMMAND),
+            "clipboard behavior command should fit");
+    pipe = popen(command, "r");
+    require(pipe != NULL, "clipboard behavior command should start");
+    output_len = fread(output, 1, sizeof(output), pipe);
+    require(pclose(pipe) == 0, "clipboard behavior command should succeed");
+    require(output_len == 6 && memcmp(output, "line\n\n", 6) == 0,
+            "clipboard paste must preserve trailing newlines");
 }
 
 static void test_info_command(void)
@@ -160,6 +186,12 @@ static void test_env_name_validation(void)
     require(!host_env_valid_name("1FOO"), "env name must not start with a digit");
     require(!host_env_valid_name("BAD-NAME"), "env name must not contain hyphens");
     require(!host_env_valid_name("BAD=NAME"), "env name must not contain equals");
+    require(host_env_valid_value("one line"), "single-line env value should be valid");
+    require(host_env_valid_value(""), "empty env value should be valid");
+    require(!host_env_valid_value("line one\nline two"),
+            "env value must not contain line feeds");
+    require(!host_env_valid_value("line one\rline two"),
+            "env value must not contain carriage returns");
 }
 
 static void test_env_get_command(void)
@@ -170,7 +202,7 @@ static void test_env_get_command(void)
     require(host_append_env_get_command(command, sizeof(command), "FOO"),
             "env get command should build");
 
-    require_contains(command, "f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "umask 077; f=\"${HOME:?}/.host-tools-env\"");
     require_contains(command, "if [ \"${FOO+x}\" = x ]; then printf %s \"$FOO\"");
     require_contains(command, ". \"$f\"");
     require_contains(command, "else exit 1; fi");
@@ -186,11 +218,18 @@ static void test_env_set_command(void)
                                         "FOO", "a b's $HOME"),
             "env set command should build");
 
-    require_contains(command, "f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "umask 077; f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "t=$(mktemp \"${f}.XXXXXX\")");
+    require_contains(command, "trap 'rm -f \"$t\"' 0 1 2 15");
     require_contains(command, "grep -v '^export FOO=' \"$f\"");
     require_contains(command, "printf '%s\\n' 'export FOO='\\''a b'\\''\\'\\'''\\''s $HOME'\\'''");
     require_contains(command, "mv \"$t\" \"$f\"");
+    require_contains(command, "chmod 600 \"$t\"");
     require_shell_syntax(command);
+
+    command[0] = '\0';
+    require(!host_append_env_set_command(command, sizeof(command), "FOO", "one\ntwo"),
+            "multiline env values should be rejected");
 }
 
 static void test_env_unset_command(void)
@@ -201,10 +240,56 @@ static void test_env_unset_command(void)
     require(host_append_env_unset_command(command, sizeof(command), "FOO"),
             "env unset command should build");
 
-    require_contains(command, "f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "umask 077; f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "t=$(mktemp \"${f}.XXXXXX\")");
     require_contains(command, "grep -v '^export FOO=' \"$f\" > \"$t\"");
     require_contains(command, "mv \"$t\" \"$f\"");
+    require_contains(command, "chmod 600 \"$t\"");
     require_shell_syntax(command);
+}
+
+static void test_env_set_behavior(void)
+{
+    char temp_dir[] = "/tmp/host-tools-env.XXXXXX";
+    char env_path[256];
+    char command[HOST_MAX_COMMAND_LEN];
+    char invoke[HOST_MAX_COMMAND_LEN * 4];
+    char contents[128];
+    struct stat st;
+    FILE *env_file;
+    size_t contents_len;
+
+    require(mkdtemp(temp_dir) != NULL, "env behavior temp directory should be created");
+    command[0] = '\0';
+    require(host_append_env_set_command(command, sizeof(command), "FOO", "private value"),
+            "env behavior command should build");
+
+    invoke[0] = '\0';
+    require(host_append_literal(invoke, sizeof(invoke), "HOME="),
+            "env behavior HOME prefix should fit");
+    require(host_append_shell_arg(invoke, sizeof(invoke), temp_dir, 0),
+            "env behavior HOME should fit");
+    require(host_append_literal(invoke, sizeof(invoke), " sh -c "),
+            "env behavior shell prefix should fit");
+    require(host_append_shell_arg(invoke, sizeof(invoke), command, 0),
+            "env behavior shell command should fit");
+    require(system(invoke) == 0, "env behavior command should succeed");
+
+    require(snprintf(env_path, sizeof(env_path), "%s/.host-tools-env", temp_dir) > 0,
+            "env behavior path should build");
+    require(stat(env_path, &st) == 0, "env file should exist");
+    require((st.st_mode & 0777) == 0600, "env file should be owner-readable only");
+
+    env_file = fopen(env_path, "r");
+    require(env_file != NULL, "env file should be readable");
+    contents_len = fread(contents, 1, sizeof(contents) - 1, env_file);
+    require(fclose(env_file) == 0, "env file should close");
+    contents[contents_len] = '\0';
+    require(strcmp(contents, "export FOO='private value'\n") == 0,
+            "env file should contain the requested export");
+
+    require(unlink(env_path) == 0, "env behavior file should be removed");
+    require(rmdir(temp_dir) == 0, "env behavior temp directory should be removed");
 }
 
 static void test_env_list_command(void)
@@ -247,6 +332,18 @@ static void test_shell_login_explicit_command(void)
                    "h=\"${SHELL:-/bin/sh}\"; exec \"$h\" -l -c 'printf '\\''%s\\n'\\'' \"$PATH\"'",
                    "explicit command should run through the user's login shell");
     require_shell_syntax(command);
+}
+
+static void test_shell_login_command_limit(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+    char explicit_command[HOST_MAX_COMMAND_LEN];
+
+    memset(explicit_command, 'x', sizeof(explicit_command) - 1);
+    explicit_command[sizeof(explicit_command) - 1] = '\0';
+    command[0] = '\0';
+    require(!host_append_shell_login_command(command, sizeof(command), explicit_command),
+            "login wrapper must reject a command that exceeds the trap buffer");
 }
 
 static void require_ps_script(const char *command, const char *script)
@@ -390,9 +487,11 @@ int main(void)
     test_env_get_command();
     test_env_set_command();
     test_env_unset_command();
+    test_env_set_behavior();
     test_env_list_command();
     test_shell_login_interactive_command();
     test_shell_login_explicit_command();
+    test_shell_login_command_limit();
     test_ps_quoting();
     test_windows_clip_commands();
     test_windows_reveal_command();

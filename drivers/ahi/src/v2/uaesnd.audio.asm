@@ -1710,7 +1710,7 @@ initRoutine:
 	moveq #0,d0
 	call OpenLibrary
 	tst.l d0
-	beq.s .end
+	beq.s .init_failed
 	move.l d0,a6
 	sub.l a0,a0
 	move.w #6502,d0
@@ -1722,11 +1722,18 @@ initRoutine:
 	call CloseLibrary
 
 	move.l ub_ConfigDev(a5),d0
-	beq.s .end
+	beq.s .init_failed
 	move.l d0,a0
 	move.l cd_BoardAddr(a0),ub_Base(a5)
 
 	move.l a5,a4
+	bra.s .end
+.init_failed
+	move.l ub_UtilBase(a5),a1
+	beq.s .end
+	move.l ub_SysLib(a5),a6
+	call CloseLibrary
+	clr.l ub_UtilBase(a5)
 .end
 	move.l a4,d0
 	movem.l	(sp)+,d1/a0/a1/a4/a5/a6

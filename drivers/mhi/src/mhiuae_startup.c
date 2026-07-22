@@ -5,6 +5,7 @@
 
 #define __USE_SYSBASE
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include <exec/execbase.h>
@@ -95,11 +96,11 @@ struct MyDataInit {
     ULONG end_mark;
 } DataTab = {
     INITBYTE(OFFSET(Node, ln_Type), NT_LIBRARY),
-    0x80, (UBYTE)OFFSET(Node, ln_Name), MHIUAE_INIT_PTR(&lib_name[0]),
+    0x80, (UBYTE)offsetof(struct Node, ln_Name), MHIUAE_INIT_PTR(&lib_name[0]),
     INITBYTE(OFFSET(Library, lib_Flags), LIBF_SUMUSED | LIBF_CHANGED),
     INITWORD(OFFSET(Library, lib_Version), LIB_VERSION),
     INITWORD(OFFSET(Library, lib_Revision), LIB_REVISION),
-    0x80, (UBYTE)OFFSET(Library, lib_IdString), MHIUAE_INIT_PTR(&lib_id[0]),
+    0x80, (UBYTE)offsetof(struct Library, lib_IdString), MHIUAE_INIT_PTR(&lib_id[0]),
     0
 };
 

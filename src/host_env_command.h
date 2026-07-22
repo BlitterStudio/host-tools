@@ -34,10 +34,25 @@ static inline int host_env_valid_name(const char *name)
     return 1;
 }
 
+static inline int host_env_valid_value(const char *value)
+{
+    if (value == NULL) {
+        return 0;
+    }
+
+    for (const char *p = value; *p; p++) {
+        if (*p == '\n' || *p == '\r') {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static inline int host_append_env_export_line(char *line, size_t line_size,
                                               const char *name, const char *value)
 {
-    if (!host_append_literal(line, line_size, "export ") ||
+    if (!host_env_valid_name(name) || !host_env_valid_value(value) ||
+        !host_append_literal(line, line_size, "export ") ||
         !host_append_literal(line, line_size, name) ||
         !host_append_literal(line, line_size, "='")) {
         return 0;
@@ -65,7 +80,7 @@ static inline int host_append_env_export_line(char *line, size_t line_size,
 static inline int host_append_env_file_prefix(char *command, size_t command_size)
 {
     return host_append_literal(command, command_size,
-                               "f=\"${HOME:?}/.host-tools-env\"; ");
+                               "umask 077; f=\"${HOME:?}/.host-tools-env\"; ");
 }
 
 static inline int host_append_env_get_command(char *command, size_t command_size,
@@ -92,7 +107,7 @@ static inline int host_append_env_set_command(char *command, size_t command_size
 {
     static char line[HOST_MAX_COMMAND_LEN];
 
-    if (!host_env_valid_name(name)) {
+    if (!host_env_valid_name(name) || !host_env_valid_value(value)) {
         return 0;
     }
 
@@ -103,11 +118,16 @@ static inline int host_append_env_set_command(char *command, size_t command_size
 
     return host_append_env_file_prefix(command, command_size) &&
            host_append_literal(command, command_size,
-                               "t=\"${f}.$$\"; touch \"$f\" || exit $?; grep -v '^export ") &&
+                               "t=$(mktemp \"${f}.XXXXXX\") || exit 1; "
+                               "trap 'rm -f \"$t\"' 0 1 2 15; "
+                               "if [ -f \"$f\" ]; then grep -v '^export ") &&
            host_append_literal(command, command_size, name) &&
-           host_append_literal(command, command_size, "=' \"$f\" > \"$t\" 2>/dev/null || true; printf '%s\\n' ") &&
+           host_append_literal(command, command_size,
+                               "=' \"$f\" > \"$t\"; s=$?; [ \"$s\" -le 1 ] || exit \"$s\"; fi; "
+                               "printf '%s\\n' ") &&
            host_append_shell_arg(command, command_size, line, 0) &&
-           host_append_literal(command, command_size, " >> \"$t\" && mv \"$t\" \"$f\"");
+           host_append_literal(command, command_size,
+                               " >> \"$t\" || exit $?; chmod 600 \"$t\" || exit $?; mv \"$t\" \"$f\"");
 }
 
 static inline int host_append_env_unset_command(char *command, size_t command_size,
@@ -119,9 +139,12 @@ static inline int host_append_env_unset_command(char *command, size_t command_si
 
     return host_append_env_file_prefix(command, command_size) &&
            host_append_literal(command, command_size,
-                               "t=\"${f}.$$\"; if [ -f \"$f\" ]; then grep -v '^export ") &&
+                               "if [ -f \"$f\" ]; then t=$(mktemp \"${f}.XXXXXX\") || exit 1; "
+                               "trap 'rm -f \"$t\"' 0 1 2 15; grep -v '^export ") &&
            host_append_literal(command, command_size, name) &&
-           host_append_literal(command, command_size, "=' \"$f\" > \"$t\" || true; mv \"$t\" \"$f\"; fi");
+           host_append_literal(command, command_size,
+                               "=' \"$f\" > \"$t\"; s=$?; [ \"$s\" -le 1 ] || exit \"$s\"; "
+                               "chmod 600 \"$t\" || exit $?; mv \"$t\" \"$f\"; fi");
 }
 
 static inline int host_append_env_list_command(char *command, size_t command_size)
@@ -156,7 +179,7 @@ static inline int host_append_env_set_command_windows(char *command, size_t comm
 {
     static char script[HOST_MAX_COMMAND_LEN];
 
-    if (!host_env_valid_name(name)) {
+    if (!host_env_valid_name(name) || !host_env_valid_value(value)) {
         return 0;
     }
 

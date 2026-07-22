@@ -55,8 +55,6 @@ APTR i_MHIAllocDecoder(struct Task *task __asm("a0"), ULONG sigmask __asm("d0"),
         return NULL;
     }
 
-    player->task = task;
-    player->sigmask = sigmask;
     player->host_handle = host_handle;
     player->status = MHIF_STOPPED;
     base->allocated_decoders++;
@@ -84,18 +82,12 @@ void i_MHIFreeDecoder(APTR handle __asm("a3"), struct MHIUAEBase *base __asm("a6
 BOOL i_MHIQueueBuffer(APTR handle __asm("a3"), APTR buffer __asm("a0"), ULONG size __asm("d0"), struct MHIUAEBase *base __asm("a6"))
 {
     struct MHIUAEPlayer *player = valid_player(handle);
-    ULONG queued;
-
     (void)base;
     if (player == NULL || buffer == NULL || size == 0) {
         return FALSE;
     }
 
-    queued = UaeMHIQueue(player->host_handle, buffer, size, (ULONG)buffer);
-    if (queued && player->task != NULL && player->sigmask != 0) {
-        Signal(player->task, player->sigmask);
-    }
-    return queued ? TRUE : FALSE;
+    return UaeMHIQueue(player->host_handle, buffer, size, (ULONG)buffer) ? TRUE : FALSE;
 }
 
 APTR i_MHIGetEmpty(APTR handle __asm("a3"), struct MHIUAEBase *base __asm("a6"))

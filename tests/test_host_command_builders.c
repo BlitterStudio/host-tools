@@ -203,10 +203,38 @@ static void test_env_get_command(void)
             "env get command should build");
 
     require_contains(command, "umask 077; f=\"${HOME:?}/.host-tools-env\"");
-    require_contains(command, "if [ \"${FOO+x}\" = x ]; then printf %s \"$FOO\"");
+    require_contains(command, "if [ \"${FOO+x}\" = x ]; then printf '%s\\n' \"$FOO\"");
     require_contains(command, ". \"$f\"");
     require_contains(command, "else exit 1; fi");
     require_shell_syntax(command);
+}
+
+static void test_env_get_command_output(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+    char wrapped[HOST_MAX_COMMAND_LEN * 2];
+    char output[64];
+    FILE *pipe;
+    size_t output_len;
+
+    command[0] = '\0';
+    require(host_append_env_get_command(command, sizeof(command), "HOST_TOOLS_TEST"),
+            "env get command should build for behavior test");
+
+    wrapped[0] = '\0';
+    require(host_append_literal(wrapped, sizeof(wrapped),
+                                "HOST_TOOLS_TEST='value with spaces' sh -c "),
+            "env get behavior prefix should fit");
+    require(host_append_shell_arg(wrapped, sizeof(wrapped), command, 0),
+            "env get behavior command should fit");
+
+    pipe = popen(wrapped, "r");
+    require(pipe != NULL, "env get behavior command should start");
+    output_len = fread(output, 1, sizeof(output) - 1, pipe);
+    output[output_len] = '\0';
+    require(pclose(pipe) == 0, "env get behavior command should succeed");
+    require_string(output, "value with spaces\n",
+                   "env get should print the value as one complete line");
 }
 
 static void test_env_set_command(void)
@@ -429,7 +457,7 @@ static void test_windows_env_commands(void)
     require_ps_script(command,
                       "[Console]::OutputEncoding=[System.Text.Encoding]::GetEncoding(28591);"
                       "$v=[Environment]::GetEnvironmentVariable('FOO','User');"
-                      "if($null -eq $v){exit 1};[Console]::Out.Write($v)");
+                      "if($null -eq $v){exit 1};[Console]::Out.WriteLine($v)");
 
     command[0] = '\0';
     require(host_append_env_set_command_windows(command, sizeof(command),
@@ -485,6 +513,7 @@ int main(void)
     test_info_command();
     test_env_name_validation();
     test_env_get_command();
+    test_env_get_command_output();
     test_env_set_command();
     test_env_unset_command();
     test_env_set_behavior();

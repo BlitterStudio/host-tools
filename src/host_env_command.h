@@ -93,11 +93,11 @@ static inline int host_append_env_get_command(char *command, size_t command_size
     return host_append_env_file_prefix(command, command_size) &&
            host_append_literal(command, command_size, "if [ \"${") &&
            host_append_literal(command, command_size, name) &&
-           host_append_literal(command, command_size, "+x}\" = x ]; then printf %s \"$") &&
+           host_append_literal(command, command_size, "+x}\" = x ]; then printf '%s\\n' \"$") &&
            host_append_literal(command, command_size, name) &&
            host_append_literal(command, command_size, "\"; elif [ -r \"$f\" ]; then . \"$f\"; if [ \"${") &&
            host_append_literal(command, command_size, name) &&
-           host_append_literal(command, command_size, "+x}\" = x ]; then printf %s \"$") &&
+           host_append_literal(command, command_size, "+x}\" = x ]; then printf '%s\\n' \"$") &&
            host_append_literal(command, command_size, name) &&
            host_append_literal(command, command_size, "\"; else exit 1; fi; else exit 1; fi");
 }
@@ -169,7 +169,7 @@ static inline int host_append_env_get_command_windows(char *command, size_t comm
                                "$v=[Environment]::GetEnvironmentVariable(") &&
            host_append_ps_quoted(script, sizeof(script), name) &&
            host_append_literal(script, sizeof(script), ",'User');"
-                               "if($null -eq $v){exit 1};[Console]::Out.Write($v)") &&
+                               "if($null -eq $v){exit 1};[Console]::Out.WriteLine($v)") &&
            host_append_ps_encoded_command(command, command_size, script);
 }
 

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env
-TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out tests/test_host_download_command.out
+TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out tests/test_host_download_command.out tests/test_host_terminal_filter.out
 TEST_SCRIPTS	= tests/test_package_layout.sh tests/test_ahi_driver_source.sh
 TESTS		= $(TEST_BINS) $(TEST_SCRIPTS)
 COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_capture.h src/host_base64.h src/host_clip_command.h src/host_download_command.h src/host_edit_command.h src/host_env_command.h src/host_info_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h src/host_shell_command.h src/uae_pragmas.h
@@ -74,7 +74,7 @@ host-run: src/host-run.c $(COMMON_HEADERS)
 host-multiview: src/host-multiview.c $(COMMON_HEADERS)
 	$(CC) $(CFLAGS) $(VERFLAGS) $(INCLUDES) src/host-multiview.c -o $@
 
-host-shell: src/host-shell.c $(COMMON_HEADERS)
+host-shell: src/host-shell.c $(COMMON_HEADERS) src/host_terminal_filter.h
 	$(CC) $(CFLAGS) $(VERFLAGS) $(INCLUDES) src/host-shell.c -o $@
 
 host-path: src/host-path.c $(COMMON_HEADERS)
@@ -112,6 +112,9 @@ tests/test_host_edit_command.out: tests/test_host_edit_command.c src/host_edit_c
 
 tests/test_host_download_command.out: tests/test_host_download_command.c src/host_download_command.h src/host_base64.h src/host_common.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_download_command.c -o $@
+
+tests/test_host_terminal_filter.out: tests/test_host_terminal_filter.c src/host_terminal_filter.h
+	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_terminal_filter.c -o $@
 
 debug: CFLAGS += -DDEBUG -g
 debug: clean all

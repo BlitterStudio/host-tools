@@ -12,6 +12,7 @@
 #include "host_capture.h"
 #include "host_common.h"
 #include "host_shell_command.h"
+#include "host_terminal_filter.h"
 
 #define OUTBUFSIZE 4095
 
@@ -128,8 +129,8 @@ int main(int argc, char *argv[])
     BPTR in = 0;
     BPTR out = 0;
     long handle = 0;
-    BOOL esc_pending = FALSE;
     BOOL raw_mode = FALSE;
+    struct host_terminal_filter terminal_filter = { HOST_TERMINAL_TEXT, 0 };
     long actual;
     ULONG status;
     int status_supported = 0;
@@ -222,30 +223,13 @@ int main(int argc, char *argv[])
         actual = HostShell_Read(handle, (UBYTE *)buffer, sizeof(buffer) - 2);
         if (actual > 0)
         {
-            int outptr = 0;
-            for (int i = 0; i < actual; i++) {
-                unsigned char c = (unsigned char)buffer[i];
-                if (esc_pending) {
-                    if (c == 0x5B) { // '['
-                        outbuf[outptr++] = 0x9B; // CSI
-                    } else {
-                        outbuf[outptr++] = 0x1B; // Original ESC
-                        outbuf[outptr++] = c;
-                    }
-                    esc_pending = FALSE;
-                } else {
-                    if (c == 0x1B) {
-                        esc_pending = TRUE;
-                    } else {
-                        outbuf[outptr++] = c;
-                    }
-                }
-
-                // Safety check for outbuf overflow (should rarely happen given the math)
-                if (outptr >= OUTBUFSIZE) {
-                    Write(out, outbuf, outptr);
-                    outptr = 0;
-                }
+            int outptr = host_terminal_filter_process(&terminal_filter,
+                                                      (const unsigned char *)buffer, actual,
+                                                      (unsigned char *)outbuf, sizeof(outbuf));
+            if (outptr < 0) {
+                printf("Failed to translate host terminal output.\n");
+                return_code = HOST_RETURN_ERROR;
+                goto cleanup;
             }
             if (outptr > 0) {
                 Write(out, outbuf, outptr);
@@ -318,9 +302,12 @@ int main(int argc, char *argv[])
     }
 
 cleanup:
-    if (esc_pending && out != 0) {
-        outbuf[0] = 0x1B;
-        Write(out, outbuf, 1);
+    if (out != 0) {
+        int outptr = host_terminal_filter_finish(&terminal_filter,
+                                                 (unsigned char *)outbuf, sizeof(outbuf));
+        if (outptr > 0) {
+            Write(out, outbuf, outptr);
+        }
     }
     if (handle != 0) {
         HostShell_Close(handle);

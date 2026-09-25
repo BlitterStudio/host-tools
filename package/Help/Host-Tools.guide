@@ -4,9 +4,9 @@
 @wordwrap
 
 @node Main "Host-Tools"
-Host-Tools provides command line utilities for classic AmigaOS 68k systems running under Amiberry.
+Host-Tools is a classic AmigaOS 68k package for Amiberry. It includes 11 command-line tools for host integration, two optional AHI audio drivers, an MHI MP3 decoder, and this guide. The command tools run inside the Amiga; their host support varies by tool.
 
-Installed components:
+Choose a topic:
 
 @{"Command tools" link Commands}
 @{"UAE AHI audio driver" link AHI}
@@ -17,7 +17,7 @@ Installed components:
 @endnode
 
 @node Commands "Command Tools"
-The command tools are installed to C: when selected in the installer.
+Select "Command tools" in the installer to copy all 11 programs to C:. Linux and macOS support all 11; six also work on Windows with a current Amiberry (see Installation Notes). Each command accepts ? for usage help.
 
 @{"host-run" link HostRun} executes host commands.
 @{"host-multiview" link HostMultiView} opens files or URLs with the host default application.
@@ -34,7 +34,7 @@ The command tools are installed to C: when selected in the installer.
 @endnode
 
 @node AHI "UAE AHI Audio Driver"
-The UAE AHI audio driver is installed only when selected in the installer.
+Select "UAE AHI audio driver" in the installer to copy the driver and its AudioMode.
 
 Installed files:
 
@@ -50,7 +50,7 @@ The installer does not change AHI preferences. Select the UAE mode in AHI prefer
 @endnode
 
 @node UAESND "UAESND AHI Audio Driver"
-The UAESND AHI audio driver is installed only when selected in the installer.
+Select "UAESND AHI audio driver" in the installer to copy the driver and its AudioMode.
 
 Installed files:
 
@@ -70,7 +70,7 @@ The installer does not change AHI preferences. Select a uaesnd mode in AHI prefe
 @endnode
 
 @node MHI "UAE MHI MP3 Decoder"
-The UAE MHI MP3 decoder library is installed only when selected in the installer.
+Select "UAE MHI MP3 decoder" in the installer to copy the library.
 
 Installed file:
 
@@ -216,13 +216,13 @@ Variable names must use ASCII letters, digits, and underscores, and must not sta
 @endnode
 
 @node InstallNotes "Installation Notes"
-The installer copies selected files only. It shows a component checklist first. When a versioned file already exists, Installer shows the installed and package versions and asks whether to replace or skip it. Files without version strings are still checked for existence and ask before overwrite.
+The installer offers five components: command tools, this AmigaGuide, UAE AHI, UAESND AHI, and the UAE MHI MP3 decoder. All are selected by default. Novice installs everything; Intermediate lets you select components and copies files automatically; Expert lets you select components and asks before replacing files, showing installed and package versions when available.
 
-It does not edit startup files, system settings, or existing driver configuration.
+The guide is installed to HELP:<language>/Host-Tools.guide (English if no language is set). The drivers go to DEVS:AHI/ and DEVS:AudioModes/; the decoder goes to LIBS:MHI/. The installer does not edit startup files, system settings, AHI preferences, or driver configuration.
 
-Native Code execution must be enabled in Amiberry for these tools to communicate with the host.
+Enable Native Code execution in Amiberry to use the command tools and MHI decoder. Enable the UAESND sound board in Amiberry before using the UAESND AHI modes. Choose your preferred AHI mode in AHI preferences yourself.
 
-All tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, host-info, and host-env are supported with a current Amiberry; the remaining tools require a Linux or macOS host.
+All command tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, host-info, and host-env are supported with a current Amiberry; the remaining command tools require a Linux or macOS host.
 
 Host commands used by host-reveal, host-notify, host-clip, host-info, and host-env can be cancelled with Ctrl-C. Idle commands time out after approximately 30 seconds on status-aware Amiberry builds or 5 seconds on older builds.
 

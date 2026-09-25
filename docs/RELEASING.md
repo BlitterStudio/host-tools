@@ -18,8 +18,11 @@ exact version; CI rejects a mismatch before building.
 
    ```shell
    docker run --rm -v "$PWD":/work -w /work \
-     sacredbanana/amiga-compiler:m68k-amigaos make clean test package
+     amigadev/crosstools:m68k-amigaos-gcc10 make clean test package
    ```
+
+   On Windows, check out `tests/*.sh` and `CHANGELOG.md` with LF line endings;
+   CRLF breaks the shell tests and the changelog link check inside Docker.
 
 5. Confirm that `git status --short` contains only intentional source changes.
    `make package` already verifies the package layout and all release version
@@ -42,3 +45,23 @@ exact version; CI rejects a mismatch before building.
 
 The tag workflow rebuilds and verifies the package, publishes the `.lha` and
 `.lha.sha256` artifacts, and creates the GitHub release with generated notes.
+
+## Publishing the wiki
+
+The detailed wiki pages are authored in `docs/wiki/`, not in the wiki editor.
+Publish them when their content changes, after the corresponding repository
+change is merged; keep the release archive's README and AmigaGuide usable
+offline. The GitHub wiki is a separate Git repository, so merging this
+repository does not update the live wiki:
+
+```shell
+gh repo clone BlitterStudio/host-tools.wiki ../host-tools.wiki
+cp docs/wiki/*.md ../host-tools.wiki/
+git -C ../host-tools.wiki add Home.md Getting-Started.md Command-Tools.md Audio-and-MP3.md
+git -C ../host-tools.wiki commit -m "Update Host-Tools user guides"
+git -C ../host-tools.wiki push
+```
+
+Clone only once; for subsequent updates, pull the wiki's latest commit before
+copying the pages. The first page of a new wiki must be created in GitHub's
+wiki editor before its Git repository can be cloned.

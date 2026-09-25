@@ -10,6 +10,7 @@
 #include <exec/semaphores.h>
 #include <exec/tasks.h>
 #include <exec/types.h>
+#include <dos/dos.h>
 
 #include "mhi_abi.h"
 

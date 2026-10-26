@@ -8,7 +8,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Notable user-visible changes are recorded here. This project follows semantic
 versioning for release tags.
 
-## [2.7.1] - 2026-10-26
+## [2.8] - 2026-10-26
 
 ### Fixed
 
@@ -61,7 +61,7 @@ versioning for release tags.
 - Added `host-env` and the UAE MHI MP3 decoder library.
 - Added UAESND recording support and driver refinements.
 
-[2.7.1]: https://github.com/BlitterStudio/host-tools/compare/v2.7...v2.7.1
+[2.8]: https://github.com/BlitterStudio/host-tools/compare/v2.7...v2.8
 [2.7]: https://github.com/BlitterStudio/host-tools/compare/v2.6...v2.7
 [2.6]: https://github.com/BlitterStudio/host-tools/compare/v2.5...v2.6
 [2.5]: https://github.com/BlitterStudio/host-tools/releases/tag/v2.5

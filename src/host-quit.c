@@ -9,10 +9,15 @@
  * registers, and output through dos.library calls that Kickstart 1.2 has.
  */
 
-/* The entry point must be the first code in the executable
- * (-nostartfiles; -fno-toplevel-reorder keeps definition order), so it
- * comes before any header that could emit code. AmigaDOS passes the
- * argument line in A0 and its length in D0. */
+/* AmigaDOS starts a program at its first byte (-nostartfiles: no startup
+ * code), with the argument line in A0 and its length in D0. Compilers may
+ * place string constants ahead of the first function, so the file opens
+ * with a branch to the entry point; -fno-toplevel-reorder keeps it first. */
+__asm__(
+    "\t.text\n"
+    "\t.even\n"
+    "\tjra\t_start\n");
+
 struct ExecBase;
 struct ExecBase *SysBase;
 static int run(const char *args, long length);

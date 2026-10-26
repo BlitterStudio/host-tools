@@ -8,6 +8,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Notable user-visible changes are recorded here. This project follows semantic
 versioning for release tags.
 
+## [2.8] - 2026-10-26
+
+### Fixed
+
+- `host-quit` in the 2.7 package crashed when run: the release toolchain put
+  a string constant ahead of its entry point. It now opens with a branch to
+  the entry point, and the package check rejects a build that does not.
+
 ## [2.7] - 2026-10-26
 
 ### Added
@@ -53,6 +61,7 @@ versioning for release tags.
 - Added `host-env` and the UAE MHI MP3 decoder library.
 - Added UAESND recording support and driver refinements.
 
+[2.8]: https://github.com/BlitterStudio/host-tools/compare/v2.7...v2.8
 [2.7]: https://github.com/BlitterStudio/host-tools/compare/v2.6...v2.7
 [2.6]: https://github.com/BlitterStudio/host-tools/compare/v2.5...v2.6
 [2.5]: https://github.com/BlitterStudio/host-tools/releases/tag/v2.5

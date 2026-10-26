@@ -8,6 +8,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Notable user-visible changes are recorded here. This project follows semantic
 versioning for release tags.
 
+## [Unreleased]
+
+### Added
+
+- `host-quit` closes Amiberry. Amiberry's WHDLoad booter uses it when a game
+  exits, in place of the third-party AmiQuit.
+
 ## [2.6] - 2026-07-22
 
 ### Added

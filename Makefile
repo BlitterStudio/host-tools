@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env
+TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env host-quit
 TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_edit_command.out tests/test_host_download_command.out tests/test_host_terminal_filter.out tests/test_host_env_cli.out
 TEST_SCRIPTS	= tests/test_package_layout.sh tests/test_ahi_driver_source.sh tests/test_runtime_source.sh
 include version.mk
@@ -112,6 +112,11 @@ host-download: src/host-download.c $(COMMON_HEADERS)
 
 host-env: src/host-env.c $(COMMON_HEADERS)
 	$(CC) $(CFLAGS) $(VERFLAGS) $(INCLUDES) src/host-env.c -o $@
+
+# Amiberry's WHDLoad booter runs host-quit on every machine, Kickstart 1.3
+# and 68000 included: plain 68000 code and no C runtime (see the source).
+host-quit: src/host-quit.c $(COMMON_HEADERS)
+	$(CC) $(subst -mcpu=68020,-mcpu=68000,$(CFLAGS)) -ffreestanding -fno-builtin -fno-toplevel-reorder -nostartfiles -nostdlib $(VERFLAGS) $(INCLUDES) src/host-quit.c -o $@
 
 tests/test_host_common.out: tests/test_host_common.c src/host_common.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_common.c -o $@

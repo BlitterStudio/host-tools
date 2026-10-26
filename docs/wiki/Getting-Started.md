@@ -11,8 +11,8 @@ Run the classic AmigaOS 68k tools in Amiberry v6.0+ or a build with the required
 
 | Host | Supported commands |
 | --- | --- |
-| Linux and macOS | All 11 commands |
-| Windows (current Amiberry) | `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env` |
+| Linux and macOS | All 12 commands |
+| Windows (current Amiberry) | `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env`, `host-quit` |
 
 Linux desktop integration uses `xdg-utils`, `notify-send`, and, depending on the operation, `gtk-launch`, `gdbus`, `iconv`, or a clipboard backend (`wl-clipboard`, `xclip`, `xsel`). Downloads use host `curl` or `wget`; on Windows they use `curl.exe` (included in Windows 10 and later). Windows desktop integrations use PowerShell and Explorer. Check the [command reference](Command-Tools) for individual requirements and exit codes.
 

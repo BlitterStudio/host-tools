@@ -4,7 +4,7 @@
 @wordwrap
 
 @node Main "Host-Tools"
-Host-Tools is a classic AmigaOS 68k package for Amiberry. It includes 11 command-line tools for host integration, two optional AHI audio drivers, an MHI MP3 decoder, and this guide. The command tools run inside the Amiga; their host support varies by tool.
+Host-Tools is a classic AmigaOS 68k package for Amiberry. It includes 12 command-line tools for host integration, two optional AHI audio drivers, an MHI MP3 decoder, and this guide. The command tools run inside the Amiga; their host support varies by tool.
 
 Choose a topic:
 
@@ -17,7 +17,7 @@ Choose a topic:
 @endnode
 
 @node Commands "Command Tools"
-Select "Command tools" in the installer to copy all 11 programs to C:. Linux and macOS support all 11; six also work on Windows with a current Amiberry (see Installation Notes). Each command accepts ? for usage help.
+Select "Command tools" in the installer to copy all 12 programs to C:. Linux and macOS support all 12; seven also work on Windows with a current Amiberry (see Installation Notes). Each command accepts ? for usage help.
 
 @{"host-run" link HostRun} executes host commands.
 @{"host-multiview" link HostMultiView} opens files or URLs with the host default application.
@@ -30,6 +30,7 @@ Select "Command tools" in the installer to copy all 11 programs to C:. Linux and
 @{"host-info" link HostInfo} prints host integration details.
 @{"host-download" link HostDownload} downloads files through the host.
 @{"host-env" link HostEnv} gets and sets host environment variables.
+@{"host-quit" link HostQuit} closes Amiberry.
 
 @endnode
 
@@ -215,6 +216,17 @@ Variable names must use ASCII letters, digits, and underscores, and must not sta
 
 @endnode
 
+@node HostQuit "host-quit"
+host-quit closes Amiberry, as quitting from its menu does. Amiberry's WHDLoad booter runs it when a game exits.
+
+Usage:
+
+host-quit
+
+host-quit works on Linux, macOS, and Windows hosts, and does not need Native Code.
+
+@endnode
+
 @node InstallNotes "Installation Notes"
 The installer offers five components: command tools, this AmigaGuide, UAE AHI, UAESND AHI, and the UAE MHI MP3 decoder. All are selected by default. Novice installs everything; Intermediate lets you select components and copies files automatically; Expert lets you select components and asks before replacing files, showing installed and package versions when available.
 
@@ -222,7 +234,7 @@ The guide is installed to HELP:<language>/Host-Tools.guide (English if no langua
 
 Enable Native Code execution in Amiberry to use the command tools and MHI decoder. Enable the UAESND sound board in Amiberry before using the UAESND AHI modes. Choose your preferred AHI mode in AHI preferences yourself.
 
-All command tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, host-info, and host-env are supported with a current Amiberry; the remaining command tools require a Linux or macOS host.
+All command tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, host-info, host-env, and host-quit are supported with a current Amiberry; the remaining command tools require a Linux or macOS host.
 
 Host commands used by host-reveal, host-notify, host-clip, host-info, and host-env can be cancelled with Ctrl-C. Idle commands time out after approximately 30 seconds on status-aware Amiberry builds or 5 seconds on older builds.
 

@@ -116,7 +116,7 @@ if [ "$(drawer_window_hex "$PACKAGE_ROOT/Help.info")" != "0050002801900096" ]; t
 	exit 1
 fi
 
-for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env; do
+for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env host-quit; do
 	test -f "$PACKAGE_ROOT/C/$tool"
 done
 assert_ver() {
@@ -140,6 +140,7 @@ assert_ver "Host-Clip" "$PACKAGE_ROOT/C/host-clip"
 assert_ver "Host-Info" "$PACKAGE_ROOT/C/host-info"
 assert_ver "Host-Download" "$PACKAGE_ROOT/C/host-download"
 assert_ver "Host-Env" "$PACKAGE_ROOT/C/host-env"
+assert_ver "Host-Quit" "$PACKAGE_ROOT/C/host-quit"
 if grep -a '\$VER: Host-[A-Za-z]* v[0-9]' "$PACKAGE_ROOT/C/"*; then
 	echo "Host command \$VER strings must be parseable by Installer getversion, without a v prefix before the version number" >&2
 	exit 1
@@ -163,6 +164,7 @@ grep -q 'host-run' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-shell' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-clip' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-env' "$PACKAGE_ROOT/Help/Host-Tools.guide"
+grep -q 'host-quit' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'UAE :16 bit HIFI Stereo++' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'uaesnd: Stereo' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'uaesnd: HiFi Stereo' "$PACKAGE_ROOT/Help/Host-Tools.guide"
@@ -250,7 +252,7 @@ if ! grep -q "^(exit)" "$PACKAGE_ROOT/Install"; then
 	exit 1
 fi
 
-for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env; do
+for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-info host-download host-env host-quit; do
 	grep -q "(P_InstallCommandTool \"$tool\")" "$PACKAGE_ROOT/Install"
 done
 

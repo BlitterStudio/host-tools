@@ -141,6 +141,23 @@ assert_ver "Host-Info" "$PACKAGE_ROOT/C/host-info"
 assert_ver "Host-Download" "$PACKAGE_ROOT/C/host-download"
 assert_ver "Host-Env" "$PACKAGE_ROOT/C/host-env"
 assert_ver "Host-Quit" "$PACKAGE_ROOT/C/host-quit"
+
+# host-quit has no startup code: AmigaDOS runs its first code byte, which
+# must be the branch to its entry point, not a string constant.
+first_code=$(od -An -v -tx1 -N 512 "$PACKAGE_ROOT/C/host-quit" | tr -s ' \n' ' ' | awk '{
+	for (i = 1; i <= NF - 3; i++)
+		if ($i == "00" && $(i + 1) == "00" && $(i + 2) == "03" && $(i + 3) == "e9") {
+			print $(i + 8) $(i + 9)
+			exit
+		}
+}')
+case "$first_code" in
+60??|4ef9) ;;
+*)
+	echo "host-quit does not start with a branch to its entry point (first code bytes: $first_code)" >&2
+	exit 1
+	;;
+esac
 if grep -a '\$VER: Host-[A-Za-z]* v[0-9]' "$PACKAGE_ROOT/C/"*; then
 	echo "Host command \$VER strings must be parseable by Installer getversion, without a v prefix before the version number" >&2
 	exit 1

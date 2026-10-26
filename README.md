@@ -5,13 +5,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Host-Tools
 
-A classic AmigaOS 68k package for [Amiberry](https://github.com/BlitterStudio/amiberry). It includes 11 command-line tools for working with the host operating system, two AHI audio drivers, and an MHI MP3 decoder library. The guest tools run inside Amiberry; host integrations target Linux, macOS, or Windows as noted below.
+A classic AmigaOS 68k package for [Amiberry](https://github.com/BlitterStudio/amiberry). It includes 12 command-line tools for working with the host operating system, two AHI audio drivers, and an MHI MP3 decoder library. The guest tools run inside Amiberry; host integrations target Linux, macOS, or Windows as noted below.
 
 ## What's included
 
 | Component | What it does | Installed location |
 | --- | --- | --- |
-| 11 command tools | Run host commands, open files and URLs, use the host shell, paths, desktop, clipboard, downloads, and environment | `C:` |
+| 12 command tools | Run host commands, open files and URLs, use the host shell, paths, desktop, clipboard, downloads, and environment, and close Amiberry | `C:` |
 | UAE AHI driver | Classic UAE 16-bit stereo AHI output | `DEVS:AHI/uae.audio`, `DEVS:AudioModes/UAE` |
 | UAESND AHI driver | AHI output through Amiberry's UAESND sound board | `DEVS:AHI/uaesnd.audio`, `DEVS:AudioModes/UAESND` |
 | UAE MHI MP3 decoder | Offloads MP3 decoding to Amiberry | `LIBS:MHI/mhiuae.library` |
@@ -29,7 +29,7 @@ For detailed usage, see the [command reference](https://github.com/BlitterStudio
 | Tool | Linux | macOS | Windows |
 | --- | :---: | :---: | :---: |
 | `host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify` | Yes | Yes | — |
-| `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env` | Yes | Yes | Yes |
+| `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env`, `host-quit` | Yes | Yes | Yes |
 
 ## Exit Codes
 

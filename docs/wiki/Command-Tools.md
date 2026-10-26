@@ -5,11 +5,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Command tools
 
-Run these commands in an AmigaOS CLI under Amiberry with **Native Code** enabled. The package installer copies all 11 to `C:` when the command-tools component is selected. Enter `?` after a command for its built-in usage help. Existing Amiga paths are translated to host paths where a tool accepts file arguments; a host application cannot normally open a file that exists only inside an unmapped hardfile.
+Run these commands in an AmigaOS CLI under Amiberry with **Native Code** enabled. The package installer copies all 12 to `C:` when the command-tools component is selected. Enter `?` after a command for its built-in usage help. Existing Amiga paths are translated to host paths where a tool accepts file arguments; a host application cannot normally open a file that exists only inside an unmapped hardfile.
 
 | Host support | Tools |
 | --- | --- |
-| Linux, macOS, Windows (current Amiberry) | `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env` |
+| Linux, macOS, Windows (current Amiberry) | `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env`, `host-quit` |
 | Linux and macOS | `host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify` |
 
 ## host-run
@@ -131,6 +131,14 @@ host-env list
 Reads, sets, removes, or lists **host user** environment variables. Names use ASCII letters, digits, and underscores and cannot start with a digit. Values cannot contain line breaks.
 
 On Windows, values are stored in the persistent user environment. On Linux/macOS, changes are written atomically to `$HOME/.host-tools-env` with mode `0600`; source that file from your host shell startup files to import values into later login shells. Neither approach changes the environment of host processes that are already running, including Amiberry's parent process.
+
+## host-quit
+
+```text
+host-quit
+```
+
+Closes Amiberry, as quitting from its menu does. Amiberry's WHDLoad booter runs it when a game exits. It works on every host and does not need Native Code, only `uae.resource`.
 
 ## Exit codes and host requirements
 

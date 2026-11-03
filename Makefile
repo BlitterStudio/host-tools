@@ -77,8 +77,19 @@ HOST_GNU_ARCH	= $(if $(filter arm64,$(HOST_ARCH)),aarch64,$(HOST_ARCH))
 HOST_CC		?= $(shell command -v $(HOST_GNU_ARCH)-linux-gnu-gcc 2>/dev/null || command -v cc 2>/dev/null || printf cc)
 HOST_CC_NAME	= $(notdir $(HOST_CC))
 HOST_GNU_PREFIX	= $(patsubst %-gcc,%,$(HOST_CC_NAME))
-HOST_NATIVE_FLAGS = $(if $(findstring -linux-gnu-gcc,$(HOST_CC_NAME)),-B/usr/bin/$(HOST_GNU_PREFIX)- -fuse-ld=bfd,)
+# The AmigaOS 3 image points /usr/bin/as and /usr/bin/ld at the m68k tools and
+# has only the triplet-prefixed native binutils. Give the native compiler a
+# directory where as and ld are the native ones.
+HOST_TOOL_DIR	= build/host-bin
+HOST_TOOLS	= $(if $(findstring -linux-gnu-gcc,$(HOST_CC_NAME)),$(HOST_TOOL_DIR)/as $(HOST_TOOL_DIR)/ld,)
+HOST_NATIVE_FLAGS = $(if $(HOST_TOOLS),-B$(HOST_TOOL_DIR)/,)
 HOST_CFLAGS	= -std=c99 -Wall -Wextra -Wstrict-prototypes -Isrc
+
+$(HOST_TOOL_DIR)/as $(HOST_TOOL_DIR)/ld:
+	mkdir -p $(HOST_TOOL_DIR)
+	ln -sf "$$(command -v $(HOST_GNU_PREFIX)-$(@F))" $@
+
+$(TEST_BINS): | $(HOST_TOOLS)
 
 host-run: src/host-run.c $(COMMON_HEADERS)
 	$(CC) $(CFLAGS) $(VERFLAGS) $(INCLUDES) src/host-run.c -o $@
@@ -193,5 +204,6 @@ package: verify-package
 
 clean:
 	rm -f $(TOOLS) $(TEST_BINS)
+	rm -rf $(HOST_TOOL_DIR)
 	$(MAKE) -C drivers/ahi clean
 	$(MAKE) -C drivers/mhi clean

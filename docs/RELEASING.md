@@ -14,15 +14,16 @@ exact version; CI rejects a mismatch before building.
 2. Update the `$VER` line in `package/Help/Host-Tools.guide`.
 3. Move the pending changelog entry from `Unreleased` to the release date and
    update its comparison link to end at the release tag instead of `HEAD`.
-4. Run the complete release build from a clean tree:
+4. Run the complete release build from a clean tree, in the image CI uses.
+   Take the digest-pinned image reference from the `container:` line in
+   `.github/workflows/build.yml`; the plain tag may point at a newer compiler.
+   The image has no native C compiler, so install one for the unit tests:
 
    ```shell
-   docker run --rm -v "$PWD":/work -w /work \
-     amigadev/crosstools:m68k-amigaos-gcc10 make clean test package
+   image="amigadev/crosstools:m68k-amigaos-gcc10@sha256:<digest from build.yml>"
+   docker run --rm -v "$PWD":/work -w /work "$image" sh -c \
+     'apt-get update -qq && apt-get install -y -qq --no-install-recommends "gcc-$(uname -m | tr _ -)-linux-gnu" && make clean test package'
    ```
-
-   On Windows, check out `tests/*.sh` and `CHANGELOG.md` with LF line endings;
-   CRLF breaks the shell tests and the changelog link check inside Docker.
 
 5. Confirm that `git status --short` contains only intentional source changes.
    `make package` already verifies the package layout and all release version

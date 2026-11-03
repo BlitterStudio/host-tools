@@ -38,7 +38,9 @@ static int parse_window_report(const char *buf, int len, int *rows, int *cols,
         while (j < len && field < 4) {
             char c = buf[j];
             if (c >= '0' && c <= '9') {
-                vals[field] = vals[field] * 10 + (c - '0');
+                if (vals[field] < 1000) {
+                    vals[field] = vals[field] * 10 + (c - '0');
+                }
                 j++;
             } else if (c == ';' && field < 3) {
                 field++;

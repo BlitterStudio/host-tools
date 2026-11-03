@@ -8,6 +8,23 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Notable user-visible changes are recorded here. This project follows semantic
 versioning for release tags.
 
+## [2.9] - 2026-11-04
+
+### Changed
+
+- Build with GCC 16.2 from `amigadev/crosstools:m68k-amigaos-gcc10` instead of
+  GCC 6.5. CI pins the image by digest.
+
+### Fixed
+
+- `mhiuae.library` now has its ROMTag in the first code hunk, where AmigaOS
+  requires it for disk-based libraries. It used to sit in the data hunk.
+- `host-download` no longer overflows on a reported size of 2 GB or more. Such
+  a size is now treated as unknown, so it cannot fail the download as
+  incomplete.
+- `host-shell` no longer overflows when long digit runs reach its console
+  window-size parser.
+
 ## [2.8] - 2026-10-26
 
 ### Fixed
@@ -61,6 +78,7 @@ versioning for release tags.
 - Added `host-env` and the UAE MHI MP3 decoder library.
 - Added UAESND recording support and driver refinements.
 
+[2.9]: https://github.com/BlitterStudio/host-tools/compare/v2.8...v2.9
 [2.8]: https://github.com/BlitterStudio/host-tools/compare/v2.7...v2.8
 [2.7]: https://github.com/BlitterStudio/host-tools/compare/v2.6...v2.7
 [2.6]: https://github.com/BlitterStudio/host-tools/compare/v2.5...v2.6

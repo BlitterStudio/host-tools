@@ -1,0 +1,3 @@
+# The tests run under /bin/sh and the package ships text files to AmigaOS:
+# both need LF line endings, whatever the checkout platform.
+* text=auto eol=lf

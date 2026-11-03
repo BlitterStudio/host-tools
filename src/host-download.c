@@ -307,7 +307,12 @@ int main(int argc, char *argv[])
                         expected = 0;
                     }
                 } else if (c >= '0' && c <= '9') {
-                    expected = expected * 10 + (c - '0');
+                    if (expected < 214748364L) {
+                        expected = expected * 10 + (c - '0');
+                    } else {
+                        /* Too large for a long: report the size as unknown. */
+                        header_negative = 1;
+                    }
                 } else if (c == '-') {
                     header_negative = 1;
                 }

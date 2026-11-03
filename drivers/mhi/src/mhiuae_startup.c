@@ -71,9 +71,9 @@ APTR FuncTab[] = {
     (APTR)((LONG)-1)
 };
 
-struct Resident ROMTag __attribute__((used)) = {
+const struct Resident ROMTag __attribute__((used)) = {
     RTC_MATCHWORD,
-    &ROMTag,
+    (struct Resident *)&ROMTag,
     &EndResident,
     RTF_AUTOINIT,
     LIB_VERSION,

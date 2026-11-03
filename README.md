@@ -57,7 +57,7 @@ Choose an AHI mode in AHI preferences after installing a driver; installing both
 
 ## Building
 
-GitHub Actions builds and tests on pushes to `master`, version tags, and pull requests to `master`, using `sacredbanana/amiga-compiler:m68k-amigaos`. Tag builds also publish the release archive and its SHA-256 checksum.
+GitHub Actions builds and tests on pushes to `master`, version tags, and pull requests to `master`, using `amigadev/crosstools:m68k-amigaos-gcc10` (GCC 16.2, despite the tag name) pinned by digest in [`.github/workflows/build.yml`](.github/workflows/build.yml). Tag builds also publish the release archive and its SHA-256 checksum.
 
 With the m68k-amigaos cross-compiler, `vasmm68k_mot`, and `lha` installed locally:
 ```shell
@@ -66,14 +66,11 @@ make test
 make package
 ```
 
-Alternatively, build and test with the AmigaOS 3 cross-toolchain container:
+Alternatively, build and test with the AmigaOS 3 cross-toolchain container. The image has no native C compiler, so install one for the unit tests first:
 ```shell
-docker run --rm -v "$PWD":/work -w /work amigadev/crosstools:m68k-amigaos-gcc10 make all
-docker run --rm -v "$PWD":/work -w /work amigadev/crosstools:m68k-amigaos-gcc10 make test
-docker run --rm -v "$PWD":/work -w /work amigadev/crosstools:m68k-amigaos-gcc10 make package
+docker run --rm -v "$PWD":/work -w /work amigadev/crosstools:m68k-amigaos-gcc10 sh -c \
+  'apt-get update -qq && apt-get install -y -qq --no-install-recommends "gcc-$(uname -m | tr _ -)-linux-gnu" && make all test package'
 ```
-
-On Windows, keep `tests/*.sh` and `CHANGELOG.md` checked out with LF line endings. CRLF scripts fail in `/bin/sh`, and CRLF changelog lines fail the package's release-link check.
 
 Use `make test-unit` for native command tests without a cross-build; `make test` also runs packaging and source checks.
 

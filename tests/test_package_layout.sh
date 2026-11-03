@@ -41,22 +41,28 @@ if ! grep -E -q "^\\[$VERSION\\]: .*/compare/.*\\.\\.\\.v${VERSION}$" "$PACKAGE_
 	exit 1
 fi
 
-if ! strings "$PACKAGE_ROOT/Install.info" | grep -q '^MINUSER=NOVICE$'; then
+# Printable runs of the icon, one per line (the build image has no host
+# binutils, so no strings(1)).
+icon_text() {
+	LC_ALL=C tr -c '[:print:]' '[\n*]' < "$1"
+}
+
+if ! icon_text "$PACKAGE_ROOT/Install.info" | grep -q '^MINUSER=NOVICE$'; then
 	echo "Installer icon must allow Novice mode" >&2
 	exit 1
 fi
 
-if strings "$PACKAGE_ROOT/Install.info" | grep -q '^MINUSER=AVERAGE$'; then
+if icon_text "$PACKAGE_ROOT/Install.info" | grep -q '^MINUSER=AVERAGE$'; then
 	echo "Installer icon must not disable Novice mode with MINUSER=AVERAGE" >&2
 	exit 1
 fi
 
-if ! strings "$PACKAGE_ROOT/Install.info" | grep -q '^NOLOG$'; then
+if ! icon_text "$PACKAGE_ROOT/Install.info" | grep -q '^NOLOG$'; then
 	echo "Installer icon must disable automatic log file creation" >&2
 	exit 1
 fi
 
-if strings "$PACKAGE_ROOT/Install.info" | grep -q '^LOGFILE='; then
+if icon_text "$PACKAGE_ROOT/Install.info" | grep -q '^LOGFILE='; then
 	echo "Installer icon must not force a log file" >&2
 	exit 1
 fi

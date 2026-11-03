@@ -25,11 +25,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    container: sacredbanana/amiga-compiler:m68k-amigaos
+    # AmigaPorts GCC 16.2.1b. The tag name is historical; pin the digest so a
+    # rebuilt image cannot change the release binaries unnoticed.
+    container: amigadev/crosstools:m68k-amigaos-gcc10@sha256:7d2598ffc63fc5c4a2d1a9f1334a8d4422b3466f4fe6b58f83f09eb1e466f758
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+    - name: Install native compiler for unit tests
+      run: |
+        apt-get update -qq
+        apt-get install -y -qq --no-install-recommends "gcc-$(uname -m | tr _ -)-linux-gnu"
 
     - name: Resolve release metadata
       shell: sh

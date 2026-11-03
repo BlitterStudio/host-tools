@@ -1851,7 +1851,7 @@ check        Dc.b 0
 noplay       dc.l 0
 labname: Dc.b "ahi_winuae",0
 resname: dc.b "uae.resource",0
-Even
+  Even
 resaddr: Dc.l 0
 calladdr: Dc.l 0
 

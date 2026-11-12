@@ -8,6 +8,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Notable user-visible changes are recorded here. This project follows semantic
 versioning for release tags.
 
+## [Unreleased]
+
+### Changed
+
+- Build with `amigadev/crosstools:m68k-amigaos` (AmigaDev GCC 16.2-rc24-9,
+  binutils 2.47 snapshot), the tag that replaces `m68k-amigaos-gcc10`.
+
 ## [2.9] - 2026-11-04
 
 ### Changed

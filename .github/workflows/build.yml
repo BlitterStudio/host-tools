@@ -25,9 +25,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # AmigaPorts GCC 16.2.1b. The tag name is historical; pin the digest so a
-    # rebuilt image cannot change the release binaries unnoticed.
-    container: amigadev/crosstools:m68k-amigaos-gcc10@sha256:7d2598ffc63fc5c4a2d1a9f1334a8d4422b3466f4fe6b58f83f09eb1e466f758
+    # AmigaPorts GCC 16.2.1b. Pin the digest so a rebuilt image cannot change
+    # the release binaries unnoticed.
+    container: amigadev/crosstools:m68k-amigaos@sha256:a018cd1de600ae1c704f2eb3501f86843636f9953dd4aba6cffdf62cd7d9e8bb
 
     steps:
     - name: Checkout repository

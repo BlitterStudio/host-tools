@@ -20,7 +20,7 @@ exact version; CI rejects a mismatch before building.
    The image has no native C compiler, so install one for the unit tests:
 
    ```shell
-   image="amigadev/crosstools:m68k-amigaos-gcc10@sha256:<digest from build.yml>"
+   image="amigadev/crosstools:m68k-amigaos@sha256:<digest from build.yml>"
    docker run --rm -v "$PWD":/work -w /work "$image" sh -c \
      'apt-get update -qq && apt-get install -y -qq --no-install-recommends "gcc-$(uname -m | tr _ -)-linux-gnu" && make clean test package'
    ```

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <dos/dosextens.h>
 
+#include "host_amiga_file.h"
 #include "host_base64.h"
 #include "host_capture.h"
 #include "host_download_command.h"
@@ -28,29 +29,6 @@ static int is_force_arg(const char *arg)
     return host_has_prefix_ci(arg, "force") && arg[5] == '\0';
 }
 
-/* Lock without "please insert volume" requesters */
-static BPTR quiet_lock(const char *path)
-{
-    struct Process *proc = (struct Process *)FindTask(NULL);
-    APTR old_window = proc->pr_WindowPtr;
-    BPTR lock;
-
-    proc->pr_WindowPtr = (APTR)-1;
-    lock = Lock((STRPTR)path, ACCESS_READ);
-    proc->pr_WindowPtr = old_window;
-    return lock;
-}
-
-static int lock_is_directory(BPTR lock)
-{
-    static struct FileInfoBlock fib __attribute__((aligned(4)));
-
-    if (!Examine(lock, &fib)) {
-        return 0;
-    }
-    return fib.fib_DirEntryType > 0;
-}
-
 /*
  * Name the file after the URL. Only a single file name is accepted, so a
  * URL such as .../OUT:x cannot choose a different volume or directory.
@@ -69,74 +47,6 @@ static int derive_url_name(const char *url, char *name, size_t name_size)
         break;
     }
     return 1;
-}
-
-static int make_unused_sidecar_path(const char *destination, char kind,
-                                    char *path, size_t path_size)
-{
-    unsigned long token = (unsigned long)FindTask(NULL);
-
-    for (unsigned int attempt = 0; attempt < 100; attempt++) {
-        BPTR lock;
-
-        if (!host_download_sidecar_path(destination, kind, token, attempt,
-                                        path, path_size)) {
-            return 0;
-        }
-        lock = quiet_lock(path);
-        if (lock == 0) {
-            return 1;
-        }
-        UnLock(lock);
-    }
-    return 0;
-}
-
-static int install_download(const char *temp_path, const char *destpath, int force,
-                            char *backup_path, size_t backup_size,
-                            const char **failure)
-{
-    BPTR lock = quiet_lock(destpath);
-
-    if (lock == 0) {
-        if (Rename((STRPTR)temp_path, (STRPTR)destpath)) {
-            return 1;
-        }
-        *failure = "Cannot move download to destination";
-        return 0;
-    }
-
-    if (lock_is_directory(lock)) {
-        UnLock(lock);
-        *failure = "Destination path is a directory";
-        return 0;
-    }
-    UnLock(lock);
-
-    if (!force) {
-        *failure = "Destination appeared during download";
-        return 0;
-    }
-    if (!make_unused_sidecar_path(destpath, 'b', backup_path, backup_size)) {
-        *failure = "Cannot reserve a destination backup";
-        return 0;
-    }
-    if (!Rename((STRPTR)destpath, (STRPTR)backup_path)) {
-        *failure = "Cannot preserve the existing destination";
-        return 0;
-    }
-    if (Rename((STRPTR)temp_path, (STRPTR)destpath)) {
-        if (!DeleteFile((STRPTR)backup_path)) {
-            printf("\nWarning: old destination remains at %s\n", backup_path);
-        }
-        return 1;
-    }
-
-    if (!Rename((STRPTR)backup_path, (STRPTR)destpath)) {
-        printf("\nOriginal destination remains at %s\n", backup_path);
-    }
-    *failure = "Cannot replace destination";
-    return 0;
 }
 
 static void show_progress(unsigned long received, long expected)
@@ -237,9 +147,9 @@ int main(int argc, char *argv[])
     } else {
         int isdir = 0;
 
-        lock = quiet_lock(dest);
+        lock = host_quiet_lock(dest);
         if (lock) {
-            isdir = lock_is_directory(lock);
+            isdir = host_lock_is_directory(lock);
             UnLock(lock);
         }
 
@@ -258,7 +168,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    lock = quiet_lock(destpath);
+    lock = host_quiet_lock(destpath);
     if (lock) {
         UnLock(lock);
         if (!force) {
@@ -305,7 +215,7 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
-    if (!make_unused_sidecar_path(destpath, 'p', temp_path, sizeof(temp_path))) {
+    if (!host_make_unused_sidecar_path(destpath, 'p', temp_path, sizeof(temp_path))) {
         HostShell_Close(handle);
         printf("Cannot reserve a temporary destination file\n");
         return HOST_RETURN_ERROR;
@@ -441,8 +351,10 @@ int main(int argc, char *argv[])
     }
 
     if (failure == NULL) {
-        if (install_download(temp_path, destpath, force,
-                             backup_path, sizeof(backup_path), &failure)) {
+        if (host_install_file(temp_path, destpath, force,
+                              backup_path, sizeof(backup_path),
+                              "Cannot move download to destination",
+                              "Destination appeared during download", &failure)) {
             temp_exists = 0;
         }
     }

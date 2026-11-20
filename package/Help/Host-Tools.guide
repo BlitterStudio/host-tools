@@ -81,6 +81,8 @@ uaesnd: 7.1 is 32 bit multichannel output.
 
 The installer does not change AHI preferences. To use the driver, select a uaesnd mode in AHI preferences yourself.
 
+Only one program can use the sound board at a time. A second AHI allocation of a uaesnd mode fails until the first program releases it. Recording needs a capture device on the host. If there is none, starting recording returns an error.
+
 @endnode
 
 @node MHI "UAE MHI MP3 Decoder"

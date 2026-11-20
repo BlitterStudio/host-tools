@@ -20,11 +20,12 @@ static void require(int condition, const char *message)
 static int process_chunks(const unsigned char *input, int input_len, int split,
                           unsigned char *output, int output_size)
 {
-    struct host_terminal_filter filter = { HOST_TERMINAL_TEXT, 0 };
+    struct host_terminal_filter filter;
     int first;
     int second;
     int tail;
 
+    host_terminal_filter_init(&filter);
     first = host_terminal_filter_process(&filter, input, split, output, output_size);
     require(first >= 0, "first terminal-filter chunk should fit");
 
@@ -123,11 +124,76 @@ static void test_c1_osc_filtering(void)
 
 static void test_utf8_output(void)
 {
+    /* e acute, a with diaeresis, pound, no-break space: all in ISO-8859-1 */
     static const unsigned char input[] =
-        "UTF-8 quotes: \xE2\x80\x9C" "left\xE2\x80\x9D" " right";
+        "caf\xC3\xA9 gr\xC3\xBC\xC3\x9F \xC2\xA3" "5\xC2\xA0" "x";
+    static const unsigned char expected[] = "caf\xE9 gr\xFC\xDF \xA3" "5\xA0" "x";
 
-    require_filtered_at_every_split(input, sizeof(input) - 1, input, sizeof(input) - 1,
-                                    "UTF-8 continuation bytes should be unchanged");
+    require_filtered_at_every_split(input, sizeof(input) - 1, expected, sizeof(expected) - 1,
+                                    "UTF-8 should become ISO-8859-1");
+}
+
+static void test_utf8_without_latin1_form(void)
+{
+    /* curly quotes, en dash, ellipsis, bullet, Greek alpha, a 4-byte emoji */
+    static const unsigned char input[] =
+        "\xE2\x80\x9C" "q\xE2\x80\x9D \xE2\x80\x98" "s\xE2\x80\x99 a\xE2\x80\x93" "b\xE2\x80\xA6"
+        " \xE2\x80\xA2 \xCE\xB1 \xF0\x9F\x98\x80";
+    static const unsigned char expected[] = "\"q\" 's' a-b... * ? ?";
+
+    require_filtered_at_every_split(input, sizeof(input) - 1, expected, sizeof(expected) - 1,
+                                    "characters without an ISO-8859-1 form should become ASCII or ?");
+}
+
+static void test_malformed_utf8(void)
+{
+    /* lead byte cut short, then text; overlong NUL; surrogate; C1 control dropped */
+    static const unsigned char cut_short[] = "a\xC3" "b";
+    static const unsigned char cut_short_expected[] = "a?b";
+    static const unsigned char overlong[] = "a\xE0\x80\x80" "b";
+    static const unsigned char overlong_expected[] = "a?b";
+    static const unsigned char surrogate[] = "a\xED\xA0\x80" "b";
+    static const unsigned char surrogate_expected[] = "a?b";
+    static const unsigned char c1[] = "a\xC2\x9B" "b";
+    static const unsigned char c1_expected[] = "ab";
+    static const unsigned char stray[] = "a\xA3" "b";
+    static const unsigned char dangling[] = "a\xE2\x80";
+    static const unsigned char dangling_expected[] = "a?";
+
+    require_filtered_at_every_split(cut_short, sizeof(cut_short) - 1, cut_short_expected,
+                                    sizeof(cut_short_expected) - 1,
+                                    "a character cut short should become ?");
+    require_filtered_at_every_split(overlong, sizeof(overlong) - 1, overlong_expected,
+                                    sizeof(overlong_expected) - 1,
+                                    "an overlong sequence should become ?");
+    require_filtered_at_every_split(surrogate, sizeof(surrogate) - 1, surrogate_expected,
+                                    sizeof(surrogate_expected) - 1,
+                                    "an encoded surrogate should become ?");
+    require_filtered_at_every_split(c1, sizeof(c1) - 1, c1_expected, sizeof(c1_expected) - 1,
+                                    "an encoded C1 control must not reach the Amiga console");
+    require_filtered_at_every_split(stray, sizeof(stray) - 1, stray, sizeof(stray) - 1,
+                                    "a stray continuation byte should pass through");
+    require_filtered_at_every_split(dangling, sizeof(dangling) - 1, dangling_expected,
+                                    sizeof(dangling_expected) - 1,
+                                    "a character cut off by the end of output should become ?");
+}
+
+static void test_utf8_after_escape(void)
+{
+    static const unsigned char input[] = "\x1B" "\xC3\xA9" "x";
+    static const unsigned char expected[] = "\x1B\xE9" "x";
+
+    require_filtered_at_every_split(input, sizeof(input) - 1, expected, sizeof(expected) - 1,
+                                    "a UTF-8 character after a literal ESC should be converted");
+}
+
+static void test_csi_with_utf8_text(void)
+{
+    static const unsigned char input[] = "\x1B[1m\xC3\xA9\x1B[0m\xC3\xA9";
+    static const unsigned char expected[] = "\233" "1m\xE9\233" "0m\xE9";
+
+    require_filtered_at_every_split(input, sizeof(input) - 1, expected, sizeof(expected) - 1,
+                                    "CSI conversion and UTF-8 decoding should work together");
 }
 
 static void test_utf8_osc_payload(void)
@@ -139,6 +205,41 @@ static void test_utf8_osc_payload(void)
     require_filtered_at_every_split(input, sizeof(input) - 1,
                                     expected, sizeof(expected) - 1,
                                     "UTF-8 OSC payload should remain filtered");
+}
+
+static void test_utf8_osc_continuation_bytes(void)
+{
+    /* U+025C is C9 9C: the 0x9C continuation byte must not end the OSC */
+    static const unsigned char input[] = "a\x1B]0;x\xC9\x9Cy\x07" "b";
+    static const unsigned char expected[] = "ab";
+
+    require_filtered_at_every_split(input, sizeof(input) - 1, expected, sizeof(expected) - 1,
+                                    "a continuation byte equal to C1 ST should stay in the OSC");
+}
+
+static void test_encode_input(void)
+{
+    static const unsigned char input[] = "a\xE9\xFC\x9B" "A\x08z\xA0\xFF";
+    static const unsigned char expected[] =
+        "a\xC3\xA9\xC3\xBC\x1B[A\x7Fz\xC2\xA0\xC3\xBF";
+    unsigned char output[64];
+    int len;
+
+    len = host_terminal_encode_input(input, sizeof(input) - 1, output, sizeof(output));
+    require(len == (int)sizeof(expected) - 1 && memcmp(output, expected, len) == 0,
+            "typed ISO-8859-1 should become UTF-8, CSI ESC [ and Backspace DEL");
+    require(host_terminal_encode_input(input, sizeof(input) - 1, output, 5) == -1,
+            "input that does not fit the output buffer should fail");
+
+    /* the worst case doubles the length, as host-shell's buffers assume */
+    {
+        unsigned char high[1024];
+        unsigned char big[2048];
+
+        memset(high, 0xE9, sizeof(high));
+        require(host_terminal_encode_input(high, sizeof(high), big, sizeof(big)) == 2048,
+                "1024 high bytes should encode to 2048 bytes");
+    }
 }
 
 static void test_incomplete_sequences(void)
@@ -175,7 +276,13 @@ int main(void)
     test_osc_c1_st_filtering();
     test_c1_osc_filtering();
     test_utf8_output();
+    test_utf8_without_latin1_form();
+    test_malformed_utf8();
+    test_utf8_after_escape();
+    test_csi_with_utf8_text();
     test_utf8_osc_payload();
+    test_utf8_osc_continuation_bytes();
+    test_encode_input();
     test_incomplete_sequences();
     test_unknown_escape();
     return 0;

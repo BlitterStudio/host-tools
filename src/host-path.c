@@ -22,6 +22,17 @@ int main(int argc, char *argv[])
     static char filename[HOST_MAX_PATH_LEN];
     int status = 0;
 
+    if (argc >= 2 && strcmp(argv[1], "?") == 0)
+    {
+        if (argc > 2)
+        {
+            printf("Unexpected argument after ?\n");
+            print_usage();
+            return HOST_RETURN_ERROR;
+        }
+        return print_usage();
+    }
+
     if (!InitUAEResource())
     {
         printf("UAEResource not found!\n");
@@ -33,11 +44,6 @@ int main(int argc, char *argv[])
         printf("Missing path argument\n");
         print_usage();
         return HOST_RETURN_ERROR;
-    }
-
-    if (strcmp(argv[1], "?") == 0)
-    {
-        return print_usage();
     }
 
     for (int i = 1; i < argc; i++) {

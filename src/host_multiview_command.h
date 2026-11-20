@@ -13,6 +13,7 @@
 /*
  * Windows: Start-Process on a path or URL opens it with the default
  * handler. It returns at once and fails when no handler is found.
+ * target is UTF-8.
  */
 static inline int host_append_multiview_command_windows(char *command, size_t command_size,
                                                         const char *target)
@@ -22,7 +23,7 @@ static inline int host_append_multiview_command_windows(char *command, size_t co
     script[0] = '\0';
     return host_append_literal(script, sizeof(script),
                                HOST_PS_STOP_ON_ERROR "Start-Process -FilePath ") &&
-           host_append_ps_quoted(script, sizeof(script), target) &&
+           host_append_ps_quoted_utf8(script, sizeof(script), target) &&
            host_append_ps_encoded_command(command, command_size, script);
 }
 

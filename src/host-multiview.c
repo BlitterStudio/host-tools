@@ -27,6 +27,17 @@ int main(int argc, char *argv[])
     int status = 0;
     int windows_host;
 
+    if (argc >= 2 && strcmp(argv[1], "?") == 0)
+    {
+        if (argc > 2)
+        {
+            printf("Unexpected argument after ?\n");
+            print_usage();
+            return HOST_RETURN_ERROR;
+        }
+        return print_usage();
+    }
+
     if (!InitUAEResource())
     {
         printf("UAEResource not found!\n");
@@ -40,17 +51,12 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
-    if (strcmp(argv[1], "?") == 0)
-    {
-        return print_usage();
-    }
-
     windows_host = (GetHostPlatform() == HOST_PLATFORM_WINDOWS);
 
     /* Iterate through all arguments and request the host to view them */
     for (int i = 1; i < argc; i++)
     {
-        char *target = argv[i];
+        const char *target = argv[i];
 
         if (argv[i][0] == '\0') {
             printf("Empty filename or URL argument\n");
@@ -58,15 +64,21 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        int path_status = host_resolve_optional_path(argv[i], filename, sizeof(filename),
-                                                     (const char **)&target);
-        if (path_status != HOST_PATH_OK) {
+        int path_status = host_resolve_path(HOST_PATH_MODE_FILE, argv[i], filename,
+                                            sizeof(filename), &target);
+        if (!host_path_usable(path_status)) {
             printf("%s: %s\n", host_path_error(path_status), argv[i]);
             status = HOST_RETURN_ERROR;
             continue;
         }
 
         if (windows_host) {
+            if (!host_path_utf8_target(argv[i], filename, sizeof(filename),
+                                       &target)) {
+                printf("Command is too long\n");
+                status = HOST_RETURN_ERROR;
+                continue;
+            }
             command[0] = '\0';
             if (!host_append_multiview_command_windows(command, sizeof(command), target)) {
                 printf("Command is too long\n");

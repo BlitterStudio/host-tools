@@ -29,7 +29,7 @@ For details, see the [command reference](https://github.com/BlitterStudio/host-t
 
 ## Exit codes
 
-The tools return `0` on success and `10` (`RETURN_ERROR`) when an operation fails or an argument is missing or invalid. A tool that waits for a host command also returns `10` if that command exits with a nonzero status. They return `2` when `uae.resource` is not available, for example outside Amiberry or with Native Code disabled. Asking for usage help with `?` returns `0` when `uae.resource` is available.
+The tools return `0` on success and `10` (`RETURN_ERROR`) when an operation fails or an argument is missing or invalid. A tool that waits for a host command also returns `10` if that command exits with a nonzero status. They return `2` when `uae.resource` is not available, for example outside Amiberry or with Native Code disabled. Asking for usage help with `?` returns `0`, also when `uae.resource` is not available. An argument after `?` is an error and returns `10`.
 
 ## Installation
 

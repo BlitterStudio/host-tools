@@ -49,6 +49,40 @@ versioning for release tags.
 
 - Build with `amigadev/crosstools:m68k-amigaos` (AmigaDev GCC 16.2-rc24-9,
   binutils 2.47 snapshot), the tag that replaces `m68k-amigaos-gcc10`.
+- `?` prints the usage before the tools look for `uae.resource`, so it works
+  outside Amiberry. An argument after `?` is an error in every tool.
+- `host-shell` converts typed text from ISO-8859-1 to UTF-8 and host output back
+  to ISO-8859-1 on every host. Characters without an ISO-8859-1 form show as
+  ASCII stand-ins or `?`. `host-shell ?` now explains how one argument and
+  several arguments are handled.
+- On Windows, a failing PowerShell command prints PowerShell's error message
+  before the tool's own.
+
+### Fixed
+
+- `host-multiview`, `host-reveal`, `host-edit` and `host-run` no longer pass an
+  Amiga path that does not exist to the host as text. `host-multiview
+  HT:no-such-file` is now an error with exit code 10. `host-run` still passes
+  options and other words that are not paths to the host as written.
+- Volumes and assigns named like URL schemes (`DATA:`, `FILE:`, `FTP:`) are
+  treated as Amiga paths when they exist. They used to be refused or sent to the
+  host as URLs.
+- Paths longer than 255 characters are refused before AmigaDOS sees them, and
+  `host-run` no longer looks up a long ordinary argument as a path.
+- `host-edit` creates a new file only in a directory that exists and has a host
+  path.
+- On Windows, paths and arguments with characters outside ASCII, such as `é` or
+  `α`, reach PowerShell intact. Native host paths are UTF-8 and were read as
+  ISO-8859-1.
+- `host-reveal` on Windows starts Explorer through PowerShell. A percent sign in
+  the path is no longer expanded as an environment variable, and non-ASCII names
+  no longer depend on the ANSI code page.
+- `host-run` on Windows no longer lets an argument such as `x&calc.exe` start a
+  second command when the target is a `.bat` or `.cmd` file. Arguments with
+  quotes, percent signs or line breaks are refused for batch files.
+- `host-run` and `host-edit` on Linux and macOS report a command or editor that
+  cannot be started. They used to return success after handing the command to a
+  background shell.
 
 ## [2.9] - 2026-11-04
 

@@ -32,11 +32,14 @@ static inline int host_is_safe_cmd_char(char c)
            c == '\\' || c == ':' || c == '+' || c == '@' || c == '-';
 }
 
-/* Quotes and line breaks cannot be passed through cmd.exe safely */
+/*
+ * Quotes and line breaks cannot be passed through cmd.exe safely, and a
+ * percent sign would still expand an environment variable inside quotes.
+ */
 static inline int host_cmd_word_valid(const char *word)
 {
     for (const char *p = word; *p; p++) {
-        if (*p == '"' || *p == '\n' || *p == '\r') {
+        if (*p == '"' || *p == '%' || *p == '\n' || *p == '\r') {
             return 0;
         }
     }

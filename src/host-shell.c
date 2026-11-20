@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
         /* no arguments: interactive cmd.exe; the terminal host runs the rest through cmd /C */
         for (int i = 1; argc > 2 && i < argc; i++) {
             if (!host_cmd_word_valid(argv[i])) {
-                printf("Arguments with quotes or line breaks are not supported on Windows hosts: %s\n"
+                printf("Arguments with quotes, percent signs or line breaks are not supported on Windows hosts: %s\n"
                        "Pass the whole command as a single argument instead.\n", argv[i]);
                 return HOST_RETURN_ERROR;
             }

@@ -51,7 +51,7 @@ host-shell [command]
 
 Opens an interactive Linux or macOS login shell inside the Amiga CLI, or runs the supplied command in that login shell. Host shell startup files can supply its environment. Full-screen terminal programs work in the Amiga console; the host terminal's size is taken from the Amiga window when `host-shell` starts. Restart it after resizing the window.
 
-On Windows the session runs in a ConPTY pseudo console, so it needs Amiberry 8.6.0 or newer on Windows 10 version 1809 or later. Without arguments it opens an interactive `%ComSpec%` (normally `cmd.exe`). A single argument is run through `cmd /C` as written. Several arguments are joined into one command line, quoted where needed; an argument that contains a double quote or a line break is refused, so pass such a command as one argument. There is no login shell on Windows. With an older Amiberry the tool reports that it could not open the session.
+On Windows the session runs in a ConPTY pseudo console, so it needs Amiberry 8.6.0 or newer on Windows 10 version 1809 or later. Without arguments it opens an interactive `%ComSpec%` (normally `cmd.exe`). A single argument is run through `cmd /C` as written. Several arguments are joined into one command line, quoted where needed; an argument that contains a double quote, a percent sign, or a line break is refused, so pass such a command as one argument. There is no login shell on Windows. With an older Amiberry the tool reports that it could not open the session.
 
 ## host-path
 

@@ -688,6 +688,7 @@ static void test_windows_shell_command(void)
     char *several[] = { "host-shell", "type", "C:\\My Files\\a b.txt", "", "x&y", "plain-1.txt" };
     char *quoted[] = { "host-shell", "echo", "say \"hi\"" };
     char *newline[] = { "host-shell", "echo", "a\nb" };
+    char *percent[] = { "host-shell", "type", "C:\\data\\%USERNAME%.txt" };
     char small[16];
 
     command[0] = '\0';
@@ -713,9 +714,12 @@ static void test_windows_shell_command(void)
     command[0] = '\0';
     require(!host_append_shell_windows_command(command, sizeof(command), 3, newline),
             "argument with a line break should be rejected");
+    command[0] = '\0';
+    require(!host_append_shell_windows_command(command, sizeof(command), 3, percent),
+            "argument with a percent sign should be rejected");
     require(!host_cmd_word_valid("a\"b") && !host_cmd_word_valid("a\rb") &&
-            host_cmd_word_valid("a b&c"),
-            "cmd word validation should reject only quotes and line breaks");
+            !host_cmd_word_valid("%PATH%") && host_cmd_word_valid("a b&c"),
+            "cmd word validation should reject only quotes, percent signs and line breaks");
 
     small[0] = '\0';
     require(!host_append_shell_windows_command(small, sizeof(small), 6, several),

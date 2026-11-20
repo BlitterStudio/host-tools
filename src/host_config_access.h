@@ -24,7 +24,8 @@
  *     just the value.
  * Writing is mode -1 with "option value" pairs; it changes the pending
  * configuration (changed_prefs) and Amiberry applies it on its next frame.
- * It returns 0, or 5 when the option or value is not accepted. The trap
+ * It returns 0, or 5 when a known option is given a value it rejects; an
+ * unknown option is ignored and still returns 0, so callers search first. The trap
  * never writes anything to the output buffer when setting.
  *
  * EmuConfig (trap 81) is not used: it reads only the lines of the loaded

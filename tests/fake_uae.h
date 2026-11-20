@@ -311,7 +311,8 @@ FAKE int fake_cmdlineparser(const char *s, char *argv[], int max)
     return cnt;
 }
 
-/* execcmdline: pairs of option and value; an unknown option stops with code 5. */
+/* execcmdline: pairs of option and value. A known option given the value "invalid" stops with code 5;
+ * an unknown option is ignored and the result is still 0, as in Amiberry. */
 FAKE int fake_execcmdline(int argc, char *argv[])
 {
     for (int i = 0; i < argc; i++) {
@@ -325,19 +326,26 @@ FAKE int fake_execcmdline(int argc, char *argv[])
 
                 sprintf(name, "floppy%d", d);
                 if (strcmp(option, name) == 0) {
+                    if (strcmp(value, "invalid") == 0) {
+                        return 5;
+                    }
                     strncpy(fake_drives[d].pending, value, FAKE_NAME_MAX - 1);
                     known = 1;
                 }
             }
             for (int o = 0; !known && fake_options[o].name; o++) {
                 if (strcmp(option, fake_options[o].name) == 0) {
+                    if (strcmp(value, "invalid") == 0) {
+                        return 5;
+                    }
                     strncpy(fake_options[o].pending, value, sizeof(fake_options[o].pending) - 1);
                     fake_options[o].has_pending = 1;
                     known = 1;
                 }
             }
             if (!known) {
-                return 5;
+                i++;
+                continue;
             }
             if (fake_set_count < FAKE_SET_LOG) {
                 snprintf(fake_set_lines[fake_set_count], sizeof(fake_set_lines[0]), "%s=%s", option, value);

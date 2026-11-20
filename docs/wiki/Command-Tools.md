@@ -203,7 +203,7 @@ Reads or changes an Amiberry configuration option while Amiberry runs. Options u
 
 `set` sends the option with the rest of the line as its value, joined with single spaces. If the value contains a colon, slash or dot and names an existing Amiga file or directory, Amiberry gets its host path. Any other value goes through unchanged, so a host path works too. Amiberry applies the change on its next frame, so a `get` in the same instant can still show the old value. Amiberry decides whether an option takes effect at once or needs a reset.
 
-Amiberry answers a `set` with a result code and no message, so the tool cannot say why a value failed. It reports that Amiberry did not accept the option and returns `10`. This happens for an unknown option and for some invalid values.
+Amiberry ignores an unknown option and still reports success, so `set` first checks that `get` can find the option. An option that is not listed prints `Unknown option` and returns `10`. Amiberry answers a `set` with a result code and no message, so for a value it rejects the tool can only say that Amiberry did not accept it and return `10`. Amiberry may also accept a value it cannot use without reporting anything, so read the option back with `get`.
 
 Amiberry cannot take an empty value or a value with a double quote or a control character, and `host-config` refuses values longer than 1024 characters. It also refuses `shellexec` and `dbg`. `shellexec` would run a host command without the Native Code setting that `host-run` needs, and `dbg` drives Amiberry's debugger.
 

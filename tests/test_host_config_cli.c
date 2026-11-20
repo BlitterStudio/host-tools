@@ -168,7 +168,12 @@ static void test_set_errors(void)
 
     fake_reset();
     require(run_args("set", "no_such_option", "1", NULL) == HOST_RETURN_ERROR, "unknown option");
-    require(strstr(text, "Amiberry did not accept no_such_option") != NULL, "unknown option is reported");
+    require(strcmp(text, "Unknown option: no_such_option\n") == 0, "unknown option is reported, though Amiberry answers 0");
+    require(fake_set_count == 0, "an unknown option is not sent");
+
+    require(run_args("set", "chipset", "invalid", NULL) == HOST_RETURN_ERROR, "value Amiberry rejects");
+    require(strstr(text, "Amiberry did not accept chipset: invalid value") != NULL, "rejected value is reported");
+    require(fake_set_count == 0, "a rejected value changes nothing");
 
     require(run_args("set", "shellexec", "calc", NULL) == HOST_RETURN_ERROR, "shellexec refused");
     require(strstr(text, "host-run") != NULL, "shellexec points to host-run");

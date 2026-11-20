@@ -88,6 +88,7 @@ static int set_option(const char *option, int argc, char *argv[], int first_valu
     static char value[HOST_CONFIG_VALUE_MAX + 1];
     static char host_path[HOST_MAX_PATH_LEN];
     static char line[HOST_CONFIG_LINE_MAX];
+    static char reply[HOST_CONFIG_REPLY_MAX];
     const char *target;
     int status;
     long rc;
@@ -128,9 +129,21 @@ static int set_option(const char *option, int argc, char *argv[], int first_valu
         return HOST_RETURN_ERROR;
     }
 
+    /* Amiberry accepts an unknown option with result 0 and ignores it, so an
+     * option that the configuration does not list is rejected here. */
+    status = host_config_get(option, reply, sizeof(reply), &rc);
+    if (status == HOST_CONFIG_MISSING) {
+        printf("Unknown option: %s\n", option);
+        return HOST_RETURN_ERROR;
+    }
+    if (status != HOST_CONFIG_FOUND) {
+        printf("Amiberry could not read its configuration (code %ld)\n", rc);
+        return HOST_RETURN_ERROR;
+    }
+
     rc = host_config_apply(line);
     if (rc == HOST_CONFIG_SET_REJECTED) {
-        printf("Amiberry did not accept %s: unknown option or invalid value\n", option);
+        printf("Amiberry did not accept %s: invalid value\n", option);
         return HOST_RETURN_ERROR;
     }
     if (rc != 0) {

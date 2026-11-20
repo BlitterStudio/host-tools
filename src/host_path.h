@@ -9,97 +9,109 @@
 #include <dos/dosextens.h>
 
 #include "host_common.h"
+#include "host_path_logic.h"
 #include "uae_pragmas.h"
 
-#define HOST_PATH_OK 0
-#define HOST_PATH_EMPTY 1
-#define HOST_PATH_URI 2
-#define HOST_PATH_NOT_FOUND 3
-#define HOST_PATH_NATIVE_ERROR 4
-#define HOST_PATH_TOO_LONG 5
-
-static inline int host_resolve_existing_path(const char *arg, char *out, size_t out_size)
+static host_lock_t UAE_UNUSED host_amiga_lock(const char *path, long *ioerr)
 {
     struct Process *proc;
     APTR old_window;
     BPTR lock;
 
-    if (arg == NULL || out == NULL || out_size == 0) {
-        return HOST_PATH_NATIVE_ERROR;
-    }
-
-    if (arg[0] == '\0') {
-        return HOST_PATH_EMPTY;
-    }
-
-    if (host_is_uri(arg)) {
-        return HOST_PATH_URI;
-    }
-
     /* suppress "please insert volume" requesters while probing arguments */
     proc = (struct Process *)FindTask(NULL);
     old_window = proc->pr_WindowPtr;
     proc->pr_WindowPtr = (APTR)-1;
-    lock = Lock((STRPTR)arg, ACCESS_READ);
+    lock = Lock((STRPTR)path, ACCESS_READ);
+    *ioerr = lock ? 0 : IoErr();
     proc->pr_WindowPtr = old_window;
-    if (!lock) {
-        return HOST_PATH_NOT_FOUND;
-    }
-
-    out[0] = '\0';
-    out[out_size - 1] = '\0';
-    if (NativeDosOp(0, (ULONG)lock, (ULONG)out, out_size) != 0) {
-        UnLock(lock);
-        return HOST_PATH_NATIVE_ERROR;
-    }
-
-    UnLock(lock);
-    if (host_filled_buffer(out, out_size)) {
-        return HOST_PATH_TOO_LONG;
-    }
-
-    return HOST_PATH_OK;
+    return (host_lock_t)lock;
 }
 
-static inline int host_resolve_optional_path(const char *arg, char *out, size_t out_size,
-                                             const char **target)
+static void UAE_UNUSED host_amiga_unlock(host_lock_t lock)
 {
-    int status;
+    UnLock((BPTR)lock);
+}
 
-    *target = arg;
-    if (arg[0] == '\0' || host_is_uri(arg)) {
-        return HOST_PATH_OK;
+static int UAE_UNUSED host_amiga_is_dir(host_lock_t lock)
+{
+    struct FileInfoBlock *fib = (struct FileInfoBlock *)AllocDosObject(DOS_FIB, NULL);
+    int result = -1;
+
+    if (fib != NULL) {
+        if (Examine((BPTR)lock, fib)) {
+            result = (fib->fib_DirEntryType > 0) ? 1 : 0;
+        }
+        FreeDosObject(DOS_FIB, fib);
     }
+    return result;
+}
 
-    status = host_resolve_existing_path(arg, out, out_size);
-    if (status == HOST_PATH_OK) {
-        *target = out;
-        return HOST_PATH_OK;
-    }
+static int UAE_UNUSED host_amiga_native(host_lock_t lock, char *out, size_t out_size)
+{
+    return NativeDosOp(0, (ULONG)lock, (ULONG)out, out_size);
+}
 
-    if (status == HOST_PATH_NOT_FOUND) {
-        return HOST_PATH_OK;
-    }
+static int UAE_UNUSED host_amiga_dos_name_exists(const char *name)
+{
+    struct DosList *list = LockDosList(LDF_DEVICES | LDF_VOLUMES | LDF_ASSIGNS | LDF_READ);
+    int found = (FindDosEntry(list, (CONST_STRPTR)name,
+                              LDF_DEVICES | LDF_VOLUMES | LDF_ASSIGNS) != NULL);
 
+    UnLockDosList(LDF_DEVICES | LDF_VOLUMES | LDF_ASSIGNS | LDF_READ);
+    return found;
+}
+
+static const struct host_path_ops host_amiga_path_ops = {
+    host_amiga_lock,
+    host_amiga_unlock,
+    host_amiga_is_dir,
+    host_amiga_native,
+    host_amiga_dos_name_exists
+};
+
+/*
+ * Resolve arg (see host_path_resolve_with). On HOST_PATH_OK *target is
+ * out, the native path. On HOST_PATH_URI and HOST_PATH_HOST it is arg.
+ * Both are ISO-8859-1.
+ */
+static inline int host_resolve_path(int mode, const char *arg, char *out, size_t out_size,
+                                    const char **target)
+{
+    int status = host_path_resolve_with(&host_amiga_path_ops, mode, arg, out, out_size);
+
+    *target = (status == HOST_PATH_OK) ? out : arg;
     return status;
 }
 
-static inline const char *host_path_error(int status)
+/* host-path: the path must exist as an Amiga path */
+static inline int host_resolve_existing_path(const char *arg, char *out, size_t out_size)
 {
-    switch (status) {
-        case HOST_PATH_EMPTY:
-            return "empty path";
-        case HOST_PATH_URI:
-            return "cannot translate URI";
-        case HOST_PATH_NOT_FOUND:
-            return "path not found";
-        case HOST_PATH_NATIVE_ERROR:
-            return "native path translation failed";
-        case HOST_PATH_TOO_LONG:
-            return "resolved host path is too long";
-        default:
-            return "unknown path error";
+    const char *target;
+
+    return host_resolve_path(HOST_PATH_MODE_EXISTING, arg, out, out_size, &target);
+}
+
+/* the argument is usable on the host: translated, a URI or a host argument */
+static inline int host_path_usable(int status)
+{
+    return status == HOST_PATH_OK || status == HOST_PATH_URI || status == HOST_PATH_HOST;
+}
+
+/*
+ * Native paths and guest text are both ISO-8859-1, but POSIX hosts want
+ * UTF-8 in file names and arguments. Convert target into out and point
+ * *target at it. Windows scripts convert as they quote, so Windows
+ * callers do not use this.
+ */
+static inline int host_path_to_utf8_target(char *out, size_t out_size, const char **target)
+{
+    out[0] = '\0';
+    if (!host_append_latin1_as_utf8(out, out_size, *target)) {
+        return 0;
     }
+    *target = out;
+    return 1;
 }
 
 #endif

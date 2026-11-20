@@ -42,7 +42,7 @@ The command tools return 0 on success and 10 when an operation fails or an argum
 
 They return 2 when uae.resource is not available, for example outside Amiberry or with Native Code disabled.
 
-Asking for usage help with ? returns 0 when uae.resource is available.
+Asking for usage help with ? returns 0, also when uae.resource is not available. An argument after ? is an error and returns 10.
 
 @endnode
 
@@ -102,11 +102,11 @@ Usage:
 
 host-run <command> [arguments...]
 
-Arguments that name existing Amiga paths are translated to host paths before the command is sent to the host. On Linux and macOS each argument is quoted for the host shell, so operators such as | and > are passed to the program as plain text. Use host-shell when you need them.
+Arguments that name existing Amiga paths are translated to host paths before the command is sent to the host. A path on an existing volume or assign that does not exist is an error and returns 10. Other arguments, such as options and Windows paths like C:\Users\me\a.txt, go to the host as written. On Linux and macOS each argument is quoted for the host shell, so operators such as | and > are passed to the program as plain text. Use host-shell when you need them.
 
-On Linux and macOS host-run starts the command in the background and returns at once. The command's output goes to Amiberry's own output, not to the Amiga Shell.
+On Linux and macOS host-run checks that the command exists, starts it in the background and returns at once. If the command is not found, host-run prints "Command not found on host" and returns 10. The command's input and output are discarded.
 
-On Windows the first argument is the program and the rest are its arguments. The program is started with PowerShell Start-Process and host-run returns without waiting for it. A console program opens in its own window. If the program cannot be started, host-run prints a message and returns 10.
+On Windows the first argument is the program and the rest are its arguments. The program is started with PowerShell Start-Process and host-run returns without waiting for it. A console program opens in its own window. If the program cannot be started, host-run prints a message and returns 10. For .bat and .cmd files, arguments with & | < > or ^ are quoted. An argument with a double quote, a percent sign or a line break is refused for a batch file.
 
 @endnode
 
@@ -117,7 +117,7 @@ Usage:
 
 host-multiview <filename|URL> [filename2|URL2 ...]
 
-An existing Amiga path is translated first, and a URL is passed through as a URL. On Windows the default handler is found with PowerShell Start-Process.
+An existing Amiga path is translated first, and a URL is passed through as a URL. A path that does not exist is an error. On Windows the default handler is found with PowerShell Start-Process.
 
 @endnode
 
@@ -128,7 +128,9 @@ Usage:
 
 host-shell [command]
 
-On Linux and macOS the host user's login shell is used, so shell profile files can set paths and environment variables. This applies to interactive sessions and to a command given on the host-shell command line. A single argument is run as written; several arguments are quoted and joined.
+On Linux and macOS the host user's login shell is used, so shell profile files can set paths and environment variables. This applies to interactive sessions and to a command given on the host-shell command line. A single argument is run as written, so it can hold a whole command line. Several arguments are quoted and joined into one command.
+
+Typed text is converted from ISO-8859-1 to UTF-8 and host output back, on every host. Characters that ISO-8859-1 lacks show as an ASCII stand-in or ?.
 
 The host terminal is sized to match the Amiga console window, so full-screen host programs display correctly. To apply a new window size, resize the Amiga window and restart host-shell. Ctrl-C is sent to the host program and does not end host-shell.
 
@@ -143,7 +145,7 @@ Usage:
 
 host-path <path> [path2 ...]
 
-A path that does not exist, or a URL, prints an error and makes the exit code 10.
+A path that does not exist, a volume that is not in the DOS list, a path longer than 255 characters or a URL prints an error and makes the exit code 10.
 
 @endnode
 
@@ -154,7 +156,7 @@ Usage:
 
 host-reveal <path> [path2 ...]
 
-On macOS the file is selected in Finder, and on Windows in Explorer. On Linux the file is selected if the default file manager supports the FileManager1 desktop interface. Otherwise the containing directory is opened. URLs are refused.
+On macOS the file is selected in Finder, and on Windows in Explorer, started through PowerShell. On Linux the file is selected if the default file manager supports the FileManager1 desktop interface. Otherwise the containing directory is opened. URLs are refused.
 
 @endnode
 
@@ -166,7 +168,7 @@ Usage:
 host-notify <message>
 host-notify <title> <message...>
 
-With one argument the title is Amiga. On Linux the notification is sent with notify-send, on macOS with osascript, and on Windows as a toast. A title or message that starts with - is shown as text. The Windows toast is shown under the name Windows PowerShell. Title and message together are limited to about 900 characters on Windows.
+With one argument the title is Amiga. On Linux the notification is sent with notify-send, on macOS with osascript, and on Windows as a toast. A title or message that starts with - is shown as text. The Windows toast is shown under the name Windows PowerShell. Title and message together are limited to about 850 characters on Windows.
 
 @endnode
 
@@ -177,7 +179,7 @@ Usage:
 
 host-edit <path> [path2 ...]
 
-On Linux the files open in the application the desktop associates with plain text, started through xdg-mime and gtk-launch. If there is none, VISUAL or EDITOR is used, and xdg-open only as a last resort. The type of the file itself is not consulted, so an image or a PDF still opens in the text editor. VISUAL and EDITOR start without a terminal, so they need a graphical editor. macOS uses open -t. On Windows the files are opened in Notepad. URLs are refused.
+On Linux the files open in the application the desktop associates with plain text, started through xdg-mime and gtk-launch. If there is none, VISUAL or EDITOR is used, and xdg-open only as a last resort. The type of the file itself is not consulted, so an image or a PDF still opens in the text editor. VISUAL and EDITOR start without a terminal, so they need a graphical editor. macOS uses open -t. On Windows the files are opened in Notepad. URLs are refused. A file that does not exist yet is created in its directory, which must exist and have a host path. If no editor can be started, host-edit prints a message and returns 10. VISUAL, EDITOR and xdg-open start in the background.
 
 @endnode
 

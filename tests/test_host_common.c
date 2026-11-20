@@ -89,8 +89,46 @@ static void test_uri_detection(void)
     require(!host_is_uri("C:Tools/host-run"), "Amiga command path should not be treated as URI");
 }
 
+static void test_cmd_arg(void)
+{
+    char command[32];
+
+    command[0] = '\0';
+    require(host_append_cmd_arg(command, sizeof(command), "C:\\My Files\\a.txt"),
+            "plain Windows path should be quoted");
+    require_string(command, "\"C:\\My Files\\a.txt\"", "cmd argument should be quoted");
+
+    command[0] = '\0';
+    require(!host_append_cmd_arg(command, sizeof(command), "C:\\%USERNAME%.txt"),
+            "percent signs expand inside quotes and must be rejected");
+    require(!host_append_cmd_arg(command, sizeof(command), "a\"b") &&
+            !host_append_cmd_arg(command, sizeof(command), "a\nb"),
+            "quotes and line breaks must be rejected");
+}
+
+static void test_latin1_to_utf8(void)
+{
+    char dest[32];
+
+    dest[0] = '\0';
+    require(host_append_latin1_as_utf8(dest, sizeof(dest), "a\xE9\xFF\xA0z"),
+            "ISO-8859-1 text should convert");
+    require_string(dest, "a\xC3\xA9\xC3\xBF\xC2\xA0z", "ISO-8859-1 should become UTF-8");
+    require(host_append_latin1_as_utf8(dest, sizeof(dest), "!"), "text should append");
+    require_string(dest, "a\xC3\xA9\xC3\xBF\xC2\xA0z!", "conversion should append");
+
+    strcpy(dest, "ab");
+    require(!host_append_latin1_as_utf8(dest, 5, "\xE9\xE9"),
+            "text that does not fit after conversion should fail");
+    require_string(dest, "ab", "failed conversion should leave the buffer unchanged");
+    require(host_append_latin1_as_utf8(dest, 5, "\xE9") && strlen(dest) == 4,
+            "text that just fits should convert");
+}
+
 int main(void)
 {
+    test_cmd_arg();
+    test_latin1_to_utf8();
     test_append_literal();
     test_join_args();
     test_shell_arg_quoting();

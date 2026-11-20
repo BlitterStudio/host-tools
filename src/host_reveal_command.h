@@ -7,18 +7,37 @@
 #define HOST_REVEAL_COMMAND_H
 
 #include <stddef.h>
+#include <string.h>
 #include "host_common.h"
+#include "host_powershell.h"
 
 /*
- * Windows: Explorer selects the file directly. Explorer's exit code
- * is always 1, so it is masked; failures are rare and non-fatal.
+ * Windows: Explorer selects the file directly. Explorer returns exit
+ * code 1 even when it works, and Start-Process does not wait for it, so
+ * the script's status only says whether Explorer could be started. The
+ * path is ISO-8859-1 and goes through PowerShell, not cmd.exe, which would
+ * expand percent signs and read it in the ANSI code page. A path with a
+ * quote cannot be a Windows path and is rejected.
  */
 static inline int host_append_reveal_command_windows(char *command, size_t command_size,
                                                      const char *path)
 {
-    return host_append_literal(command, command_size, "explorer /select,") &&
-           host_append_cmd_arg(command, command_size, path) &&
-           host_append_literal(command, command_size, " & exit 0");
+    static char script[HOST_MAX_COMMAND_LEN];
+    static char argument[HOST_MAX_COMMAND_LEN];
+
+    if (strchr(path, '"') != NULL) {
+        return 0;
+    }
+
+    script[0] = '\0';
+    argument[0] = '\0';
+    return host_append_literal(argument, sizeof(argument), "/select,\"") &&
+           host_append_literal(argument, sizeof(argument), path) &&
+           host_append_literal(argument, sizeof(argument), "\"") &&
+           host_append_literal(script, sizeof(script),
+                               HOST_PS_STOP_ON_ERROR "Start-Process -FilePath 'explorer.exe' -ArgumentList ") &&
+           host_append_ps_quoted(script, sizeof(script), argument) &&
+           host_append_ps_encoded_command(command, command_size, script);
 }
 
 static inline int host_append_show_items_branch(char *command, size_t command_size,

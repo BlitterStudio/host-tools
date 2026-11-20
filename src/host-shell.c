@@ -107,6 +107,21 @@ static int query_console_size(BPTR in, BPTR out, int *rows, int *cols,
     return found;
 }
 
+static void print_usage(void)
+{
+    printf("Host-Shell v%s\n", VERSION_STR);
+    printf("Host-Shell opens an interactive terminal session on the host system.\n");
+    printf("%s\nUsage: host-shell [command [argument ...]]\n", version);
+    printf("No arguments: the host login shell (cmd.exe on Windows).\n");
+    printf("One argument: run as written, so it can hold a whole command line,\n"
+           "  for example: host-shell \"ls -l | wc -l\"\n");
+    printf("Several arguments: each is quoted and the result runs as one command,\n"
+           "  for example: host-shell ls -l \"My Files\"\n");
+    printf("Text is converted between ISO-8859-1 (Amiga) and UTF-8 (host).\n");
+    printf("Windows hosts need Amiberry 8.6.0 or newer. Several arguments there\n"
+           "  must not contain quotes, percent signs or line breaks.\n");
+}
+
 static int append_size_prefix(char *dest, size_t dest_size, int rows, int cols)
 {
     char digits[16];
@@ -132,7 +147,7 @@ int main(int argc, char *argv[])
     BPTR out = 0;
     long handle = 0;
     BOOL raw_mode = FALSE;
-    struct host_terminal_filter terminal_filter = { HOST_TERMINAL_TEXT, 0 };
+    struct host_terminal_filter terminal_filter;
     long actual;
     ULONG status;
     int status_supported = 0;
@@ -144,19 +159,24 @@ int main(int argc, char *argv[])
 
     command[0] = '\0';
     session_command[0] = '\0';
+    host_terminal_filter_init(&terminal_filter);
+
+    if (argc >= 2 && strcmp(argv[1], "?") == 0)
+    {
+        if (argc > 2)
+        {
+            printf("Unexpected argument after ?\n");
+            print_usage();
+            return HOST_RETURN_ERROR;
+        }
+        print_usage();
+        return 0;
+    }
 
     if (!InitUAEResource())
     {
         printf("UAEResource not found!\n");
         return 2;
-    }
-
-    if (argc == 2 && strcmp(argv[1], "?") == 0)
-    {
-        printf("Host-Shell v%s\n", VERSION_STR);
-        printf("Host-Shell opens an interactive terminal session on the host system.\n");
-        printf("%s\nUsage: host-shell [command]\n", version);
-        return 0;
     }
 
     windows_host = (GetHostPlatform() == HOST_PLATFORM_WINDOWS);
@@ -250,7 +270,11 @@ int main(int argc, char *argv[])
     }
 
     if (pending_len > 0) {
-        HostShell_Write(handle, (UBYTE *)pending, pending_len);
+        int encoded = host_terminal_encode_input((const unsigned char *)pending, pending_len,
+                                                 (unsigned char *)outbuf, sizeof(outbuf));
+        if (encoded > 0) {
+            HostShell_Write(handle, (UBYTE *)outbuf, encoded);
+        }
     }
 
     for (;;)
@@ -304,20 +328,9 @@ int main(int argc, char *argv[])
             actual = Read(in, buffer, 1024);
             if (actual > 0)
             {
-                int outptr = 0;
-                for (int i = 0; i < actual; i++) {
-                    unsigned char c = (unsigned char)buffer[i];
-                    if (c == 0x9B) { // Amiga CSI
-                        // Convert to ANSI ESC [
-                        outbuf[outptr++] = 0x1B;
-                        outbuf[outptr++] = 0x5B;
-                    } else if (c == 0x08) { // Backspace
-                        // Convert BS (0x08) to DEL (0x7F)
-                        outbuf[outptr++] = 0x7F;
-                    } else {
-                        outbuf[outptr++] = c;
-                    }
-                }
+                /* ISO-8859-1 to UTF-8, Amiga CSI to ESC [, Backspace to DEL */
+                int outptr = host_terminal_encode_input((const unsigned char *)buffer, (int)actual,
+                                                        (unsigned char *)outbuf, sizeof(outbuf));
                 if (outptr > 0) {
                     HostShell_Write(handle, (UBYTE *)outbuf, outptr);
                 }

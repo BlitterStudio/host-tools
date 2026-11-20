@@ -17,7 +17,15 @@
  * PNG or PDF would open an image viewer or a PDF reader. Order: the
  * desktop's text/plain association (launched with the file's URI), then
  * VISUAL or EDITOR, then xdg-open as the last resort.
+ *
+ * The script reports its own failure through the exit status. Programs
+ * it starts must not keep the session's pipe, which is closed when the
+ * script ends: a write to it would kill them with SIGPIPE. VISUAL,
+ * EDITOR and xdg-open can stay alive as long as the editor does, so
+ * they run in the background after a check that the program exists;
+ * open and gtk-launch return once the editor is started.
  */
+#define HOST_EDIT_COMMAND_HEAD "exec >/dev/null 2>&1 </dev/null; "
 #define HOST_EDIT_COMMAND_TAIL \
     "; if [ \"$(uname -s)\" = Darwin ] && command -v open >/dev/null 2>&1; then open -t \"$target\";" \
     " else desktop_file=;" \
@@ -25,14 +33,15 @@
     " if [ -n \"$target_uri\" ] && [ -n \"$desktop_file\" ] && command -v gtk-launch >/dev/null 2>&1" \
     " && gtk-launch \"$desktop_file\" \"$target_uri\"; then :;" \
     " elif host_editor=${VISUAL:-${EDITOR:-}}; [ -n \"$host_editor\" ] &&" \
-    " HOST_EDITOR=\"$host_editor\" sh -c 'exec $HOST_EDITOR \"$1\"' sh \"$target\"; then :;" \
-    " elif command -v xdg-open >/dev/null 2>&1 && xdg-open \"$target\"; then :;" \
+    " HOST_EDITOR=\"$host_editor\" sh -c 'set -- $HOST_EDITOR; command -v -- \"$1\" >/dev/null 2>&1' &&" \
+    " ( HOST_EDITOR=\"$host_editor\" sh -c 'exec $HOST_EDITOR \"$1\"' sh \"$target\" & ); then :;" \
+    " elif command -v xdg-open >/dev/null 2>&1 && ( xdg-open \"$target\" & ); then :;" \
     " else exit 127; fi; fi"
 
 static inline int host_append_edit_command_with_uri(char *command, size_t command_size,
                                                    const char *path, const char *uri)
 {
-    return host_append_literal(command, command_size, "target=") &&
+    return host_append_literal(command, command_size, HOST_EDIT_COMMAND_HEAD "target=") &&
            host_append_shell_arg(command, command_size, path, 0) &&
            host_append_literal(command, command_size, "; target_uri=") &&
            (uri[0] == '\0' || host_append_shell_arg(command, command_size, uri, 0)) &&
@@ -65,7 +74,7 @@ static inline int host_append_edit_command(char *command, size_t command_size, c
 
 /*
  * Windows: open the file in Notepad, the editor host-info reports. The
- * path is passed as a single quoted argument.
+ * path (ISO-8859-1) is passed as a single quoted argument.
  */
 static inline int host_append_edit_command_windows(char *command, size_t command_size,
                                                    const char *path)

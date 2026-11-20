@@ -13,6 +13,7 @@
 /*
  * Windows: Start-Process on a path or URL opens it with the default
  * handler. It returns at once and fails when no handler is found.
+ * target is ISO-8859-1, like the paths from NativeDosOp.
  */
 static inline int host_append_multiview_command_windows(char *command, size_t command_size,
                                                         const char *target)

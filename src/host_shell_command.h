@@ -25,68 +25,6 @@ static inline int host_append_shell_login_command(char *command, size_t command_
            host_append_shell_arg(command, command_size, session_command, 0);
 }
 
-static inline int host_is_safe_cmd_char(char c)
-{
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-           (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '/' ||
-           c == '\\' || c == ':' || c == '+' || c == '@' || c == '-';
-}
-
-/*
- * Quotes and line breaks cannot be passed through cmd.exe safely, and a
- * percent sign would still expand an environment variable inside quotes.
- */
-static inline int host_cmd_word_valid(const char *word)
-{
-    for (const char *p = word; *p; p++) {
-        if (*p == '"' || *p == '%' || *p == '\n' || *p == '\r') {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-/*
- * Append one word to a cmd.exe command line, in double quotes when it is
- * empty or holds anything but plain path characters. Words that
- * host_cmd_word_valid rejects fail. Backslashes at the end of a quoted
- * word are doubled: programs that parse their command line with the
- * Microsoft C runtime rules would otherwise read the closing quote as a
- * literal one ("C:\Dir\" next), and Windows path handling accepts the
- * doubled separator.
- */
-static inline int host_append_cmd_word(char *command, size_t command_size, const char *word,
-                                       int add_separator)
-{
-    int quote = (word[0] == '\0');
-    size_t trailing = 0;
-
-    if (!host_cmd_word_valid(word)) {
-        return 0;
-    }
-    for (const char *p = word; *p; p++) {
-        if (!host_is_safe_cmd_char(*p)) {
-            quote = 1;
-        }
-        trailing = (*p == '\\') ? trailing + 1 : 0;
-    }
-
-    if ((add_separator && !host_append_literal(command, command_size, " ")) ||
-        (quote && !host_append_literal(command, command_size, "\"")) ||
-        !host_append_literal(command, command_size, word)) {
-        return 0;
-    }
-    if (quote) {
-        while (trailing-- > 0) {
-            if (!host_append_literal(command, command_size, "\\")) {
-                return 0;
-            }
-        }
-        return host_append_literal(command, command_size, "\"");
-    }
-    return 1;
-}
-
 /*
  * Windows session command for argv[1..argc-1]: empty (interactive
  * cmd.exe) for no arguments, the argument itself for one, and the

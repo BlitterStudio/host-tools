@@ -75,13 +75,6 @@ static int run(const char *args, long length)
     if (!DOSBase)
         return RETURN_FAIL;
 
-    if (!InitUAEResource())
-    {
-        print("UAEResource not found!\n");
-        CloseLibrary((struct Library *)DOSBase);
-        return 2;
-    }
-
     /* The argument line ends with a newline; trim blanks around it. */
     while (first < last && (args[first] == ' ' || args[first] == '\t'))
         first++;
@@ -94,9 +87,16 @@ static int run(const char *args, long length)
     }
     else if (last > first)
     {
-        print("Unexpected argument\n");
+        print(args[first] == '?' && (args[first + 1] == ' ' || args[first + 1] == '\t')
+                  ? "Unexpected argument after ?\n"
+                  : "Unexpected argument\n");
         print_usage();
         result = HOST_RETURN_ERROR;
+    }
+    else if (!InitUAEResource())
+    {
+        print("UAEResource not found!\n");
+        result = 2;
     }
     else
     {

@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 #include "host_base64.h"
 #include "host_clip_command.h"
@@ -384,13 +386,17 @@ static void test_shell_login_command_limit(void)
             "login wrapper must reject a command that exceeds the trap buffer");
 }
 
-static void require_ps_script(const char *command, const char *script)
+/*
+ * Decode the -EncodedCommand payload (UTF-16LE) of a PowerShell command
+ * into UTF-8, independently of the encoder under test.
+ */
+static void decode_ps_command(const char *command, char *out, size_t out_size)
 {
     static const char prefix[] = "powershell -NoProfile -EncodedCommand ";
     struct host_base64_state st;
-    unsigned char decoded[2048];
+    static unsigned char decoded[HOST_MAX_COMMAND_LEN * 4];
     long n;
-    size_t script_len = strlen(script);
+    size_t pos = 0;
 
     require(strncmp(command, prefix, sizeof(prefix) - 1) == 0,
             "encoded command should start with the powershell prefix");
@@ -398,11 +404,50 @@ static void require_ps_script(const char *command, const char *script)
     host_base64_init(&st);
     n = host_base64_feed(&st, command + sizeof(prefix) - 1,
                          (long)strlen(command + sizeof(prefix) - 1), decoded);
-    require(n == (long)(script_len * 2), "decoded UTF-16 length should match script");
-    for (size_t i = 0; i < script_len; i++) {
-        require(decoded[i * 2] == (unsigned char)script[i] && decoded[i * 2 + 1] == 0,
-                "decoded UTF-16 bytes should spell the script");
+    require(n >= 0 && n % 2 == 0, "decoded UTF-16 should hold whole code units");
+
+    for (long i = 0; i < n; i += 2) {
+        unsigned long unit = decoded[i] | ((unsigned long)decoded[i + 1] << 8);
+        unsigned long cp = unit;
+
+        if (unit >= 0xD800 && unit <= 0xDBFF) {
+            unsigned long low;
+
+            require(i + 3 < n, "high surrogate should be followed by a low surrogate");
+            low = decoded[i + 2] | ((unsigned long)decoded[i + 3] << 8);
+            require(low >= 0xDC00 && low <= 0xDFFF, "low surrogate expected");
+            cp = 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00);
+            i += 2;
+        }
+        require(pos + 5 < out_size, "decoded script buffer should be large enough");
+        if (cp < 0x80) {
+            out[pos++] = (char)cp;
+        } else if (cp < 0x800) {
+            out[pos++] = (char)(0xC0 | (cp >> 6));
+            out[pos++] = (char)(0x80 | (cp & 0x3F));
+        } else if (cp < 0x10000) {
+            out[pos++] = (char)(0xE0 | (cp >> 12));
+            out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+            out[pos++] = (char)(0x80 | (cp & 0x3F));
+        } else {
+            out[pos++] = (char)(0xF0 | (cp >> 18));
+            out[pos++] = (char)(0x80 | ((cp >> 12) & 0x3F));
+            out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+            out[pos++] = (char)(0x80 | (cp & 0x3F));
+        }
     }
+    out[pos] = '\0';
+}
+
+/* The script (UTF-8) that the command runs inside the error-reporting wrapper */
+static void require_ps_script(const char *command, const char *script)
+{
+    static char decoded[HOST_MAX_COMMAND_LEN * 2];
+    static char expected[HOST_MAX_COMMAND_LEN * 2];
+
+    decode_ps_command(command, decoded, sizeof(decoded));
+    snprintf(expected, sizeof(expected), "%s%s%s", HOST_PS_TRY, script, HOST_PS_CATCH);
+    require_string(decoded, expected, "decoded PowerShell script");
 }
 
 static void test_ps_quoting(void)
@@ -418,6 +463,62 @@ static void test_ps_quoting(void)
     dest[0] = '\0';
     require(!host_append_ps_quoted(dest, 4, "long text"),
             "small powershell quote buffer should fail");
+}
+
+static void test_ps_encoding(void)
+{
+    char dest[64];
+    char out[64];
+    char command[HOST_MAX_COMMAND_LEN];
+    static char decoded[HOST_MAX_COMMAND_LEN * 2];
+
+    /* guest text and NativeDosOp paths are ISO-8859-1 and become UTF-8 in the script */
+    dest[0] = '\0';
+    require(host_append_ps_quoted(dest, sizeof(dest), "caf\xE9 \xFF's"),
+            "guest text should quote");
+    require_string(dest, "'caf\xC3\xA9 \xC3\xBF''s'", "guest text should become UTF-8");
+
+    dest[0] = '\0';
+    require(!host_append_ps_quoted(dest, 5, "caf\xE9"),
+            "guest text that expands past the buffer should fail");
+    require_string(dest, "", "failed quoting should leave the buffer unchanged");
+
+    /* UTF-8 to UTF-16LE, including a surrogate pair */
+    require(host_base64_encode_utf16le("\xC3\xA9", out, sizeof(out)), "e acute should encode");
+    require_string(out, "6QA=", "U+00E9 is E9 00");
+    require(host_base64_encode_utf16le("\xE2\x82\xAC", out, sizeof(out)), "euro should encode");
+    require_string(out, "rCA=", "U+20AC is AC 20");
+    require(host_base64_encode_utf16le("\xF0\x9F\x98\x80", out, sizeof(out)),
+            "astral character should encode");
+    require_string(out, "PdgA3g==", "U+1F600 is D83D DE00");
+    require(!host_base64_encode_utf16le("caf\xE9", out, sizeof(out)),
+            "ISO-8859-1 bytes are not valid UTF-8 and must not be encoded");
+    require(!host_base64_encode_utf16le("\xE0\x80\x80", out, sizeof(out)) &&
+            !host_base64_encode_utf16le("\xED\xA0\x80", out, sizeof(out)) &&
+            !host_base64_encode_utf16le("\xE2\x82", out, sizeof(out)),
+            "overlong, surrogate and truncated sequences should be rejected");
+
+    /* the whole script survives the round trip and is wrapped to report errors */
+    command[0] = '\0';
+    require(host_append_ps_encoded_command(command, sizeof(command),
+                                           "'caf\xC3\xA9 \xCE\xB1 \xF0\x9F\x98\x80'"),
+            "non-ASCII script should encode");
+    decode_ps_command(command, decoded, sizeof(decoded));
+    require_string(decoded,
+                   "try{'caf\xC3\xA9 \xCE\xB1 \xF0\x9F\x98\x80'}catch{"
+                   "[Console]::OutputEncoding=[Text.Encoding]::GetEncoding(28591);"
+                   "[Console]::Out.WriteLine($_.Exception.Message);exit 1}",
+                   "script should be wrapped and survive UTF-16 encoding");
+
+    command[0] = '\0';
+    require(!host_append_ps_encoded_command(command, sizeof(command), "'caf\xE9'"),
+            "a script with invalid UTF-8 must be rejected, not garbled");
+
+    /* existing builders keep their call sites: guest text still reaches PowerShell intact */
+    command[0] = '\0';
+    require(host_append_clip_copy_command_windows(command, sizeof(command), "caf\xE9 \xDF"),
+            "windows copy of ISO-8859-1 text should build");
+    require_ps_script(command, "Set-Clipboard -Value 'caf\xC3\xA9 \xC3\x9F'");
 }
 
 static void test_windows_clip_commands(void)
@@ -443,8 +544,27 @@ static void test_windows_reveal_command(void)
     require(host_append_reveal_command_windows(command, sizeof(command),
                                                "C:\\My Files\\disk.adf"),
             "windows reveal command should build");
-    require(strcmp(command, "explorer /select,\"C:\\My Files\\disk.adf\" & exit 0") == 0,
-            "windows reveal command should select the file and mask explorer's exit code");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'explorer.exe' "
+                      "-ArgumentList '/select,\"C:\\My Files\\disk.adf\"'");
+    require(strstr(command, "explorer /select") == NULL,
+            "windows reveal must not go through cmd.exe");
+
+    /* a percent sign is data now, not an environment variable; the ISO-8859-1
+     * path (as NativeDosOp returns it) reaches PowerShell as UTF-8 */
+    command[0] = '\0';
+    require(host_append_reveal_command_windows(command, sizeof(command),
+                                               "C:\\Files\\%USERNAME% caf\xE9 \xDF.txt"),
+            "windows reveal command should keep percent signs and accents");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'explorer.exe' "
+                      "-ArgumentList '/select,\"C:\\Files\\%USERNAME% caf\xC3\xA9 \xC3\x9F.txt\"'");
+
+    command[0] = '\0';
+    require(!host_append_reveal_command_windows(command, sizeof(command), "C:\\a\"b.txt"),
+            "windows reveal should reject a quote in the path");
 }
 
 static void test_windows_info_command(void)
@@ -608,10 +728,10 @@ static void test_windows_notify_command(void)
                       ".Show([Windows.UI.Notifications.ToastNotification]::new($x))");
 
     /* the size limit quoted in host-notify's error message */
-    memset(message, 'm', 880);
+    memset(message, 'm', 840);
     command[0] = '\0';
     require(host_append_notify_command_windows(command, sizeof(command), "Amiga", message),
-            "windows notify command should fit about 900 characters");
+            "windows notify command should fit about 850 characters");
     memset(message, 'm', sizeof(message) - 1);
     message[sizeof(message) - 1] = '\0';
     command[0] = '\0';
@@ -622,6 +742,15 @@ static void test_windows_notify_command(void)
 static void test_windows_edit_command(void)
 {
     char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_edit_command_windows(command, sizeof(command),
+                                             "C:\\Users\\Jos\xE9\\\xDF b.txt"),
+            "windows edit command should build for an ISO-8859-1 path");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'notepad.exe' "
+                      "-ArgumentList '\"C:\\Users\\Jos\xC3\xA9\\\xC3\x9F b.txt\"'");
 
     command[0] = '\0';
     require(host_append_edit_command_windows(command, sizeof(command),
@@ -642,6 +771,14 @@ static void test_windows_edit_command(void)
 static void test_windows_multiview_command(void)
 {
     char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_multiview_command_windows(command, sizeof(command),
+                                                  "C:\\Users\\Jos\xE9\\\xDF it's.png"),
+            "windows multiview command should build for an ISO-8859-1 path");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'C:\\Users\\Jos\xC3\xA9\\\xC3\x9F it''s.png'");
 
     command[0] = '\0';
     require(host_append_multiview_command_windows(command, sizeof(command),
@@ -666,25 +803,234 @@ static void test_windows_run_command(void)
     char arguments[256];
 
     command[0] = '\0';
-    require(host_append_run_command_windows(command, sizeof(command), "C:\\Tools\\app.exe", ""),
+    require(host_append_run_command_windows(command, sizeof(command), "C:\\Tools\\app.exe", "", 1),
             "windows run command without arguments should build");
     require_ps_script(command,
                       "$ErrorActionPreference='Stop';"
                       "Start-Process -FilePath 'C:\\Tools\\app.exe'");
 
     arguments[0] = '\0';
-    require(host_append_cmdline_arg(arguments, sizeof(arguments), "-f", 0) &&
-            host_append_cmdline_arg(arguments, sizeof(arguments), "C:\\My Files\\a.txt", 1) &&
-            host_append_cmdline_arg(arguments, sizeof(arguments), "it's \"x\"", 1) &&
-            host_append_cmdline_arg(arguments, sizeof(arguments), "", 1),
+    require(host_append_cmd_word(arguments, sizeof(arguments), "-f", 0) &&
+            host_append_cmd_word(arguments, sizeof(arguments), "C:\\My Files\\a.txt", 1) &&
+            host_append_cmd_word(arguments, sizeof(arguments), "it's & more", 1) &&
+            host_append_cmd_word(arguments, sizeof(arguments), "", 1),
             "windows run arguments should build");
     command[0] = '\0';
-    require(host_append_run_command_windows(command, sizeof(command), "notepad", arguments),
+    require(host_append_run_command_windows(command, sizeof(command), "notepad", arguments, 1),
             "windows run command with arguments should build");
     require_ps_script(command,
                       "$ErrorActionPreference='Stop';"
                       "Start-Process -FilePath 'notepad' -ArgumentList "
-                      "'-f \"C:\\My Files\\a.txt\" \"it''s \\\"x\\\"\" \"\"'");
+                      "'-f \"C:\\My Files\\a.txt\" \"it''s & more\" \"\"'");
+
+    /* native paths are ISO-8859-1, like guest text, and reach the script as UTF-8 */
+    command[0] = '\0';
+    require(host_append_run_command_windows(command, sizeof(command),
+                                            "C:\\Users\\Jos\xE9\\\xDF.exe", "x", 1),
+            "windows run command with an ISO-8859-1 path should build");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'C:\\Users\\Jos\xC3\xA9\\\xC3\x9F.exe' "
+                      "-ArgumentList 'x'");
+
+    /* arguments cmd.exe cannot carry: native programs run, batch files are refused */
+    arguments[0] = '\0';
+    require(host_append_cmdline_arg(arguments, sizeof(arguments), "say \"hi\"", 0) &&
+            host_append_cmdline_arg(arguments, sizeof(arguments), "100%", 1),
+            "C runtime arguments should build");
+    command[0] = '\0';
+    require(host_append_run_command_windows(command, sizeof(command), "C:\\Tools\\test.cmd",
+                                            arguments, 0),
+            "unsafe batch arguments should still build a guarded script");
+    {
+        static char decoded[HOST_MAX_COMMAND_LEN * 2];
+
+        decode_ps_command(command, decoded, sizeof(decoded));
+        require_contains(decoded, "$f='C:\\Tools\\test.cmd';");
+        require_contains(decoded, "[IO.Path]::GetExtension($f)");
+        require_contains(decoded, "Get-Command -Name $f -CommandType Application");
+        require_contains(decoded, "if($e -match '^\\.(bat|cmd)$'){throw ");
+        require_contains(decoded, "Start-Process -FilePath $f -ArgumentList "
+                                  "'\"say \\\"hi\\\"\" 100%'");
+    }
+}
+
+/*
+ * The run arguments host-run builds for a batch file must keep cmd.exe
+ * from seeing an operator: the old code used C runtime quoting, which
+ * leaves & unquoted.
+ */
+static void test_windows_run_batch_arguments(void)
+{
+    char arguments[256];
+    char crt[256];
+
+    arguments[0] = '\0';
+    crt[0] = '\0';
+    require(host_append_cmd_word(arguments, sizeof(arguments), "x&calc.exe", 0) &&
+            host_append_cmdline_arg(crt, sizeof(crt), "x&calc.exe", 0),
+            "operator argument should build");
+    require_string(arguments, "\"x&calc.exe\"", "cmd.exe words must quote an ampersand");
+    require_string(crt, "x&calc.exe", "C runtime quoting leaves the ampersand bare");
+
+    arguments[0] = '\0';
+    require(host_append_cmd_word(arguments, sizeof(arguments), "a|b<c>d^e(f)", 0),
+            "all cmd.exe operators should be quotable");
+    require_string(arguments, "\"a|b<c>d^e(f)\"", "cmd.exe operators need quotes");
+
+    arguments[0] = '\0';
+    require(!host_append_cmd_word(arguments, sizeof(arguments), "100%", 0) &&
+            !host_append_cmd_word(arguments, sizeof(arguments), "say \"hi\"", 0) &&
+            !host_append_cmd_word(arguments, sizeof(arguments), "a\nb", 0),
+            "percent signs, quotes and line breaks cannot be passed to a batch file");
+    require_string(arguments, "", "a rejected word leaves the buffer unchanged");
+
+    strcpy(arguments, "ab");
+    require(!host_append_cmd_word(arguments, 6, "c d e f", 1),
+            "a word that does not fit should fail");
+    require_string(arguments, "ab", "a word that does not fit leaves the buffer unchanged");
+}
+
+static void test_posix_run_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_run_command(command, sizeof(command), "ls", " -l 'My Files'"),
+            "posix run command should build");
+    require_contains(command, "p=ls; case $p in */*) [ -f \"$p\" ] && [ -x \"$p\" ];;");
+    require_contains(command, "*) command -v -- \"$p\" >/dev/null 2>&1;; esac || ");
+    require_contains(command, "Command not found on host: %s");
+    require_contains(command, "exit 127");
+    require_contains(command, "( \"$p\" -l 'My Files' >/dev/null 2>&1 </dev/null & ); exit 0");
+    require_shell_syntax(command);
+
+    command[0] = '\0';
+    require(!host_append_run_command(command, 20, "ls", ""),
+            "small posix run buffer should fail");
+}
+
+/* Run script under sh and capture its output and exit status */
+static int run_script(const char *script, char *output, size_t output_size)
+{
+    char wrapped[HOST_MAX_COMMAND_LEN * 2];
+    FILE *pipe;
+    size_t len;
+    int status;
+
+    wrapped[0] = '\0';
+    require(host_append_literal(wrapped, sizeof(wrapped), "sh -c ") &&
+            host_append_shell_arg(wrapped, sizeof(wrapped), script, 0),
+            "script wrapper should fit");
+    pipe = popen(wrapped, "r");
+    require(pipe != NULL, "script should start");
+    len = fread(output, 1, output_size - 1, pipe);
+    output[len] = '\0';
+    status = pclose(pipe);
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
+static int wait_for_file(const char *path, char *contents, size_t size)
+{
+    for (int i = 0; i < 50; i++) {
+        FILE *f = fopen(path, "r");
+
+        if (f != NULL) {
+            size_t len = fread(contents, 1, size - 1, f);
+
+            fclose(f);
+            if (len > 0 && contents[len - 1] == '\n') {
+                contents[len] = '\0';
+                return 1;
+            }
+        }
+        {
+            struct timespec pause = { 0, 100000000L };
+
+            nanosleep(&pause, NULL);
+        }
+    }
+    return 0;
+}
+
+static void test_posix_run_behavior(void)
+{
+    char dir[] = "/tmp/host-tools-run.XXXXXX";
+    char out_path[256];
+    char program[512];
+    char arguments[512];
+    char command[HOST_MAX_COMMAND_LEN];
+    char output[256];
+    char contents[256];
+    struct timespec start;
+    struct timespec end;
+    double elapsed;
+
+    require(mkdtemp(dir) != NULL, "temp dir should be created");
+    snprintf(out_path, sizeof(out_path), "%s/out", dir);
+
+    /* a missing program is reported, not silently accepted (it used to return 0) */
+    command[0] = '\0';
+    require(host_append_run_command(command, sizeof(command), "definitely-not-installed-xyz", ""),
+            "missing program command should build");
+    require(run_script(command, output, sizeof(output)) == 127,
+            "a missing program should exit 127");
+    require_contains(output, "Command not found on host: definitely-not-installed-xyz");
+
+    command[0] = '\0';
+    require(host_append_run_command(command, sizeof(command), "/nonexistent/dir/prog", ""),
+            "missing path command should build");
+    require(run_script(command, output, sizeof(output)) == 127,
+            "a missing program path should exit 127");
+
+    /* dash's command -v accepts any existing path: a directory or plain file must not pass */
+    command[0] = '\0';
+    require(host_append_run_command(command, sizeof(command), dir, ""),
+            "directory command should build");
+    require(run_script(command, output, sizeof(output)) == 127,
+            "a directory is not a program");
+    snprintf(out_path, sizeof(out_path), "%s/plain", dir);
+    {
+        FILE *plain = fopen(out_path, "w");
+
+        require(plain != NULL, "plain file should be created");
+        fputs("data\n", plain);
+        fclose(plain);
+    }
+    command[0] = '\0';
+    require(host_append_run_command(command, sizeof(command), out_path, ""),
+            "plain file command should build");
+    require(run_script(command, output, sizeof(output)) == 127,
+            "a file without the executable bit is not a program");
+    snprintf(out_path, sizeof(out_path), "%s/out", dir);
+
+    /* the program gets its arguments verbatim and runs detached from the script */
+    program[0] = '\0';
+    arguments[0] = '\0';
+    require(host_append_shell_arg(program, sizeof(program), "/bin/sh", 0) &&
+            host_append_shell_arg(arguments, sizeof(arguments), "-c", 1) &&
+            host_append_shell_arg(arguments, sizeof(arguments),
+                                  "printf '%s|%s|%s\\n' \"$0\" \"$1\" \"$2\" > \"$3\"; sleep 5", 1) &&
+            host_append_shell_arg(arguments, sizeof(arguments), "a b", 1) &&
+            host_append_shell_arg(arguments, sizeof(arguments), "it's $HOME", 1) &&
+            host_append_shell_arg(arguments, sizeof(arguments), "", 1) &&
+            host_append_shell_arg(arguments, sizeof(arguments), out_path, 1),
+            "program words should build");
+    command[0] = '\0';
+    require(host_append_run_command(command, sizeof(command), program, arguments),
+            "detached run command should build");
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    require(run_script(command, output, sizeof(output)) == 0,
+            "a program that exists should be started with exit 0");
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    elapsed = (double)(end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / 1e9;
+    require(elapsed < 3.0,
+            "the script must end when the program is started, not when it quits");
+    require_string(output, "", "a started program must not print into the session");
+    require(wait_for_file(out_path, contents, sizeof(contents)),
+            "the started program should run");
+    require_string(contents, "a b|it's $HOME|\n", "arguments should reach the program as written");
 }
 
 static void test_windows_shell_command(void)
@@ -786,6 +1132,7 @@ int main(void)
     test_shell_login_explicit_command();
     test_shell_login_command_limit();
     test_ps_quoting();
+    test_ps_encoding();
     test_windows_clip_commands();
     test_windows_reveal_command();
     test_windows_info_command();
@@ -795,6 +1142,9 @@ int main(void)
     test_windows_edit_command();
     test_windows_multiview_command();
     test_windows_run_command();
+    test_windows_run_batch_arguments();
+    test_posix_run_command();
+    test_posix_run_behavior();
     test_windows_shell_command();
     test_small_buffer_failures();
     return 0;

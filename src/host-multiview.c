@@ -23,9 +23,21 @@ static int print_usage(void)
 int main(int argc, char *argv[])
 {
     static char filename[HOST_MAX_PATH_LEN];
+    static char utf8[HOST_MAX_PATH_LEN * 2];
     static char command[HOST_MAX_COMMAND_LEN];
     int status = 0;
     int windows_host;
+
+    if (argc >= 2 && strcmp(argv[1], "?") == 0)
+    {
+        if (argc > 2)
+        {
+            printf("Unexpected argument after ?\n");
+            print_usage();
+            return HOST_RETURN_ERROR;
+        }
+        return print_usage();
+    }
 
     if (!InitUAEResource())
     {
@@ -40,17 +52,12 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
-    if (strcmp(argv[1], "?") == 0)
-    {
-        return print_usage();
-    }
-
     windows_host = (GetHostPlatform() == HOST_PLATFORM_WINDOWS);
 
     /* Iterate through all arguments and request the host to view them */
     for (int i = 1; i < argc; i++)
     {
-        char *target = argv[i];
+        const char *target = argv[i];
 
         if (argv[i][0] == '\0') {
             printf("Empty filename or URL argument\n");
@@ -58,9 +65,9 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        int path_status = host_resolve_optional_path(argv[i], filename, sizeof(filename),
-                                                     (const char **)&target);
-        if (path_status != HOST_PATH_OK) {
+        int path_status = host_resolve_path(HOST_PATH_MODE_FILE, argv[i], filename,
+                                            sizeof(filename), &target);
+        if (!host_path_usable(path_status)) {
             printf("%s: %s\n", host_path_error(path_status), argv[i]);
             status = HOST_RETURN_ERROR;
             continue;
@@ -75,6 +82,13 @@ int main(int argc, char *argv[])
                 printf("Failed to open on host: %s\n", argv[i]);
                 status = HOST_RETURN_ERROR;
             }
+            continue;
+        }
+
+        /* POSIX hosts want UTF-8; the Amiga side is ISO-8859-1 */
+        if (!host_path_to_utf8_target(utf8, sizeof(utf8), &target)) {
+            printf("Command is too long\n");
+            status = HOST_RETURN_ERROR;
             continue;
         }
 

@@ -82,49 +82,134 @@ static inline long host_base64_feed(struct host_base64_state *st,
 }
 
 /*
- * Base64 encode the UTF-16LE expansion of ISO-8859-1 text, as used by
- * PowerShell's -EncodedCommand. ISO-8859-1 code points map directly to
- * U+0000..U+00FF, so each input byte becomes the byte pair (c, 0x00).
- * Returns 0 when the output buffer is too small.
+ * Decode the next UTF-8 sequence of text into a code point. Returns the
+ * sequence length, or 0 for malformed input (stray continuation byte,
+ * truncated, overlong or surrogate sequence, or a value above U+10FFFF).
+ */
+static inline int host_utf8_decode(const unsigned char *text, unsigned long *code_point)
+{
+    unsigned long cp;
+    int extra;
+
+    if (text[0] < 0x80) {
+        *code_point = text[0];
+        return 1;
+    }
+    if (text[0] >= 0xC2 && text[0] <= 0xDF) {
+        cp = text[0] & 0x1F;
+        extra = 1;
+    } else if (text[0] >= 0xE0 && text[0] <= 0xEF) {
+        cp = text[0] & 0x0F;
+        extra = 2;
+    } else if (text[0] >= 0xF0 && text[0] <= 0xF4) {
+        cp = text[0] & 0x07;
+        extra = 3;
+    } else {
+        return 0;
+    }
+
+    for (int i = 1; i <= extra; i++) {
+        if ((text[i] & 0xC0) != 0x80) {
+            return 0;
+        }
+        cp = (cp << 6) | (text[i] & 0x3F);
+    }
+
+    if ((extra == 2 && cp < 0x800) || (extra == 3 && cp < 0x10000) ||
+        (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF) {
+        return 0;
+    }
+
+    *code_point = cp;
+    return extra + 1;
+}
+
+struct host_base64_encoder {
+    char *out;
+    size_t out_size;
+    size_t pos;
+    unsigned char group[3];
+    int fill;
+};
+
+static inline int host_base64_put_byte(struct host_base64_encoder *enc, unsigned char value)
+{
+    static const char alphabet[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    enc->group[enc->fill++] = value;
+    if (enc->fill == 3) {
+        if (enc->pos + 4 >= enc->out_size) {
+            return 0;
+        }
+        enc->out[enc->pos++] = alphabet[enc->group[0] >> 2];
+        enc->out[enc->pos++] = alphabet[((enc->group[0] & 0x03) << 4) | (enc->group[1] >> 4)];
+        enc->out[enc->pos++] = alphabet[((enc->group[1] & 0x0f) << 2) | (enc->group[2] >> 6)];
+        enc->out[enc->pos++] = alphabet[enc->group[2] & 0x3f];
+        enc->fill = 0;
+    }
+    return 1;
+}
+
+static inline int host_base64_put_utf16(struct host_base64_encoder *enc, unsigned long unit)
+{
+    return host_base64_put_byte(enc, (unsigned char)(unit & 0xff)) &&
+           host_base64_put_byte(enc, (unsigned char)(unit >> 8));
+}
+
+/*
+ * Base64 encode the UTF-16LE form of UTF-8 text, as used by PowerShell's
+ * -EncodedCommand. Returns 0 when the text is not valid UTF-8 or the
+ * output buffer is too small.
  */
 static inline int host_base64_encode_utf16le(const char *text, char *out, size_t out_size)
 {
     static const char alphabet[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    size_t len = strlen(text);
-    size_t pos = 0;
-    unsigned char group[3];
-    int fill = 0;
+    struct host_base64_encoder enc;
+    const unsigned char *p = (const unsigned char *)text;
 
-    for (size_t i = 0; i < len * 2; i++) {
-        group[fill++] = (i & 1) ? 0 : (unsigned char)text[i / 2];
-        if (fill == 3) {
-            if (pos + 4 >= out_size) {
-                return 0;
-            }
-            out[pos++] = alphabet[group[0] >> 2];
-            out[pos++] = alphabet[((group[0] & 0x03) << 4) | (group[1] >> 4)];
-            out[pos++] = alphabet[((group[1] & 0x0f) << 2) | (group[2] >> 6)];
-            out[pos++] = alphabet[group[2] & 0x3f];
-            fill = 0;
-        }
-    }
+    enc.out = out;
+    enc.out_size = out_size;
+    enc.pos = 0;
+    enc.fill = 0;
 
-    if (fill > 0) {
-        if (pos + 4 >= out_size) {
+    while (*p) {
+        unsigned long cp;
+        int len = host_utf8_decode(p, &cp);
+
+        if (len == 0) {
             return 0;
         }
-        group[fill] = 0;
-        out[pos++] = alphabet[group[0] >> 2];
-        out[pos++] = alphabet[((group[0] & 0x03) << 4) | (group[1] >> 4)];
-        out[pos++] = (fill == 2) ? alphabet[(group[1] & 0x0f) << 2] : '=';
-        out[pos++] = '=';
+        p += len;
+        if (cp >= 0x10000) {
+            cp -= 0x10000;
+            if (!host_base64_put_utf16(&enc, 0xD800 + (cp >> 10)) ||
+                !host_base64_put_utf16(&enc, 0xDC00 + (cp & 0x3FF))) {
+                return 0;
+            }
+        } else if (!host_base64_put_utf16(&enc, cp)) {
+            return 0;
+        }
     }
 
-    if (pos >= out_size) {
+    if (enc.fill > 0) {
+        int fill = enc.fill;
+
+        if (enc.pos + 4 >= out_size) {
+            return 0;
+        }
+        enc.group[fill] = 0;
+        out[enc.pos++] = alphabet[enc.group[0] >> 2];
+        out[enc.pos++] = alphabet[((enc.group[0] & 0x03) << 4) | (enc.group[1] >> 4)];
+        out[enc.pos++] = (fill == 2) ? alphabet[(enc.group[1] & 0x0f) << 2] : '=';
+        out[enc.pos++] = '=';
+    }
+
+    if (enc.pos >= out_size) {
         return 0;
     }
-    out[pos] = '\0';
+    out[enc.pos] = '\0';
     return 1;
 }
 

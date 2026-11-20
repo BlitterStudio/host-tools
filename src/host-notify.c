@@ -29,6 +29,17 @@ int main(int argc, char *argv[])
     host_append_literal(title, sizeof(title), "Amiga");
     message[0] = '\0';
 
+    if (argc >= 2 && strcmp(argv[1], "?") == 0)
+    {
+        if (argc > 2)
+        {
+            printf("Unexpected argument after ?\n");
+            print_usage();
+            return HOST_RETURN_ERROR;
+        }
+        return print_usage();
+    }
+
     if (!InitUAEResource())
     {
         printf("UAEResource not found!\n");
@@ -40,11 +51,6 @@ int main(int argc, char *argv[])
         printf("Missing message argument\n");
         print_usage();
         return HOST_RETURN_ERROR;
-    }
-
-    if (strcmp(argv[1], "?") == 0)
-    {
-        return print_usage();
     }
 
     if (argc == 2) {
@@ -66,9 +72,9 @@ int main(int argc, char *argv[])
     }
 
     if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {
-        /* the script travels base64-encoded, which leaves room for about 1000 characters */
+        /* the script travels base64-encoded, which leaves room for about 870 characters of title and message together */
         if (!host_append_notify_command_windows(command, sizeof(command), title, message)) {
-            printf("Title and message are too long for a Windows host (limit about 900 characters together)\n");
+            printf("Title and message are too long for a Windows host (limit about 850 characters together)\n");
             return HOST_RETURN_ERROR;
         }
     } else if (!host_append_notify_command(command, sizeof(command), title, message)) {

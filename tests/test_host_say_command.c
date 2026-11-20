@@ -6,7 +6,6 @@
 #define _POSIX_C_SOURCE 200809L
 #define _DARWIN_C_SOURCE
 
-#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,8 +84,8 @@ static void remove_stubs(void)
 
     /* the stubs live in a directory that holds nothing else of value */
     snprintf(command, sizeof(command),
-             "rm -f '%s'/say '%s'/spd-say '%s'/espeak-ng '%s'/espeak '%s'/args '%s'/stdin '%s'/spd-say.pid",
-             workdir, workdir, workdir, workdir, workdir, workdir, workdir);
+             "rm -f '%s'/say '%s'/spd-say '%s'/espeak-ng '%s'/espeak '%s'/args '%s'/stdin '%s'/spd-say.pid '%s'/spd-say.term '%s'/spd-say.cancel",
+             workdir, workdir, workdir, workdir, workdir, workdir, workdir, workdir, workdir);
     require(system(command) == 0, "stubs should be removed");
 }
 
@@ -262,17 +261,39 @@ static void test_latin1_text_becomes_utf8(void)
                    "ISO-8859-1 text should reach the program as UTF-8");
 }
 
+static void wait_for_file(const char *name)
+{
+    char path[512];
+
+    path_in(path, sizeof(path), name);
+    for (int i = 0; i < 100; i++) {
+        struct timespec pause = { 0, 50 * 1000 * 1000 };
+
+        if (access(path, F_OK) == 0) {
+            return;
+        }
+        nanosleep(&pause, NULL);
+    }
+    require(0, "an expected test file did not appear");
+}
+
+/*
+ * Closing a session sends SIGTERM to the shell. The stub spd-say records
+ * the SIGTERM it receives in a marker file, which holds whether or not
+ * the stopped process is reaped, and a second "spd-say -C" call marks
+ * the cancel request to the speech server.
+ */
 static void test_session_close_stops_speech(void)
 {
     char command[HOST_MAX_COMMAND_LEN];
-    char pidpath[512];
     pid_t shell;
-    pid_t speech = 0;
     int status;
 
     remove_stubs();
     write_file("spd-say",
                "#!/bin/sh\n"
+               "if [ \"$1\" = -C ]; then : > \"$0.cancel\"; exit 0; fi\n"
+               "trap ': > \"$0.term\"; exit 0' TERM\n"
                "echo $$ > \"$0.pid\"\n"
                "while :; do sleep 1; done\n", 1);
     command[0] = '\0';
@@ -287,32 +308,15 @@ static void test_session_close_stops_speech(void)
         _exit(126);
     }
 
-    path_in(pidpath, sizeof(pidpath), "spd-say.pid");
-    for (int i = 0; i < 100 && speech == 0; i++) {
-        FILE *f = fopen(pidpath, "r");
-        if (f != NULL) {
-            int value = 0;
-            if (fscanf(f, "%d", &value) == 1) {
-                speech = (pid_t)value;
-            }
-            fclose(f);
-        }
-        if (speech == 0) {
-            struct timespec pause = { 0, 50 * 1000 * 1000 };
-            nanosleep(&pause, NULL);
-        }
-    }
-    require(speech > 0, "the speech stub should start");
+    wait_for_file("spd-say.pid");
 
     /* what Amiberry does when the guest closes a session */
     require(kill(shell, SIGTERM) == 0, "SIGTERM should reach the shell");
     require(waitpid(shell, &status, 0) == shell, "the shell should end");
+    require(WIFEXITED(status) && WEXITSTATUS(status) == 1, "the trap should end the shell with status 1");
 
-    for (int i = 0; i < 100 && kill(speech, 0) == 0; i++) {
-        struct timespec pause = { 0, 50 * 1000 * 1000 };
-        nanosleep(&pause, NULL);
-    }
-    require(kill(speech, 0) != 0 && errno == ESRCH, "the speech program should stop with the shell");
+    wait_for_file("spd-say.term");
+    wait_for_file("spd-say.cancel");
 }
 
 /* ---- Windows script ---- */

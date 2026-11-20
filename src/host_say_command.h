@@ -20,15 +20,17 @@
  * The speech program runs in the background and the shell waits for it.
  * Closing the session sends SIGTERM to the shell only; the trap passes
  * it on, so the speech stops with the session instead of finishing.
+ * Speech Dispatcher keeps speaking a message after its client is gone,
+ * so with spd-say the trap also cancels the queue with "spd-say -C".
  */
 #define HOST_SAY_POSIX_CONVERT \
     "; if command -v iconv >/dev/null 2>&1; then" \
     " t=$(printf %s \"$t\" | iconv -f ISO-8859-1 -t UTF-8 2>/dev/null || printf %s \"$t\"); fi" \
-    "; trap 'kill $p 2>/dev/null; exit 1' 1 2 15"
+    "; c=; trap 'kill $p 2>/dev/null; if [ -n \"$c\" ]; then spd-say -C >/dev/null 2>&1; fi; exit 1' 1 2 15"
 
 #define HOST_SAY_POSIX_RUN \
     "; if command -v say >/dev/null 2>&1; then printf %s \"$t\" | say -f - &" \
-    " elif command -v spd-say >/dev/null 2>&1; then spd-say -w -- \"$t\" &" \
+    " elif command -v spd-say >/dev/null 2>&1; then c=1; spd-say -w -- \"$t\" &" \
     " elif command -v espeak-ng >/dev/null 2>&1; then espeak-ng -- \"$t\" &" \
     " elif command -v espeak >/dev/null 2>&1; then espeak -- \"$t\" &" \
     " else printf 'No host speech program found (say, spd-say, espeak-ng or espeak)\\n'; exit 127; fi" \

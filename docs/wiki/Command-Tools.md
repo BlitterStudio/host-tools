@@ -5,9 +5,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Command tools
 
-Run these commands in an AmigaOS CLI under Amiberry with **Native Code** enabled (`host-quit` needs only `uae.resource`). The installer copies all 12 to `C:` when you select the command tools component. Type `?` after a command for its built-in usage help.
+Run these commands in an AmigaOS CLI under Amiberry with **Native Code** enabled (`host-quit` needs only `uae.resource`). The installer copies them all to `C:` when you select the command tools component. Type `?` after a command for its built-in usage help.
 
-All 12 commands work on Linux, macOS and Windows hosts. `host-shell` on Windows needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later. The others need a current Amiberry.
+All commands work on Linux, macOS and Windows hosts. `host-shell` on Windows needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later. The others need a current Amiberry.
 
 Where a command takes file arguments, existing Amiga paths are translated to host paths. A host application cannot normally open a file that exists only inside an unmapped hardfile.
 

@@ -5,13 +5,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Host-Tools
 
-A classic AmigaOS 68k package for [Amiberry](https://github.com/BlitterStudio/amiberry). It has 12 command-line tools that talk to the host operating system (Linux, macOS or Windows), two AHI audio drivers, and an MHI MP3 decoder library. The tools and drivers run inside Amiberry.
+A classic AmigaOS 68k package for [Amiberry](https://github.com/BlitterStudio/amiberry). It has command-line tools that talk to the host operating system (Linux, macOS or Windows), two AHI audio drivers, and an MHI MP3 decoder library. The tools and drivers run inside Amiberry.
 
 ## What's included
 
 | Component | What it does | Installed location |
 | --- | --- | --- |
-| 12 command tools | Run commands on the host, open a host shell, open or edit files and URLs, show files in the host file manager, send notifications, use the host clipboard and environment, download files, quit Amiberry | `C:` |
+| Command tools | Run commands on the host, open a host shell, open or edit files and URLs, show files in the host file manager, send notifications, use the host clipboard and environment, download files, quit Amiberry | `C:` |
 | UAE AHI driver | Classic UAE 16-bit stereo AHI output | `DEVS:AHI/uae.audio`, `DEVS:AudioModes/UAE` |
 | UAESND AHI driver | AHI output through Amiberry's UAESND sound board | `DEVS:AHI/uaesnd.audio`, `DEVS:AudioModes/UAESND` |
 | UAE MHI MP3 decoder | Offloads MP3 decoding to Amiberry | `LIBS:MHI/mhiuae.library` |
@@ -24,7 +24,7 @@ For details, see the [command reference](https://github.com/BlitterStudio/host-t
 ## Requirements
 
 -   Amiberry v6.0 or newer, or a build with the `uae.resource`/`uaelib` support the tools use. Enable **Native Code** execution in the Amiberry settings for the command tools and the MHI library. `host-quit` is the exception: it needs only `uae.resource`. The UAESND AHI driver also needs the UAESND sound board enabled.
--   All 12 command tools work on Linux, macOS and Windows hosts. The audio components use Amiberry's emulated interfaces and do not depend on the host system.
+-   All command tools work on Linux, macOS and Windows hosts. The audio components use Amiberry's emulated interfaces and do not depend on the host system.
 -   On Windows, `host-shell` needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later, which provides the ConPTY pseudo console. The other command tools need a current Amiberry.
 
 ## Exit codes

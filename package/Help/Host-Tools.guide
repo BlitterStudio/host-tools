@@ -4,7 +4,7 @@
 @wordwrap
 
 @node Main "Host-Tools"
-Host-Tools is a classic AmigaOS 68k package for Amiberry. It has 12 command-line tools that talk to the host operating system, two optional AHI audio drivers, an MHI MP3 decoder, and this guide.
+Host-Tools is a classic AmigaOS 68k package for Amiberry. It has command-line tools that talk to the host operating system, two optional AHI audio drivers, an MHI MP3 decoder, and this guide.
 
 Choose a topic:
 
@@ -18,7 +18,7 @@ Choose a topic:
 @endnode
 
 @node Commands "Command Tools"
-Select "Command tools" in the installer to copy all 12 programs to C:. All 12 work on Linux, macOS and Windows hosts. The only extra requirement is for host-shell on Windows, which needs Amiberry 8.6.0 or newer (see Installation Notes). Type ? after a command for usage help.
+Select "Command tools" in the installer to copy the programs to C:. They all work on Linux, macOS and Windows hosts. The only extra requirement is for host-shell on Windows, which needs Amiberry 8.6.0 or newer (see Installation Notes). Type ? after a command for usage help.
 
 @{"host-run" link HostRun} runs a command on the host.
 @{"host-multiview" link HostMultiView} opens files or URLs with the host default application.

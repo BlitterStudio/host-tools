@@ -297,11 +297,13 @@ Options use the names from Amiberry's .uae configuration files, such as cpu_spee
 
 get prints the value Amiberry is using now, not the value in a configuration file on disk. With a * at the end, get prints option=value for every option that starts with the prefix. For example, host-config get floppy* lists the floppy options. An option that does not exist prints "Unknown option" and returns 10.
 
-set sends the option with the rest of the line as its value, joined with single spaces. If the value contains a colon, slash or dot and names an existing Amiga file or directory, Amiberry gets its host path. Any other value goes through unchanged, so a host path works too. Amiberry applies the change on its next frame, so a get in the same instant can still show the old value. Amiberry decides whether an option takes effect at once or needs a reset.
+set sends the option with the rest of the line as its value, joined with single spaces. If the value contains a colon, slash or dot and names an existing Amiga file or directory, Amiberry gets its host path. A value on a mounted volume or assign that does not exist is an error. Any other value goes through unchanged, so a host path works too. Amiberry applies the change on its next frame, so a get in the same instant can still show the old value. Amiberry decides whether an option takes effect at once or needs a reset.
 
 Amiberry ignores an unknown option and still reports success, so set first checks that get can find the option. An option that is not listed prints "Unknown option" and returns 10. Amiberry answers a set with a result code and no message, so for a value it rejects host-config can only say that Amiberry did not accept it and return 10. Amiberry may also accept a value it cannot use without reporting anything, so read the option back with get.
 
-Amiberry cannot take an empty value or a value with a double quote or a control character, and host-config refuses values longer than 1024 characters. It also refuses shellexec and dbg. shellexec would run a host command without the Native Code setting that host-run needs, and dbg drives Amiberry's debugger.
+Amiberry cannot take an empty value or a value with a double quote or a control character. It copies each value into a buffer without checking the length, and the buffer is 260 characters on Windows hosts, so host-config refuses values longer than 259 characters, after a path is translated. It also refuses shellexec and dbg. shellexec would run a host command without the Native Code setting that host-run needs, and dbg drives Amiberry's debugger.
+
+Amiberry keeps one search state for all programs, so host-config and host-disk take a shared semaphore while they read the configuration. A tool that cannot get it within about five seconds reports that another host tool is reading the configuration.
 
 Examples:
 
@@ -325,9 +327,9 @@ The drive is 0 to 3 or DF0: to DF3:, in any case.
 
 Without arguments, host-disk prints one line per drive: the host path of the image in it, (empty), or (no drive) when the drive is not in Amiberry's configuration. A line ends in (not loaded) while Amiberry has an image set for the drive but no disk in it.
 
-insert takes an Amiga path or a host path. An existing Amiga path is translated to its host path. If no such Amiga path exists, the argument is used as a host path as written. Amiberry loads whatever its floppy drive accepts, such as ADF, ADZ, DMS and IPF images. The host path can be at most 255 characters.
+insert takes an Amiga path or a host path. An existing Amiga path is translated to its host path. A path on a mounted volume or assign that does not exist is an error. Any other argument, such as /home/me/disk.adf or C:\Disks\disk.adf, is used as a host path as written. Amiberry loads whatever its floppy drive accepts, such as ADF, ADZ, DMS and IPF images. The host path can be at most 255 characters.
 
-Amiberry loads the image a moment after the request, and replacing a disk takes about two seconds because Amiberry simulates the disk change. host-disk waits until the disk is in the drive, then prints "Inserted". It returns 10 if the drive is not in the configuration, if the path cannot be translated, or if the disk is still not loaded after about eight seconds. In that case it clears the image from the drive and tells you to check that the file exists on the host and is a readable image. Ctrl-C stops the wait.
+Amiberry loads the image a moment after the request. When a disk is already in the drive, host-disk ejects it first, waits about two seconds for the Amiga to notice the change, then inserts the new one. It waits until the disk is in the drive, then prints "Inserted". It returns 10 if the drive is not in the configuration, if the path cannot be translated, or if the disk is still not loaded after about eight seconds. In that case it clears the image from the drive and tells you to check that the file exists on the host and is a readable image. Ctrl-C stops the wait.
 
 eject empties the drive. Like insert, it returns 10 for a drive that is not in the configuration.
 

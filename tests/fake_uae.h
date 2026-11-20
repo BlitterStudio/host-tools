@@ -40,6 +40,9 @@
 #define FAKE_SET_LOG 8
 #define FAKE_LINE_MAX 2048
 #define FAKE_EJECT_FRAMES 100
+/* cmdlineparser copies each token into TCHAR tmp1[MAX_DPATH] without a bounds check; 260 is the smallest MAX_DPATH (Windows). */
+#define FAKE_MAX_DPATH 260
+#define FAKE_LONG_HOST_PATH 300
 
 struct fake_drive {
     int type;                    /* floppyNtype; -1 is no drive */
@@ -47,6 +50,7 @@ struct fake_drive {
     char pending[FAKE_NAME_MAX]; /* changed_prefs.floppyslots[n].df */
     int in;                      /* disk_in_dfN */
     int wait;                    /* frames until the delayed insert */
+    int eject_pending;           /* dskeject: the old disk leaves on the next frame */
 };
 
 struct fake_option {
@@ -59,6 +63,7 @@ struct fake_option {
 struct fake_file {
     const char *amiga; /* path the Amiga knows */
     const char *host;  /* its host path, NULL when Amiberry cannot map it */
+    int dir;           /* 1 for a directory */
 };
 
 /* Host files that load as disk images. */
@@ -68,14 +73,17 @@ static const char *const fake_host_images[] = {
     NULL
 };
 
+static char fake_long_host[FAKE_LONG_HOST_PATH + 1];
+
 static struct fake_file fake_files[] = {
-    { "Work:disks/good.adf", "/host/disks/good.adf" },
-    { "Work:disks/with space.adf", "/host/disks/with space.adf" },
-    { "Work:disks/bad.adf", "/host/disks/bad.adf" },
-    { "Work:disks", "/host/disks" },
-    { "max", "/host/max" },
-    { "DH9:hardfile.adf", NULL },
-    { NULL, NULL }
+    { "Work:disks/good.adf", "/host/disks/good.adf", 0 },
+    { "Work:disks/with space.adf", "/host/disks/with space.adf", 0 },
+    { "Work:disks/bad.adf", "/host/disks/bad.adf", 0 },
+    { "Work:disks", "/host/disks", 1 },
+    { "Work:long", fake_long_host, 0 },
+    { "max", "/host/max", 0 },
+    { "DH9:hardfile.adf", NULL, 0 },
+    { NULL, NULL, 0 }
 };
 
 static struct fake_option fake_options[] = {
@@ -105,6 +113,13 @@ static int fake_store_valid;
 static char fake_search[128];
 static int fake_have_search;
 
+/* The named semaphore the tools use to serialize their searches. */
+static struct SignalSemaphore *fake_named_semaphore;
+static int fake_sem_other_holds; /* another task holds it: AttemptSemaphore fails */
+static int fake_sem_depth;       /* 1 while this tool holds it */
+static int fake_sem_attempts;
+static long fake_ioerr;
+
 FAKE void fake_reset(void)
 {
     memset(fake_drives, 0, sizeof(fake_drives));
@@ -128,6 +143,16 @@ FAKE void fake_reset(void)
     fake_set_count = 0;
     fake_store_valid = 0;
     fake_have_search = 0;
+    if (fake_named_semaphore) {
+        fake_named_semaphore->ss_Held = 0;
+    }
+    fake_sem_other_holds = 0;
+    fake_sem_depth = 0;
+    fake_sem_attempts = 0;
+    fake_ioerr = 0;
+    memset(fake_long_host, 'h', FAKE_LONG_HOST_PATH);
+    fake_long_host[0] = '/';
+    fake_long_host[FAKE_LONG_HOST_PATH] = '\0';
 }
 
 FAKE int fake_image_loads(const char *path)
@@ -140,14 +165,23 @@ FAKE int fake_image_loads(const char *path)
     return 0;
 }
 
-/* DISK_vsync: act on a changed path, with the disk change delay when a disk is in. */
+/*
+ * DISK_vsync. A changed path is taken over at once (currprefs.df is the new
+ * name) but a disk that is in the drive is ejected only on the next frame,
+ * and the new image loads after the disk change delay. In between the drive
+ * reports the new name together with the old disk.
+ */
 FAKE void fake_frame(void)
 {
     fake_frames++;
     for (int i = 0; i < FAKE_DRIVES; i++) {
         struct fake_drive *drive = &fake_drives[i];
 
-        if (drive->wait > 0 && --drive->wait == 0) {
+        if (drive->eject_pending) {
+            drive->eject_pending = 0;
+            drive->in = 0;
+            drive->wait = FAKE_EJECT_FRAMES;
+        } else if (drive->wait > 0 && --drive->wait == 0) {
             drive->in = fake_image_loads(drive->df);
         }
         if (strcmp(drive->df, drive->pending) != 0) {
@@ -155,9 +189,9 @@ FAKE void fake_frame(void)
             if (drive->df[0] == '\0') {
                 drive->in = 0;
                 drive->wait = 0;
+                drive->eject_pending = 0;
             } else if (drive->in) {
-                drive->in = 0;
-                drive->wait = FAKE_EJECT_FRAMES;
+                drive->eject_pending = 1;
             } else {
                 drive->wait = 1;
             }
@@ -263,7 +297,7 @@ FAKE int fake_cmdlineparser(const char *s, char *argv[], int max)
     int quote = 0;
     int doout;
     int j = 0;
-    char tmp1[2048];
+    char tmp1[FAKE_MAX_DPATH + 1];
 
     tmp1[0] = '\0';
     argv[0] = NULL;
@@ -291,6 +325,10 @@ FAKE int fake_cmdlineparser(const char *s, char *argv[], int max)
         }
         if (!doout) {
             if (j >= 0) {
+                if (j + 1 >= FAKE_MAX_DPATH) {
+                    fprintf(stderr, "cmdlineparser overflows tmp1[%d]\n", FAKE_MAX_DPATH);
+                    exit(1);
+                }
                 tmp1[j] = c;
                 tmp1[j + 1] = '\0';
             }
@@ -357,6 +395,15 @@ FAKE int fake_execcmdline(int argc, char *argv[])
     return 0;
 }
 
+/* Amiberry has one configsearch for all callers; two interleaved searches corrupt each other. */
+FAKE void fake_require_search_lock(void)
+{
+    if (!fake_sem_depth) {
+        fprintf(stderr, "configuration search without holding the semaphore\n");
+        exit(1);
+    }
+}
+
 /* cfgfile_uaelib_modify and cfgfile_modify */
 FAKE int fake_config_modify(int index, const char *parms, size_t size, char *out, size_t outsize)
 {
@@ -390,6 +437,7 @@ FAKE int fake_config_modify(int index, const char *parms, size_t size, char *out
     line[size] = '\0';
 
     if (index != -1) {
+        fake_require_search_lock();
         if (!fake_store_valid) {
             return 20;
         }
@@ -401,6 +449,7 @@ FAKE int fake_config_modify(int index, const char *parms, size_t size, char *out
 
     argc = fake_cmdlineparser(line, argv, FAKE_ARGV_MAX);
     if (argc <= 1) {
+        fake_require_search_lock();
         fake_create_store();
         fake_have_search = 0;
         if (argc > 0 && strlen(argv[0]) > 0) {
@@ -531,7 +580,115 @@ BPTR Lock(STRPTR name, long mode)
             return (BPTR)(i + 1);
         }
     }
+    fake_ioerr = 205; /* object not found */
     return 0;
+}
+
+long IoErr(void)
+{
+    return fake_ioerr;
+}
+
+long Examine(BPTR lock, struct FileInfoBlock *fib)
+{
+    fib->fib_DirEntryType = fake_files[lock - 1].dir ? 2 : -3;
+    return 1;
+}
+
+APTR AllocDosObject(ULONG type, void *tags)
+{
+    (void)type;
+    (void)tags;
+    return calloc(1, sizeof(struct FileInfoBlock));
+}
+
+void FreeDosObject(ULONG type, APTR object)
+{
+    (void)type;
+    free(object);
+}
+
+struct DosList *LockDosList(ULONG flags)
+{
+    static struct DosList list;
+
+    (void)flags;
+    return &list;
+}
+
+/* The volumes the fake Amiga has mounted. */
+struct DosList *FindDosEntry(struct DosList *list, CONST_STRPTR name, ULONG flags)
+{
+    static const char *const volumes[] = { "Work", "DH9", "HT", NULL };
+
+    (void)flags;
+    for (int i = 0; volumes[i]; i++) {
+        if (strcmp(volumes[i], (const char *)name) == 0) {
+            return list;
+        }
+    }
+    return NULL;
+}
+
+void UnLockDosList(ULONG flags)
+{
+    (void)flags;
+}
+
+APTR AllocMem(ULONG size, ULONG flags)
+{
+    (void)flags;
+    return calloc(1, size);
+}
+
+void FreeMem(APTR memory, ULONG size)
+{
+    (void)size;
+    free(memory);
+}
+
+void Forbid(void)
+{
+}
+
+void Permit(void)
+{
+}
+
+void InitSemaphore(struct SignalSemaphore *semaphore)
+{
+    memset(semaphore, 0, sizeof(*semaphore));
+}
+
+void AddSemaphore(struct SignalSemaphore *semaphore)
+{
+    fake_named_semaphore = semaphore;
+}
+
+struct SignalSemaphore *FindSemaphore(CONST_STRPTR name)
+{
+    if (fake_named_semaphore && fake_named_semaphore->ss_Link.ln_Name &&
+        strcmp(fake_named_semaphore->ss_Link.ln_Name, (const char *)name) == 0) {
+        return fake_named_semaphore;
+    }
+    return NULL;
+}
+
+long AttemptSemaphore(struct SignalSemaphore *semaphore)
+{
+    fake_sem_attempts++;
+    if (fake_sem_other_holds || semaphore->ss_Held) {
+        return 0;
+    }
+    semaphore->ss_Held = 1;
+    fake_sem_depth = 1;
+    return 1;
+}
+
+void ReleaseSemaphore(struct SignalSemaphore *semaphore)
+{
+    semaphore->ss_Held = 0;
+    fake_sem_depth = 0;
 }
 
 void UnLock(BPTR lock)

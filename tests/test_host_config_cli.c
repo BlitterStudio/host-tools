@@ -21,7 +21,10 @@ static void require(int condition, const char *message)
 
 static int run(int argc, char **argv)
 {
-    return fake_run(host_config_main, argc, argv, text, sizeof(text));
+    int rc = fake_run(host_config_main, argc, argv, text, sizeof(text));
+
+    require(fake_sem_depth == 0, "the search semaphore is released when the tool returns");
+    return rc;
 }
 
 static int run_args(char *a1, char *a2, char *a3, char *a4)
@@ -158,6 +161,12 @@ static void test_set_translates_paths(void)
     require(fake_set_count == 0, "nothing is sent for an unmapped path");
 
     fake_reset();
+    require(run_args("set", "kickstart_rom_file", "Work:nofile.rom", NULL) == HOST_RETURN_ERROR,
+            "missing file on a mounted volume");
+    require(strstr(text, "path not found") != NULL, "a typo on a known volume is an error");
+    require(fake_set_count == 0, "nothing is sent for a missing Amiga file");
+
+    fake_reset();
     require(run_args("set", "cpu_speed", "max", NULL) == 0, "keyword while a file of that name exists");
     require(strcmp(fake_set_lines[0], "cpu_speed=max") == 0, "a keyword is never taken for a file in the current directory");
 }
@@ -193,6 +202,83 @@ static void test_set_errors(void)
     require(fake_set_count == 0, "an overlong value reaches nothing");
 }
 
+/*
+ * Amiberry copies each token into a buffer of MAX_DPATH characters, 260 on
+ * Windows. The fake tokenizer exits when a token would not fit.
+ */
+static void test_value_fits_amiberry_buffer(void)
+{
+    char value[FAKE_MAX_DPATH + 8];
+
+    memset(value, 'x', sizeof(value));
+    value[FAKE_MAX_DPATH - 1] = '\0';
+    fake_reset();
+    require(run_args("set", "kickstart_rom_file", value, NULL) == 0, "259 characters fit Amiberry's buffer");
+    require(fake_set_count == 1, "the 259-character value reached Amiberry");
+
+    value[FAKE_MAX_DPATH - 1] = 'x';
+    value[FAKE_MAX_DPATH] = '\0';
+    fake_reset();
+    require(run_args("set", "kickstart_rom_file", value, NULL) == HOST_RETURN_ERROR, "260 characters do not");
+    require(strstr(text, "Value is too long") != NULL, "260 characters are refused as too long");
+    require(fake_set_count == 0, "nothing is sent that could overrun Amiberry's buffer");
+
+    fake_reset();
+    require(run_args("set", "kickstart_rom_file", "Work:long", NULL) == HOST_RETURN_ERROR,
+            "a host path longer than Amiberry can take");
+    require(strstr(text, "Value is too long") != NULL, "a long translated path is refused as too long");
+    require(fake_set_count == 0, "a long translated path reaches nothing");
+
+    /* a value with spaces is sent in quotes, which do not count toward the token */
+    memset(value, 'x', sizeof(value));
+    value[FAKE_MAX_DPATH - 1] = '\0';
+    value[100] = ' ';
+    fake_reset();
+    require(run_args("set", "kickstart_rom_file", value, NULL) == 0, "259 characters with a space");
+}
+
+static void test_search_semaphore(void)
+{
+    fake_reset();
+    require(run_args("get", "cpu_speed", NULL, NULL) == 0, "get takes and releases the semaphore");
+    require(fake_named_semaphore != NULL && strcmp(fake_named_semaphore->ss_Link.ln_Name, "host-tools.config") == 0,
+            "the first tool creates the named semaphore");
+    {
+        struct SignalSemaphore *first = fake_named_semaphore;
+
+        require(run_args("get", "floppy*", NULL, NULL) == 0, "wildcard get under the semaphore");
+        require(run_args("set", "cpu_speed", "max", NULL) == 0, "set under the semaphore");
+        require(fake_named_semaphore == first, "later runs find the semaphore instead of creating another");
+    }
+
+    /* another task is in the middle of a search */
+    fake_reset();
+    fake_sem_other_holds = 1;
+    require(run_args("get", "cpu_speed", NULL, NULL) == HOST_RETURN_ERROR, "get while another tool searches");
+    require(strstr(text, "Another host tool is reading") != NULL, "get reports the busy configuration");
+    require(fake_frames >= 200, "the tool waited for the other search before giving up");
+    require(run_args("get", "floppy*", NULL, NULL) == HOST_RETURN_ERROR, "wildcard get while busy");
+    require(strstr(text, "Another host tool is reading") != NULL, "wildcard get reports the busy configuration");
+    require(run_args("set", "cpu_speed", "max", NULL) == HOST_RETURN_ERROR, "set while busy");
+    require(strstr(text, "Another host tool is reading") != NULL, "set reports the busy configuration");
+    require(fake_set_count == 0, "set sends nothing while it cannot check the option");
+
+    /* the other search ends while this tool waits */
+    fake_reset();
+    fake_sem_other_holds = 1;
+    fake_named_semaphore = NULL;
+    require(run_args("get", "cpu_speed", NULL, NULL) == HOST_RETURN_ERROR, "busy first");
+    fake_sem_other_holds = 0;
+    require(run_args("get", "cpu_speed", NULL, NULL) == 0, "get works once the other search is over");
+    require(strcmp(text, "real\n") == 0, "and returns the value");
+
+    /* Ctrl-C in a wildcard listing gives the semaphore back */
+    fake_reset();
+    fake_break_pending = 1;
+    require(run_args("get", "floppy*", NULL, NULL) == HOST_RETURN_ERROR, "Ctrl-C in a listing");
+    require(strstr(text, "***Break") != NULL, "Ctrl-C is acknowledged");
+}
+
 static void test_quoted_value_survives_amiberry_parser(void)
 {
     /* The fake runs Amiberry's own tokenizer: a quoted value stays one token, a bare one splits. */
@@ -224,5 +310,7 @@ int main(void)
     test_set_translates_paths();
     test_set_errors();
     test_quoted_value_survives_amiberry_parser();
+    test_value_fits_amiberry_buffer();
+    test_search_semaphore();
     return 0;
 }

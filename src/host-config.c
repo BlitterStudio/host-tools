@@ -4,6 +4,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "host_config_access.h"
 #include "host_path.h"
@@ -31,33 +32,79 @@ static int check_option(const char *option, int allow_wildcard)
     return 1;
 }
 
+static int append_line(char **text, size_t *length, size_t *capacity, const char *line)
+{
+    size_t needed = *length + strlen(line) + 2;
+
+    if (needed > *capacity) {
+        size_t grown = *capacity ? *capacity : 4096;
+        char *bigger;
+
+        while (grown < needed) {
+            grown *= 2;
+        }
+        bigger = (char *)realloc(*text, grown);
+        if (bigger == NULL) {
+            return 0;
+        }
+        *text = bigger;
+        *capacity = grown;
+    }
+    memcpy(*text + *length, line, strlen(line));
+    *length += strlen(line);
+    (*text)[(*length)++] = '\n';
+    (*text)[*length] = '\0';
+    return 1;
+}
+
+/*
+ * Collects every match while holding the search semaphore and prints them
+ * afterwards, so a console that stops output cannot keep other tools waiting.
+ */
 static int list_matches(const char *option)
 {
     static char reply[HOST_CONFIG_REPLY_MAX];
-    long rc;
+    char *text = NULL;
+    size_t length = 0;
+    size_t capacity = 0;
+    long rc = 0;
     int status;
+    int outcome = HOST_RETURN_ERROR;
+
+    if (!host_config_lock()) {
+        printf("%s\n", HOST_CONFIG_BUSY_TEXT);
+        return HOST_RETURN_ERROR;
+    }
 
     status = host_config_begin_search(option, &rc);
     for (int index = 0; status == HOST_CONFIG_FOUND; index++) {
         if (SetSignal(0, 0) & SIGBREAKF_CTRL_C) {
             SetSignal(0, SIGBREAKF_CTRL_C);
+            host_config_unlock();
             printf("***Break\n");
+            free(text);
             return HOST_RETURN_ERROR;
         }
         status = host_config_next_match(index, reply, sizeof(reply), &rc);
-        if (status == HOST_CONFIG_FOUND) {
-            printf("%s\n", reply);
-        } else if (status == HOST_CONFIG_END) {
-            return 0;
+        if (status == HOST_CONFIG_FOUND && !append_line(&text, &length, &capacity, reply)) {
+            host_config_unlock();
+            printf("Out of memory\n");
+            free(text);
+            return HOST_RETURN_ERROR;
         }
     }
+    host_config_unlock();
 
-    if (status == HOST_CONFIG_MISSING) {
+    if (status == HOST_CONFIG_END) {
+        fwrite(text, 1, length, stdout);
+        outcome = 0;
+    } else if (status == HOST_CONFIG_MISSING) {
         printf("No option starts with %.*s\n", (int)(strlen(option) - 1), option);
     } else {
         printf("Amiberry could not read its configuration (code %ld)\n", rc);
     }
-    return HOST_RETURN_ERROR;
+    free(text);
+    return outcome;
 }
 
 static int get_option(const char *option)
@@ -77,6 +124,8 @@ static int get_option(const char *option)
     }
     if (status == HOST_CONFIG_MISSING) {
         printf("Unknown option: %s\n", option);
+    } else if (status == HOST_CONFIG_BUSY) {
+        printf("%s\n", HOST_CONFIG_BUSY_TEXT);
     } else {
         printf("Amiberry could not read its configuration (code %ld)\n", rc);
     }
@@ -115,9 +164,9 @@ static int set_option(const char *option, int argc, char *argv[], int first_valu
 
     target = value;
     if (host_config_value_may_be_path(value)) {
-        int path_status = host_resolve_optional_path(value, host_path, sizeof(host_path), &target);
+        int path_status = host_resolve_path(HOST_PATH_MODE_ARG, value, host_path, sizeof(host_path), &target);
 
-        if (path_status != HOST_PATH_OK) {
+        if (!host_path_usable(path_status)) {
             printf("%s: %s\n", host_path_error(path_status), value);
             return HOST_RETURN_ERROR;
         }
@@ -134,6 +183,10 @@ static int set_option(const char *option, int argc, char *argv[], int first_valu
     status = host_config_get(option, reply, sizeof(reply), &rc);
     if (status == HOST_CONFIG_MISSING) {
         printf("Unknown option: %s\n", option);
+        return HOST_RETURN_ERROR;
+    }
+    if (status == HOST_CONFIG_BUSY) {
+        printf("%s\n", HOST_CONFIG_BUSY_TEXT);
         return HOST_RETURN_ERROR;
     }
     if (status != HOST_CONFIG_FOUND) {

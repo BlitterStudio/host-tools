@@ -14,10 +14,15 @@
  * space-separated tokens, with double quotes grouping a token. It has no
  * escape for a quote and drops control characters, and an empty token is
  * lost, so these helpers refuse what the parser cannot carry.
+ *
+ * The parser also copies each token into a buffer of MAX_DPATH characters
+ * without checking the length. MAX_DPATH is 260 on Windows hosts, the
+ * smallest on any host, so a token of 260 characters or more overruns the
+ * buffer. Options and values stop at 259 characters.
  */
 
 #define HOST_CONFIG_OPTION_MAX 128
-#define HOST_CONFIG_VALUE_MAX 1024
+#define HOST_CONFIG_VALUE_MAX 259
 #define HOST_CONFIG_LINE_MAX (HOST_CONFIG_OPTION_MAX + HOST_CONFIG_VALUE_MAX + 8)
 /* Amiberry's longest saved configuration line is 2560 characters. */
 #define HOST_CONFIG_REPLY_MAX 2600

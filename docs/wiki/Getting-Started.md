@@ -7,29 +7,32 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Requirements
 
-Run the classic AmigaOS 68k tools in Amiberry v6.0+ or a build with the required `uae.resource`/`uaelib` support. Enable **Native Code** execution for the command tools and MHI decoder. To use the UAESND AHI driver, also enable the **UAESND sound board** in Amiberry. The two AHI drivers are guest audio components; the host support table below describes the **command tools**, not the audio drivers.
+Run the tools in Amiberry v6.0 or newer, or in a build with the `uae.resource`/`uaelib` support the tools use. Enable **Native Code** execution for the command tools and the MHI decoder. `host-quit` is the exception: it needs only `uae.resource`. The UAESND AHI driver also needs the **UAESND sound board** enabled in Amiberry. The audio drivers run on the Amiga side, so the host requirements below apply to the command tools only.
 
-| Host | Supported commands |
-| --- | --- |
-| Linux, macOS, and Windows | All 12 commands |
+All commands work on Linux, macOS and Windows hosts. On Windows, `host-shell` needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later, which provides the ConPTY pseudo console. The other commands work with a current Amiberry on every host.
 
-On Windows, `host-shell` needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later, which provides the ConPTY pseudo console. The other commands work with a current Amiberry.
+The commands call these programs on the host:
 
-Linux desktop integration uses `xdg-utils`, `notify-send`, and, depending on the operation, `gtk-launch`, `gdbus`, `iconv`, or a clipboard backend (`wl-clipboard`, `xclip`, `xsel`). Downloads use host `curl` or `wget`; on Windows they use `curl.exe` (included in Windows 10 and later). Windows desktop integrations use PowerShell, Explorer, and Notepad. Check the [command reference](Command-Tools) for individual requirements and exit codes.
+- Linux: `xdg-utils` and `notify-send`, plus `gtk-launch`, `gdbus`, `iconv` or a clipboard backend (`wl-clipboard`, `xclip`, `xsel`) depending on the command.
+- macOS: `open`, `osascript`, `pbcopy` and `pbpaste`.
+- Windows: PowerShell, Explorer and Notepad.
+- Downloads: `curl` or `wget` on Linux and macOS, `curl.exe` on Windows (included in Windows 10 and later).
+
+The [command reference](Command-Tools) lists the requirements and exit codes of each command.
 
 ## Install from a release
 
-1. Download the latest `Host-Tools-<version>.lha` from the [releases page](https://github.com/BlitterStudio/host-tools/releases); a `.lha.sha256` checksum is published beside it.
+1. Download the latest `Host-Tools-<version>.lha` from the [releases page](https://github.com/BlitterStudio/host-tools/releases). A `.lha.sha256` checksum is published beside it.
 2. Extract the archive and open the `Host-Tools` drawer.
-3. Run `Install`. All five components are selected by default: command tools, AmigaGuide, UAE AHI, UAESND AHI, and UAE MHI MP3.
+3. Run `Install`. All five components are selected by default: command tools, AmigaGuide, UAE AHI, UAESND AHI and UAE MHI MP3.
 
-**Novice** installs everything and replaces existing files. **Intermediate** lets you select components and copies files automatically. **Expert** lets you select components and asks before replacing files, showing installed and package versions when available. The installer does not change startup scripts, system settings, AHI preferences, or existing driver configuration. It installs the guide to `HELP:<language>/Host-Tools.guide`, using `English` if no language is set.
+**Novice** installs everything and replaces existing files. **Intermediate** lets you select components and copies files without asking, but leaves an installed program or library alone when it is the same version or newer. **Expert** lets you select components and asks before replacing files, showing the installed and package versions when available. The installer does not change startup scripts, system settings, AHI preferences or existing driver configuration. It installs the guide to `HELP:<language>/Host-Tools.guide`, using `English` if no language is set.
 
-For manual installation, copy the command programs from the archive's `C/` drawer to `C:` or another directory on the Amiga command path. Copy each audio component's files to the locations in [Audio and MP3](Audio-and-MP3). The AmigaGuide can be copied to `HELP:<language>/`.
+To install by hand, copy the command programs from the archive's `C/` drawer to `C:` or another directory on the Amiga command path. Copy the audio files to the locations listed in [Audio and MP3](Audio-and-MP3). Copy the AmigaGuide to `HELP:<language>/`.
 
 ## Try the host commands
 
-These are Amiga CLI examples. Files must already exist where the example expects them; host applications can use Amiga paths backed by host-visible mounts.
+Type these in an Amiga CLI. A host application can open a file only if it sits in a host-visible mount, not in a hardfile.
 
 Open a URL in the host browser:
 
@@ -37,24 +40,24 @@ Open a URL in the host browser:
 host-multiview https://github.com/BlitterStudio/amiberry
 ```
 
-Open a video on a host-visible Amiga volume using the host's default application:
+Open a video on a host-visible Amiga volume with the host's default application:
 
 ```text
 host-multiview "Work:Videos/My Holiday.mp4"
 ```
 
-To use a particular host application instead, run it explicitly (with the application installed on the host):
+To use a particular host application, run it by name. It must be installed on the host:
 
 ```text
 host-run vlc "Work:Videos/My Holiday.mp4"
 ```
 
-Download an archive onto the Amiga RAM disk on any supported host:
+Download an archive to the Amiga RAM disk (this works on every supported host):
 
 ```text
 host-download https://github.com/BlitterStudio/host-tools/releases/download/v2.6/Host-Tools-2.6.lha RAM:
 ```
 
-To open a class of files on the host from Workbench, set its **DefIcons** default tool to `host-multiview`. `host-path Work:Videos` prints the host path for a mounted directory when you need to check where it resolves.
+To open a class of files on the host from Workbench, set its **DefIcons** default tool to `host-multiview`. `host-path Work:Videos` prints the host path of a mounted directory, which shows where it resolves.
 
-For usage and behavior of the remaining commands, see [Command tools](Command-Tools). For choosing and installing audio modes, see [Audio and MP3](Audio-and-MP3).
+The other commands are described in [Command tools](Command-Tools). Audio modes and drivers are in [Audio and MP3](Audio-and-MP3).

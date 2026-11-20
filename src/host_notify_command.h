@@ -21,8 +21,9 @@ static inline int host_append_notify_command(char *command, size_t command_size,
                                "; if command -v iconv >/dev/null 2>&1; then"
                                " t=$(printf %s \"$t\" | iconv -f ISO-8859-1 -t UTF-8 2>/dev/null || printf %s \"$t\");"
                                " m=$(printf %s \"$m\" | iconv -f ISO-8859-1 -t UTF-8 2>/dev/null || printf %s \"$m\"); fi"
-                               "; if command -v notify-send >/dev/null 2>&1; then notify-send \"$t\" \"$m\""
-                               "; elif command -v osascript >/dev/null 2>&1; then osascript -e 'on run argv' -e 'display notification (item 2 of argv) with title (item 1 of argv)' -e 'end run' \"$t\" \"$m\""
+                               "; if command -v notify-send >/dev/null 2>&1; then notify-send -- \"$t\" \"$m\""
+                               /* osascript reads the script from standard input ("-"), which ends its option parsing, so a title or message starting with '-' stays an argument */
+                               "; elif command -v osascript >/dev/null 2>&1; then printf '%s\\n' 'on run argv' 'display notification (item 2 of argv) with title (item 1 of argv)' 'end run' | osascript - \"$t\" \"$m\""
                                "; else exit 127; fi");
 }
 

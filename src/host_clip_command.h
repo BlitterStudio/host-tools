@@ -7,8 +7,50 @@
 #define HOST_CLIP_COMMAND_H
 
 #include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 #include "host_common.h"
 #include "host_powershell.h"
+
+#define HOST_CLIP_INPUT_OK 0
+#define HOST_CLIP_INPUT_TOO_LONG 1
+#define HOST_CLIP_INPUT_READ_ERROR 2
+#define HOST_CLIP_INPUT_HAS_NUL 3
+
+/*
+ * Read the clipboard text from a stream. The text is handed to the host
+ * as a C string, so a NUL byte would silently cut it short, and a read
+ * error would look like end of input; both are reported instead of
+ * being copied. The result is always NUL terminated.
+ */
+static inline int host_clip_read_text(FILE *in, char *text, size_t text_size)
+{
+    size_t total;
+
+    if (in == NULL || text == NULL || text_size == 0) {
+        return HOST_CLIP_INPUT_READ_ERROR;
+    }
+
+    total = fread(text, 1, text_size - 1, in);
+    text[total] = '\0';
+    if (ferror(in)) {
+        return HOST_CLIP_INPUT_READ_ERROR;
+    }
+    if (memchr(text, '\0', total) != NULL) {
+        return HOST_CLIP_INPUT_HAS_NUL;
+    }
+    if (total == text_size - 1) {
+        int c = getc(in);
+
+        if (c != EOF) {
+            return HOST_CLIP_INPUT_TOO_LONG;
+        }
+        if (ferror(in)) {
+            return HOST_CLIP_INPUT_READ_ERROR;
+        }
+    }
+    return HOST_CLIP_INPUT_OK;
+}
 
 #define HOST_CLIP_PASTE_COMMAND \
     "t=$(mktemp) || exit 1; c=\"${t}.converted\"; " \

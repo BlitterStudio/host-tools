@@ -20,17 +20,6 @@ static int print_usage(void)
     return 0;
 }
 
-static int read_stdin_text(char *text, size_t text_size)
-{
-    size_t total = fread(text, 1, text_size - 1, stdin);
-
-    text[total] = '\0';
-    if (total == text_size - 1 && getc(stdin) != EOF) {
-        return 0;
-    }
-    return 1;
-}
-
 int main(int argc, char *argv[])
 {
     static char command[HOST_MAX_COMMAND_LEN];
@@ -85,8 +74,17 @@ int main(int argc, char *argv[])
             return HOST_RETURN_ERROR;
         }
         /* "host-clip copy" without text reads standard input verbatim */
-        if (!read_stdin_text(text, sizeof(text))) {
+        switch (host_clip_read_text(stdin, text, sizeof(text))) {
+        case HOST_CLIP_INPUT_OK:
+            break;
+        case HOST_CLIP_INPUT_TOO_LONG:
             printf("Clipboard text is too long\n");
+            return HOST_RETURN_ERROR;
+        case HOST_CLIP_INPUT_HAS_NUL:
+            printf("Clipboard text must not contain NUL bytes\n");
+            return HOST_RETURN_ERROR;
+        default:
+            printf("Cannot read the clipboard text from standard input\n");
             return HOST_RETURN_ERROR;
         }
     } else if (!host_join_args(text, sizeof(text), argc, argv, start)) {

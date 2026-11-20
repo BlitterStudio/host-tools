@@ -11,7 +11,23 @@
 #include "host_common.h"
 #include "host_powershell.h"
 
-#define HOST_EDIT_COMMAND_TAIL "; if [ \"$(uname -s)\" = Darwin ] && command -v open >/dev/null 2>&1; then open -t \"$target\"; else mime_type=text/plain; desktop_file=; if command -v xdg-mime >/dev/null 2>&1; then detected_mime=$(xdg-mime query filetype \"$target\" 2>/dev/null); [ -n \"$detected_mime\" ] && mime_type=$detected_mime; desktop_file=$(xdg-mime query default \"$mime_type\" 2>/dev/null); [ -n \"$desktop_file\" ] || desktop_file=$(xdg-mime query default text/plain 2>/dev/null); fi; if [ -n \"$target_uri\" ] && [ -n \"$desktop_file\" ] && command -v gtk-launch >/dev/null 2>&1 && gtk-launch \"$desktop_file\" \"$target_uri\"; then :; elif command -v xdg-open >/dev/null 2>&1 && xdg-open \"$target\"; then :; else host_editor=${VISUAL:-${EDITOR:-}}; if [ -n \"$host_editor\" ]; then HOST_EDITOR=\"$host_editor\" sh -c 'exec $HOST_EDITOR \"$1\"' sh \"$target\"; else exit 127; fi; fi; fi"
+/*
+ * POSIX editor choice. The tool promises a text editor, so the target's
+ * own MIME type is not consulted: asking for the default handler of a
+ * PNG or PDF would open an image viewer or a PDF reader. Order: the
+ * desktop's text/plain association (launched with the file's URI), then
+ * VISUAL or EDITOR, then xdg-open as the last resort.
+ */
+#define HOST_EDIT_COMMAND_TAIL \
+    "; if [ \"$(uname -s)\" = Darwin ] && command -v open >/dev/null 2>&1; then open -t \"$target\";" \
+    " else desktop_file=;" \
+    " if command -v xdg-mime >/dev/null 2>&1; then desktop_file=$(xdg-mime query default text/plain 2>/dev/null); fi;" \
+    " if [ -n \"$target_uri\" ] && [ -n \"$desktop_file\" ] && command -v gtk-launch >/dev/null 2>&1" \
+    " && gtk-launch \"$desktop_file\" \"$target_uri\"; then :;" \
+    " elif host_editor=${VISUAL:-${EDITOR:-}}; [ -n \"$host_editor\" ] &&" \
+    " HOST_EDITOR=\"$host_editor\" sh -c 'exec $HOST_EDITOR \"$1\"' sh \"$target\"; then :;" \
+    " elif command -v xdg-open >/dev/null 2>&1 && xdg-open \"$target\"; then :;" \
+    " else exit 127; fi; fi"
 
 static inline int host_append_edit_command_with_uri(char *command, size_t command_size,
                                                    const char *path, const char *uri)

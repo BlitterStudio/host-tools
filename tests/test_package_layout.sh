@@ -122,7 +122,7 @@ if [ "$(drawer_window_hex "$PACKAGE_ROOT/Help.info")" != "0050002801900096" ]; t
 	exit 1
 fi
 
-for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-say host-info host-download host-copy host-env host-quit; do
+for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-say host-info host-download host-copy host-env host-config host-disk host-quit; do
 	test -f "$PACKAGE_ROOT/C/$tool"
 done
 assert_ver() {
@@ -148,6 +148,8 @@ assert_ver "Host-Info" "$PACKAGE_ROOT/C/host-info"
 assert_ver "Host-Download" "$PACKAGE_ROOT/C/host-download"
 assert_ver "Host-Copy" "$PACKAGE_ROOT/C/host-copy"
 assert_ver "Host-Env" "$PACKAGE_ROOT/C/host-env"
+assert_ver "Host-Config" "$PACKAGE_ROOT/C/host-config"
+assert_ver "Host-Disk" "$PACKAGE_ROOT/C/host-disk"
 assert_ver "Host-Quit" "$PACKAGE_ROOT/C/host-quit"
 
 # host-quit has no startup code: AmigaDOS runs its first code byte, which
@@ -190,6 +192,8 @@ grep -q 'host-shell' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-clip' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-say' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-env' "$PACKAGE_ROOT/Help/Host-Tools.guide"
+grep -q 'host-config' "$PACKAGE_ROOT/Help/Host-Tools.guide"
+grep -q 'host-disk' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'host-quit' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'UAE :16 bit HIFI Stereo++' "$PACKAGE_ROOT/Help/Host-Tools.guide"
 grep -q 'uaesnd: Stereo' "$PACKAGE_ROOT/Help/Host-Tools.guide"
@@ -278,7 +282,7 @@ if ! grep -q "^(exit)" "$PACKAGE_ROOT/Install"; then
 	exit 1
 fi
 
-for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-say host-info host-download host-copy host-env host-quit; do
+for tool in host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-say host-info host-download host-copy host-env host-config host-disk host-quit; do
 	grep -q "(P_InstallCommandTool \"$tool\")" "$PACKAGE_ROOT/Install"
 done
 

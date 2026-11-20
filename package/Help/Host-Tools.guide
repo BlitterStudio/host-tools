@@ -33,6 +33,8 @@ Select "Command tools" in the installer to copy the programs to C:. They all wor
 @{"host-download" link HostDownload} downloads files through the host.
 @{"host-copy" link HostCopy} copies one file between a host path and the Amiga.
 @{"host-env" link HostEnv} gets and sets host environment variables.
+@{"host-config" link HostConfig} reads and changes Amiberry configuration options.
+@{"host-disk" link HostDisk} lists, inserts and ejects floppy disk images.
 @{"host-quit" link HostQuit} closes Amiberry.
 
 @{"Exit codes" link ExitCodes}
@@ -282,6 +284,61 @@ Variable names use ASCII letters, digits and underscores and must not start with
 
 @endnode
 
+@node HostConfig "host-config"
+host-config reads and changes Amiberry configuration options while Amiberry runs.
+
+Usage:
+
+host-config get <option>
+host-config get <prefix>*
+host-config set <option> <value...>
+
+Options use the names from Amiberry's .uae configuration files, such as cpu_speed. The names are lowercase and case-sensitive.
+
+get prints the value Amiberry is using now, not the value in a configuration file on disk. With a * at the end, get prints option=value for every option that starts with the prefix. For example, host-config get floppy* lists the floppy options. An option that does not exist prints "Unknown option" and returns 10.
+
+set sends the option with the rest of the line as its value, joined with single spaces. If the value contains a colon, slash or dot and names an existing Amiga file or directory, Amiberry gets its host path. Any other value goes through unchanged, so a host path works too. Amiberry applies the change on its next frame, so a get in the same instant can still show the old value. Amiberry decides whether an option takes effect at once or needs a reset.
+
+Amiberry answers a set with a result code and no message. host-config reports that Amiberry did not accept the option and returns 10. This happens for an unknown option and for some invalid values.
+
+Amiberry cannot take an empty value or a value with a double quote or a control character, and host-config refuses values longer than 1024 characters. It also refuses shellexec and dbg. shellexec would run a host command without the Native Code setting that host-run needs, and dbg drives Amiberry's debugger.
+
+Examples:
+
+host-config get cpu_speed
+host-config set cpu_speed max
+
+host-config works the same on Linux, macOS and Windows hosts. It runs no host commands and needs uae.resource but not Native Code.
+
+@endnode
+
+@node HostDisk "host-disk"
+host-disk lists the floppy drives, inserts a disk image or ejects one.
+
+Usage:
+
+host-disk
+host-disk insert <drive> <file>
+host-disk eject <drive>
+
+The drive is 0 to 3 or DF0: to DF3:, in any case.
+
+Without arguments, host-disk prints one line per drive: the host path of the image in it, (empty), or (no drive) when the drive is not in Amiberry's configuration. A line ends in (not loaded) while Amiberry has an image set for the drive but no disk in it.
+
+insert takes an Amiga path or a host path. An existing Amiga path is translated to its host path. If no such Amiga path exists, the argument is used as a host path as written. Amiberry loads whatever its floppy drive accepts, such as ADF, ADZ, DMS and IPF images. The host path can be at most 255 characters.
+
+Amiberry loads the image a moment after the request, and replacing a disk takes about two seconds because Amiberry simulates the disk change. host-disk waits until the disk is in the drive, then prints "Inserted". It returns 10 if the drive is not in the configuration, if the path cannot be translated, or if the disk is still not loaded after about eight seconds. In that case it clears the image from the drive and tells you to check that the file exists on the host and is a readable image. Ctrl-C stops the wait.
+
+eject empties the drive. Like insert, it returns 10 for a drive that is not in the configuration.
+
+Example:
+
+host-disk insert DF0: Work:Disks/Game.adf
+
+host-disk works the same on Linux, macOS and Windows hosts. It runs no host commands and needs uae.resource but not Native Code.
+
+@endnode
+
 @node HostQuit "host-quit"
 host-quit closes Amiberry, as quitting from its menu does. Amiberry's WHDLoad booter runs it when a game exits.
 
@@ -298,7 +355,7 @@ The installer offers five components: command tools, this AmigaGuide, UAE AHI, U
 
 The guide is installed to HELP:<language>/Host-Tools.guide (English if no language is set). The drivers go to DEVS:AHI/ and DEVS:AudioModes/, and the decoder goes to LIBS:MHI/. The installer does not edit startup files, system settings, AHI preferences or driver configuration.
 
-Enable Native Code execution in Amiberry to use the command tools (except host-quit) and the MHI decoder. Enable the UAESND sound board in Amiberry before you use the UAESND AHI modes. Choose your AHI mode in AHI preferences yourself.
+Enable Native Code execution in Amiberry to use the command tools (except host-quit, host-config and host-disk) and the MHI decoder. Enable the UAESND sound board in Amiberry before you use the UAESND AHI modes. Choose your AHI mode in AHI preferences yourself.
 
 All command tools work on Linux, macOS and Windows hosts with a current Amiberry. The exception is host-shell on Windows, which needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later for the ConPTY pseudo console.
 

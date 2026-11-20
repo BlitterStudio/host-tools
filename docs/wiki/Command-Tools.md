@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Command tools
 
-Run these commands in an AmigaOS CLI under Amiberry with **Native Code** enabled (`host-quit` needs only `uae.resource`). The installer copies them all to `C:` when you select the command tools component. Type `?` after a command for its built-in usage help.
+Run these commands in an AmigaOS CLI under Amiberry with **Native Code** enabled (`host-quit`, `host-config` and `host-disk` need only `uae.resource`). The installer copies them all to `C:` when you select the command tools component. Type `?` after a command for its built-in usage help.
 
 All commands work on Linux, macOS and Windows hosts. `host-shell` on Windows needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later. The others need a current Amiberry.
 
@@ -189,6 +189,54 @@ Reads, sets, removes or lists host **user** environment variables. Names use ASC
 
 On Windows, values are stored in the persistent user environment. On Linux and macOS, `set` and `unset` change `$HOME/.host-tools-env`, which is replaced atomically with mode `0600`. Two commands that run at the same time take turns, so neither change is lost; one that cannot get its turn within five seconds fails with a message. `get` and `list` read the host session's environment and the values from that file. Source the file from your host shell startup files to import the values into later login shells. Neither approach changes the environment of host processes that are already running, including Amiberry's parent process.
 
+## host-config
+
+```text
+host-config get <option>
+host-config get <prefix>*
+host-config set <option> <value...>
+```
+
+Reads or changes an Amiberry configuration option while Amiberry runs. Options use the names from Amiberry's `.uae` configuration files, such as `cpu_speed`. The names are lowercase and case-sensitive.
+
+`get` prints the value Amiberry is using now, not the value in a configuration file on disk. With a `*` at the end, `get` prints `option=value` for every option that starts with the prefix, so `host-config get floppy*` lists the floppy options and `host-config get *` lists all of them. An option that does not exist prints `Unknown option` and returns `10`.
+
+`set` sends the option with the rest of the line as its value, joined with single spaces. If the value contains a colon, slash or dot and names an existing Amiga file or directory, Amiberry gets its host path. Any other value goes through unchanged, so a host path works too. Amiberry applies the change on its next frame, so a `get` in the same instant can still show the old value. Amiberry decides whether an option takes effect at once or needs a reset.
+
+Amiberry answers a `set` with a result code and no message, so the tool cannot say why a value failed. It reports that Amiberry did not accept the option and returns `10`. This happens for an unknown option and for some invalid values.
+
+Amiberry cannot take an empty value or a value with a double quote or a control character, and `host-config` refuses values longer than 1024 characters. It also refuses `shellexec` and `dbg`. `shellexec` would run a host command without the Native Code setting that `host-run` needs, and `dbg` drives Amiberry's debugger.
+
+```text
+host-config get cpu_speed
+host-config set cpu_speed max
+host-config get floppy*
+```
+
+## host-disk
+
+```text
+host-disk
+host-disk insert <drive> <file>
+host-disk eject <drive>
+```
+
+Lists the floppy drives, inserts a disk image or ejects one. The drive is `0` to `3` or `DF0:` to `DF3:`, in any case.
+
+Without arguments, `host-disk` prints one line per drive: the host path of the image in it, `(empty)`, or `(no drive)` when the drive is not in Amiberry's configuration. A line ends in `(not loaded)` while Amiberry has an image set for the drive but no disk in it.
+
+`insert` takes an Amiga path or a host path. An existing Amiga path is translated to its host path. If no such Amiga path exists, the argument is used as a host path as written. Amiberry loads whatever its floppy drive accepts, such as ADF, ADZ, DMS and IPF images. The host path can be at most 255 characters.
+
+Amiberry loads the image a moment after the request, and replacing a disk takes about two seconds because Amiberry simulates the disk change. `host-disk` waits until the disk is in the drive, then prints `Inserted`. It returns `10` if the drive is not in the configuration, if the path cannot be translated, or if the disk is still not loaded after about eight seconds; in that case it clears the image from the drive and tells you to check that the file exists on the host and is a readable image. Ctrl-C stops the wait.
+
+`eject` empties the drive. Like `insert`, it returns `10` for a drive that is not in the configuration.
+
+```text
+host-disk insert DF0: Work:Disks/Game.adf
+host-disk
+host-disk eject DF0:
+```
+
 ## host-quit
 
 ```text
@@ -204,3 +252,5 @@ Commands return `0` on success, `10` for missing or invalid arguments or a faile
 On Linux, the desktop commands need the matching host utilities: `xdg-utils`, `notify-send`, a clipboard backend, `spd-say`, `espeak-ng` or `espeak` for `host-say`, and optionally `gdbus` or `iconv`. Downloads need `curl` or `wget` on Linux and macOS and `curl.exe` on Windows. On Windows, `host-run`, `host-multiview`, `host-edit`, `host-notify`, `host-clip`, `host-say`, `host-info`, `host-env` and `host-copy` run PowerShell, `host-reveal` runs Explorer, and `host-edit` needs Notepad.
 
 `host-reveal`, `host-notify`, `host-clip`, `host-say`, `host-info` and `host-env` can be cancelled with Ctrl-C, and so can `host-run`, `host-multiview` and `host-edit` on Windows. These commands give up when the host sends no output for about 30 seconds (`host-say` excepted, see above), or 5 seconds on older Amiberry builds that lack `HostShell_Status`. `host-download` and `host-copy` keep waiting while the host process runs and stop only on Ctrl-C or when the host session ends. See [Getting started](Getting-Started) for installation and host support.
+
+`host-config` and `host-disk` run no host commands, so none of the host requirements above apply to them. `host-disk` waits for Amiberry to load or eject a disk, for up to about eight seconds when loading, and stops on Ctrl-C.

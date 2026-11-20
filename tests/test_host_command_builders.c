@@ -689,6 +689,8 @@ static void test_windows_shell_command(void)
     char *quoted[] = { "host-shell", "echo", "say \"hi\"" };
     char *newline[] = { "host-shell", "echo", "a\nb" };
     char *percent[] = { "host-shell", "type", "C:\\data\\%USERNAME%.txt" };
+    char *trailing[] = { "host-shell", "app.exe", "C:\\My Files\\", "next", "C:\\plain\\" };
+    char parsed[8][64];
     char small[16];
 
     command[0] = '\0';
@@ -708,6 +710,16 @@ static void test_windows_shell_command(void)
     require_string(command, "type \"C:\\My Files\\a b.txt\" \"\" \"x&y\" plain-1.txt",
                    "several arguments should be joined as cmd.exe words");
 
+    /* a quoted word ending in backslashes must not swallow its closing quote */
+    command[0] = '\0';
+    require(host_append_shell_windows_command(command, sizeof(command), 5, trailing),
+            "windows shell command with trailing backslashes should build");
+    require_string(command, "app.exe \"C:\\My Files\\\\\" next C:\\plain\\",
+                   "trailing backslashes of a quoted word should be doubled");
+    require(split_cmdline(command, parsed, 8) == 4 &&
+            strcmp(parsed[1], "C:\\My Files\\") == 0 && strcmp(parsed[2], "next") == 0 &&
+            strcmp(parsed[3], "C:\\plain\\") == 0,
+            "a C runtime parser should read the quoted directory and the next word separately");
     command[0] = '\0';
     require(!host_append_shell_windows_command(command, sizeof(command), 3, quoted),
             "argument with a quote should be rejected");

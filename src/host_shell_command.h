@@ -49,12 +49,17 @@ static inline int host_cmd_word_valid(const char *word)
 /*
  * Append one word to a cmd.exe command line, in double quotes when it is
  * empty or holds anything but plain path characters. Words that
- * host_cmd_word_valid rejects fail.
+ * host_cmd_word_valid rejects fail. Backslashes at the end of a quoted
+ * word are doubled: programs that parse their command line with the
+ * Microsoft C runtime rules would otherwise read the closing quote as a
+ * literal one ("C:\Dir\" next), and Windows path handling accepts the
+ * doubled separator.
  */
 static inline int host_append_cmd_word(char *command, size_t command_size, const char *word,
                                        int add_separator)
 {
     int quote = (word[0] == '\0');
+    size_t trailing = 0;
 
     if (!host_cmd_word_valid(word)) {
         return 0;
@@ -63,12 +68,23 @@ static inline int host_append_cmd_word(char *command, size_t command_size, const
         if (!host_is_safe_cmd_char(*p)) {
             quote = 1;
         }
+        trailing = (*p == '\\') ? trailing + 1 : 0;
     }
 
-    return (!add_separator || host_append_literal(command, command_size, " ")) &&
-           (!quote || host_append_literal(command, command_size, "\"")) &&
-           host_append_literal(command, command_size, word) &&
-           (!quote || host_append_literal(command, command_size, "\""));
+    if ((add_separator && !host_append_literal(command, command_size, " ")) ||
+        (quote && !host_append_literal(command, command_size, "\"")) ||
+        !host_append_literal(command, command_size, word)) {
+        return 0;
+    }
+    if (quote) {
+        while (trailing-- > 0) {
+            if (!host_append_literal(command, command_size, "\\")) {
+                return 0;
+            }
+        }
+        return host_append_literal(command, command_size, "\"");
+    }
+    return 1;
 }
 
 /*

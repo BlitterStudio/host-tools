@@ -32,6 +32,7 @@ AHI_V2_SOURCES	= drivers/ahi/Makefile \
 	drivers/ahi/src/v2/uaesnd.audio.asm \
 	drivers/ahi/src/v2/UAESND.asm
 MHI_SOURCES	= drivers/mhi/Makefile \
+	drivers/mhi/src/mhi_abi.h \
 	drivers/mhi/src/mhiuae.h \
 	drivers/mhi/src/mhiuae_startup.c \
 	drivers/mhi/src/mhiuae.c \

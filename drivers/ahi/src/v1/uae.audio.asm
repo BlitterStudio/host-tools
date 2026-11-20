@@ -94,7 +94,7 @@ AHIDB_PaulaTable  EQU AHIDB_UserBase+1  * Boolean
  ;* paula (private) ahiac_DriverData points to this structure.
   STRUCTURE paula,0
   UBYTE p_Flags
-  UBYTE p_Parallel      ;TRUE if pport allocated
+  UBYTE p_Streams       ;PSB_PLAY/PSB_REC: directions AHIsub_Start() started
   UWORD p_DisableCount
   APTR  p_audioport
   APTR  p_audioreq
@@ -167,6 +167,10 @@ AHIDB_PaulaTable  EQU AHIDB_UserBase+1  * Boolean
   BITDEF  P,14BIT,0
 PB_STEREO EQU AHIACB_STEREO   ;=2
 PF_STEREO EQU AHIACF_STEREO
+
+;* p_Streams
+PSB_PLAY EQU 0
+PSB_REC  EQU 1
 
 Start:
   MOVEQ #-1,d0
@@ -241,8 +245,7 @@ initRoutine:
   MOVE.l  d0,pb_GfxLib(a5)
   BNE.b .gfxOK
   ALERT AG_OpenLib!AO_GraphicsLib
-  MOVEQ #0,d0
-  BRA .exit
+  BRA .free_base
 .gfxOK
   LEA resname(pc),a1
   call OpenResource
@@ -265,8 +268,7 @@ initRoutine:
   MOVE.l  d0,pb_UtilLib(a5)
   BNE.b .utilOK
   ALERT AG_OpenLib!AO_UtilityLib
-  MOVEQ #0,d0
-  BRA .exit
+  BRA .close_gfx
 .utilOK
   LEA dosName(pc),a1
   MOVEQ #0,d0
@@ -274,12 +276,29 @@ initRoutine:
   MOVE.l  d0,pb_DosLib(a5)
   BNE.b .dosOK
   ALERT AG_OpenLib!AO_DOSLib
-  MOVEQ #0,d0
-  BRA .exit
+  BRA .close_util
 .dosOK  MOVE.l  a5,d0
 .exit
   MOVEM.l (sp)+,d1/a0/a1/a5/a6
   RTS
+
+* The library was never added to the system list, so the initializer has to
+* close what it opened and free the base itself before returning NULL.
+.close_util
+  MOVE.l  pb_UtilLib(a5),a1
+  call  CloseLibrary
+.close_gfx
+  MOVE.l  pb_GfxLib(a5),a1
+  call  CloseLibrary
+.free_base
+  MOVEQ #0,d0
+  MOVE.l  a5,a1
+  MOVE.w  LIB_NEGSIZE(a5),d0
+  SUB.l d0,a1
+  ADD.w LIB_POSSIZE(a5),d0
+  call  FreeMem
+  MOVEQ #0,d0
+  BRA .exit
 
 Open:
   MOVEQ #0,d0
@@ -550,14 +569,16 @@ AHIsub_AllocAudio:
 .error_noreqmem
 .error_noport
 .error_nopaula
-
-  clr.l alloc_1
-  
   MOVEQ #AHISF_ERROR,d0
   BRA.b .exit
 .error1
+* The hardware belongs to another allocation: give back our driver data.
+  MOVE.l  a3,a1
+  CLR.l ahiac_DriverData(a2)
+  MOVE.l  pb_SysLib(a5),a6
+  call  FreeVec
   MOVEQ #AHISF_ERROR,d0
-  BRA.b .exit 
+  BRA.b .exit
 .audiochannelarray
   Dc.b  1+2+4+8
 .audioname
@@ -655,9 +676,21 @@ AHIsub_FreeAudio:
   MOVE.l  ahiac_DriverData(a2),d0
   BEQ .nopaula
   MOVE.l  d0,a3
+
+* AHI stops playback and recording first; do it again so nothing is left
+* behind if it did not (Stop is a no-op for what is already stopped).
+  MOVE.l  a5,a6
+  MOVEQ #AHISF_PLAY|AHISF_RECORD,d0
+  call  AHIsub_Stop
+  MOVE.l  pb_SysLib(a5),a6
+
   tst.l p_audiodev(a3)
-  beq .nopaula
+  beq .free
   clr.l alloc_1
+.free
+  CLR.l ahiac_DriverData(a2)
+  MOVE.l  a3,a1
+  call  FreeVec
 .nopaula
   MOVEQ #0,d0
   popm  d2-d7/a2-a6
@@ -923,39 +956,41 @@ AHIsub_Start:
   clr.l disableint
   MOVE.l  d0,d7
   LEA CUSTOM,a4
+  MOVE.l  a6,a5       ;a5 = paulaBase
   MOVE.l  ahiac_DriverData(a2),a3
   cmp.l #0,a3
   beq .error_unknown
   tst.l p_audiodev(a3)
   beq .error_unknown
-  clr.l p_RecBuffer1(a3)
-  clr.l p_RecBuffer2(a3)
   clr.b noplay
-  BTST  #AHISB_PLAY,d0
-  ;BEQ .dont_play
-  ;bne .no
-  ;move.b #1,noplay
-.no
-;**
-;*** AHISB_PLAY
-;**
+
+* The play interrupt also drives recording, so it runs while either
+* direction is active. A recording-only Start joins a running engine
+* instead of restarting it.
+  BTST  #AHISB_PLAY,d7
+  BNE.b .startengine
+  tst.l playing
+  BNE .startrecord
+.startengine
+**
+*** AHISB_PLAY
+**
+  MOVE.l  pb_SysLib(a5),a6
+  bsr engine_stop       ;Stop current playback if any.
+  MOVE.l  a5,a6
   MOVE.l  ahiac_MixFreq(a2),d1
   MOVE.l  d1,p_AudPer(a3)
-  MOVEQ #AHISF_PLAY,d0
-  call  AHIsub_Stop     ;Stop current playback if any.
   call  AHIsub_Update     ;fill variables
 
-  MOVE.l  a6,a5
   MOVE.l  pb_SysLib(a5),a6
-  
+
   MOVE.l  ahiac_BuffSize(a2),d0
   muls.l  minbufflen,d0
   MOVE.l  #MEMF_PUBLIC|MEMF_CLEAR,d1
   call  AllocVec
   MOVE.l  d0,p_Mixbuffer(a3)
   BEQ .error_nomem
-  
- 
+
 * The init*bit? routines allocates p_DMAbuffer, sets up p_AudPtr, sets the Volume,
 * stores the correct interrupt routines in p_PlayInt's AND p_PlaySoftInt's IS_CODE.
 
@@ -964,7 +999,7 @@ AHIsub_Start:
   BRA.w initahisound
 .1
   TST.l d0
-  BNE .exit
+  BNE .error_nomem
 
 * Install play interrupt
   move.l p_AudPer(a3),d2
@@ -978,8 +1013,8 @@ AHIsub_Start:
   moveq #0,d0
   MOVE.l calladdr,a1
   jsr (a1)
-  tst.l d0                      
-  beq .error_nomem              
+  tst.l d0
+  beq .error_nomem
   LEA p_PlayInt(a3),a1
   MOVEQ #INTB_EXTER,d0
   move.l a3,p_base
@@ -987,27 +1022,29 @@ AHIsub_Start:
   CLR.w p_DisableCount(a3)
 
   MOVE.l  a5,a6
-  move.b #1,playing
+  move.l #1,playing
+  BCLR  #PSB_PLAY,p_Streams(a3)
+  BTST  #AHISB_PLAY,d7
+  BEQ.b .startrecord
+  BSET  #PSB_PLAY,p_Streams(a3)
 
-.dont_play
-
+.startrecord
   BTST  #AHISB_RECORD,d7
-  BEQ .dont_record
+  BEQ .return
 
 **
 *** AHISB_RECORD
 **
-  ;MOVEQ #AHISF_RECORD,d0
-  ;call  AHIsub_Stop     ;Stop current recording if any.
-  MOVE.l  a6,a5
+* Start over with fresh buffers if recording was already running.
   MOVE.l  pb_SysLib(a5),a6
+  bsr rec_free
   MOVE.l  ahiac_BuffSize(a2),d0
   muls.l  minbufflen,d0
   MOVE.l  #MEMF_PUBLIC,d1
      asl.l #1,d0
   call  AllocVec
   MOVE.l  d0,p_RecBuffer1(a3)
-  BEQ .error_nomem
+  BEQ .error_nomem_rec
   MOVE.l  d0,p_RecFillPtr(a3)
   MOVE.l  ahiac_BuffSamples(a2),d0
   muls.l  minbufflen,d0
@@ -1018,10 +1055,8 @@ AHIsub_Start:
   MOVE.l  #MEMF_PUBLIC,d1
   call  AllocVec
   MOVE.l  d0,p_RecBuffer2(a3)
-  BEQ .error_nomem
-* Install Record interrupt
-  move.b #1,playing
-.dont_record
+  BEQ .error_nomem_rec
+  BSET  #PSB_REC,p_Streams(a3)
 .return
 
 
@@ -1029,7 +1064,19 @@ AHIsub_Start:
 .exit
   popm  d2-d7/a2-a6
   RTS
+* Start failed before the play interrupt was installed: free what it
+* allocated (nothing runs yet) and drop recording, which depends on it.
 .error_nomem
+  MOVE.l  pb_SysLib(a5),a6
+  bsr engine_stop
+  bsr rec_free
+  CLR.b p_Streams(a3)
+  MOVEQ #AHIE_NOMEM,d0
+  BRA.b .exit
+.error_nomem_rec
+  MOVE.l  pb_SysLib(a5),a6
+  bsr rec_free
+  BCLR  #PSB_REC,p_Streams(a3)
   MOVEQ #AHIE_NOMEM,d0
   BRA.b .exit
 .error_unknown
@@ -1193,28 +1240,50 @@ AHIsub_Stop:
   LEA CUSTOM,a4
   MOVE.l  a6,a5
   MOVE.l  pb_SysLib(a5),a6
+  MOVE.l  d0,d2
   MOVE.l  ahiac_DriverData(a2),a3
-  push  d0
+  cmp.l #0,a3
+  beq .return
   tst.l p_audiodev(a3)
-  beq .dontplay
-  tst.l playing
-  beq .dontplay
-  BTST  #AHISB_PLAY,d0
-  ;BEQ .dontplay
+  beq .return
 
-**
-*** AHISB_PLAY
-**
+* Play and record stop independently. The play interrupt and the host
+* audio session are shared, so they go away only when neither is left.
+  BTST  #AHISB_PLAY,d2
+  BEQ.b .keepplay
+  BCLR  #PSB_PLAY,p_Streams(a3)
+.keepplay
+  BTST  #AHISB_RECORD,d2
+  BEQ.b .keeprecord
+  BCLR  #PSB_REC,p_Streams(a3)
+  bsr rec_free
+.keeprecord
+  tst.b p_Streams(a3)
+  BNE.b .return
+  bsr engine_stop
+.return
+  MOVEQ #0,d0
+  popm  d2-d7/a2-a6
+  RTS
+
+;in:
+* a3  paula
+* a6  ExecBase
+* Close the host audio session and remove the play interrupt if they are
+* up, then free the mixing and DMA buffers. The buffers are freed even if
+* playback never came up, because a failed Start leaves them allocated.
+engine_stop:
+  tst.l playing
+  beq.b .notrunning
   MOVEQ #1,d0
   MOVEQ #0,d1
   move.l calladdr,a1
   jsr (a1)               ;close winuae ahi
   clr.l playing
-  MOVEQ #0,d0
   LEA p_PlayInt(a3),a1
   MOVEQ #INTB_EXTER,d0
   call  RemIntServer
-
+.notrunning
   MOVE.l  p_DMAbuffer(a3),d0
   BEQ.b .nodmamem
   MOVE.l  d0,a1
@@ -1227,31 +1296,26 @@ AHIsub_Stop:
   CLR.l p_Mixbuffer(a3)
   call  FreeVec
 .nomixmem
+  RTS
 
-.dontplay
-  pop d0
-  BTST  #AHISB_RECORD,d0
-  BEQ .dontrecord
-
-**
-*** AHISB_RECORD
-**
-  MOVE.l  p_RecBuffer1(a3),d0
-  BEQ.b .norecmem1
-  MOVE.l  d0,a1
-  CLR.l p_RecBuffer1(a3)
-  call  FreeVec
-.norecmem1
+;in:
+* a3  paula
+* a6  ExecBase
+* The pointers are cleared before the memory is freed, the record code in
+* the soft interrupt skips recording when p_RecBuffer2 is NULL.
+rec_free:
   MOVE.l  p_RecBuffer2(a3),d0
   BEQ.b .norecmem2
   MOVE.l  d0,a1
   CLR.l p_RecBuffer2(a3)
   call  FreeVec
 .norecmem2
-.dontrecord
-.return
-  MOVEQ #0,d0
-  popm  d2-d7/a2-a6
+  MOVE.l  p_RecBuffer1(a3),d0
+  BEQ.b .norecmem1
+  MOVE.l  d0,a1
+  CLR.l p_RecBuffer1(a3)
+  call  FreeVec
+.norecmem1
   RTS
 
 ****** [driver].audio/AHIsub_#? *********************************************
@@ -1734,6 +1798,7 @@ ourint  MOVEM.l (a1)+,d0/d1     ;p_PlaySoftIntPtr,p_AudLen/p_AudPer
   jsr (a1)              ;write samples
   move.l (a7)+,a1
                     ;p_PlaySoftInt
+  move.l $4,a6          ;an interrupt server cannot rely on a6
   jsr _LVOCause(a6)     ;start PlaySoftInt
   moveq #0,d0
   rts

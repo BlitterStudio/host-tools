@@ -29,6 +29,8 @@ Enable the **UAESND sound board** in Amiberry before you select a `uaesnd` mode 
 
 Install both `uaesnd.audio` and its `UAESND` AudioMode file. The installer does not enable the sound board or change your AHI preferences.
 
+Only one program can use the sound board at a time. A second AHI allocation of a `uaesnd` mode fails until the first program releases it. Recording needs a capture device on the host. If there is none, starting recording returns an error instead of succeeding without any samples.
+
 ## UAE MHI MP3 decoder
 
 `mhiuae.library` implements the classic MHI decoder interface for MHI-compatible MP3 players. It passes MP3 buffers to Amiberry through `uae.resource`. Amiberry decodes them with its host mpg123 decoder and feeds the audio into the emulator's mixer, so decoding takes no Amiga CPU time.

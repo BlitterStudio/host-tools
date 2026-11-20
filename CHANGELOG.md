@@ -86,6 +86,32 @@ versioning for release tags.
   cannot be started. They used to return success after handing the command to a
   background shell.
 
+### Fixed
+
+- `uaesnd.audio` now lets other EXTER interrupt servers run when the sound board
+  has nothing pending. It used to end the interrupt chain for every interrupt.
+- `uaesnd.audio` Disable and Enable preserve all registers. Disable also
+  masks capture interrupts, `Update` no longer re-enables interrupts inside an
+  outstanding Disable, and the interrupt server does nothing while disabled.
+- `uaesnd.audio` allows one AHI allocation at a time. A second allocation fails
+  instead of resetting the board under the first and releasing it on free.
+- `uaesnd.audio` returns an error from Start when recording cannot begin,
+  because the host has no capture device, instead of reporting success.
+- `uae.audio` calls `Cause()` with ExecBase in A6. A higher priority server
+  could leave another value there.
+- `uae.audio` frees its per-allocation driver data when AHI frees the audio
+  control, and frees the mixing and DMA buffers when Start fails, for example
+  when the host cannot open an audio device.
+- `uae.audio` starting recording twice no longer loses the recording buffers,
+  and a Start without recording leaves a running recording alone.
+- `uae.audio` stopping only recording keeps playback running, and stopping only
+  playback keeps recording running. The shared host audio session now closes
+  only when neither is active.
+- `uae.audio` and `uaesnd.audio` free their library base and close the
+  libraries they opened when initialization fails.
+- The root build now also watches `drivers/mhi/src/mhi_abi.h`, so changing only
+  that header rebuilds `mhiuae.library`.
+
 ## [2.9] - 2026-11-04
 
 ### Changed

@@ -148,6 +148,7 @@ STREAM_OFFSET = $100
 	ULONG	ub_Base
 	APTR	ub_ConfigDev
 	APTR	ub_UtilBase
+	APTR	ub_Owner
 	LABEL	UAESNDBase_SIZEOF
 
 	STRUCTURE UAESND,0
@@ -612,19 +613,19 @@ update_playerfunc
 	; struct AHIAudioCtrlDrv* A2
 
 AHIsub_Update
-	
+
+	; nest inside Disable/Enable so an outstanding Disable scope
+	; stays disabled when Update returns
+
 	move.l a3,-(sp)
 
-	move.l ahiac_DriverData(a2),a3
-	move.l p_Base(a3),a0
-	bsr.w uaesnd_disable
-	
+	bsr.w AHIsub_Disable
+
 	move.l a2,a0
 	bsr.w update_playerfunc
 
-	move.l p_Base(a3),a0
-	bsr.w uaesnd_enable
-	
+	bsr.w AHIsub_Enable
+
 	move.l (sp)+,a3
 	rts
 
@@ -740,36 +741,58 @@ sampletypes
 	dc.b 8, 3, 0, 32
 	dc.l -1
 
-uaesnd_enable
-	move.l base_stream_enable(a0),base_stream_intena(a0)
+	; a0 = UAESND, clobbers a1
+	; stream interrupts follow the stream enable mask again,
+	; capture interrupts are on again if recording is active
+
+uaesnd_unmask
+	move.l p_Base(a0),a1
+	move.l base_stream_enable(a1),base_stream_intena(a1)
+	tst.w p_RecordActive(a0)
+	beq.s .done
+	move.l #UAESND_CAPTURE_CONTROL_ENABLE|UAESND_CAPTURE_CONTROL_IRQ_ENABLE,base_capture_control(a1)
+.done
 	rts
 
-uaesnd_disable
-	clr.l base_stream_intena(a0)
+	; a0 = UAESND, clobbers a1
+	; mask stream interrupts and capture interrupts (capture
+	; keeps running, only its interrupt is turned off)
+
+uaesnd_mask
+	move.l p_Base(a0),a1
+	clr.l base_stream_intena(a1)
+	tst.w p_RecordActive(a0)
+	beq.s .done
+	move.l #UAESND_CAPTURE_CONTROL_ENABLE,base_capture_control(a1)
+.done
 	rts
 
 	; struct AHIAudioCtrlDrv* A2
+	; preserves all registers, nests
 
 AHIsub_Disable
+	movem.l a0/a1,-(sp)
 	move.l ahiac_DriverData(a2),a0
 	addq.w #1,p_DisableCount(a0)
-	move.l p_Base(a0),a0
-	bsr uaesnd_disable
+	bsr.s uaesnd_mask
+	movem.l (sp)+,a0/a1
 	rts
 
 	; struct AHIAudioCtrlDrv* A2
+	; preserves all registers, nests
 
 AHIsub_Enable
+	movem.l a0/a1,-(sp)
 	move.l ahiac_DriverData(a2),a1
 	tst.w p_DisableCount(a1)
 	beq.s .already_enabled
 	subq.w	#1,p_DisableCount(a1)
-	bne.s .exit
+	bne.s .already_enabled
 	bsr.w flush_pending_starts
-	move.l p_Base(a1),a0
-	bsr uaesnd_enable
-.exit
+	move.l a1,a0
+	bsr.s uaesnd_unmask
 .already_enabled
+	movem.l (sp)+,a0/a1
 	rts
 
 flush_pending_starts
@@ -826,8 +849,9 @@ debug_start
 
 AHIsub_Start
 
-	movem.l d2,-(sp)
+	movem.l d2-d3,-(sp)
 	move.l d0,d2
+	moveq #AHIE_OK,d3
 
 	IFNE DEBUG
 	lea DEBUG_ADDR,a0
@@ -846,14 +870,15 @@ AHIsub_Start
 	move.l ahiac_DriverData(a2),a1
 	move.l p_Base(a1),a0
 	bsr.w start_recording
+	move.l d0,d3
 .norecord
-	moveq #AHIE_OK,d0
+	move.l d3,d0
 
 	IFNE DEBUG
 	bsr debugreturn
 	ENDC
 
-	movem.l (sp)+,d2
+	movem.l (sp)+,d2-d3
 	rts	
 
 	IFNE DEBUG
@@ -908,7 +933,10 @@ start_playback
 	lsl.l d1,d0
 	subq.l #1,d0
 	move.l d0,base_stream_enable(a0)
+	tst.w p_DisableCount(a1)
+	bne.s .masked
 	move.l d0,base_stream_intena(a0)
+.masked
 	rts
 
 	; a2 = AHIAudioCtrlDrv
@@ -924,25 +952,33 @@ stop_playback
 	; a1 = UAESND
 	; a0 = UAESNDHW
 	; a2 = AHIAudioCtrlDrv
+	; returns AHIE_OK in D0, or an error if capture cannot run
 start_recording
 	tst.l p_RecordBuffer(a1)
-	beq.s .done
+	beq.s .failed
 	move.l #AHIST_S16S,p_RecordMessage+ahirm_Type(a1)
 	move.l p_RecordBuffer(a1),p_RecordMessage+ahirm_Buffer(a1)
 	move.l #UAESND_RECORD_FRAMES,p_RecordMessage+ahirm_Length(a1)
 	move.l ahiac_MixFreq(a2),base_capture_frequency(a0)
 	move.l #UAESND_RECORD_BYTES,base_capture_threshold(a0)
-	move.l #UAESND_CAPTURE_CONTROL_ENABLE|UAESND_CAPTURE_CONTROL_IRQ_ENABLE,base_capture_control(a0)
+	move.l #UAESND_CAPTURE_CONTROL_ENABLE,base_capture_control(a0)
 	btst #0,base_capture_status+3(a0)
 	bne.s .unavailable
 	move.w #1,p_RecordActive(a1)
+	tst.w p_DisableCount(a1)
+	bne.s .done
+	move.l #UAESND_CAPTURE_CONTROL_ENABLE|UAESND_CAPTURE_CONTROL_IRQ_ENABLE,base_capture_control(a0)
 .done
+	moveq #AHIE_OK,d0
 	rts
 .unavailable
 	clr.l base_capture_control(a0)
 	clr.l base_capture_intreq(a0)
 	clr.l base_capture_threshold(a0)
-	bra.s .done
+	clr.w p_RecordActive(a1)
+.failed
+	moveq #AHIE_UNKNOWN,d0
+	rts
 
 	; a1 = UAESND
 	; a0 = UAESNDHW
@@ -1084,6 +1120,20 @@ AHIsub_AllocAudio
 	move.l a3,a0
 	bsr.w reset_ch
 
+	; take exclusive ownership of the board, the host stream
+	; allocation mask is a plain register and cannot refuse a second owner
+
+	call Forbid
+	tst.l ub_Owner(a5)
+	bne.s .busy
+	move.l a3,ub_Owner(a5)
+	call Permit
+	bra.s .owned
+.busy
+	call Permit
+	bra.w .alloc_error
+.owned
+
 	move.l a4,a0
 	bsr.w reset_hw
 
@@ -1192,6 +1242,7 @@ AHIsub_FreeAudio
 	move.l p_Base(a3),a0
 	bsr.w reset_hw
 	clr.l base_stream_allocate(a0)
+	clr.l ub_Owner(a5)
 .noint
 	
 	move.l p_Sounds(a3),d0
@@ -1607,6 +1658,8 @@ callsoundfunc:
 
 	; a1 = UAESND
 interrupt_code
+	tst.w p_DisableCount(a1)
+	bne.w .notours
 	move.l p_Base(a1),a0
 	move.l base_stream_intreq(a0),d0
 	bne.s .gotirq
@@ -1690,7 +1743,8 @@ interrupt_code
 	moveq #0,d0
 	rts
 .notours
-	moveq #1,d0
+	; Z set: not handled here, let the next server in the EXTER chain run
+	moveq #0,d0
 	rts
 
 initRoutine:
@@ -1704,7 +1758,7 @@ initRoutine:
 	moveq #0,d0
 	call OpenLibrary
 	move.l d0,ub_UtilBase(a5)
-	beq.s .end
+	beq.s .free_base
 
 	lea expname(pc),a1
 	moveq #0,d0
@@ -1729,11 +1783,21 @@ initRoutine:
 	move.l a5,a4
 	bra.s .end
 .init_failed
-	move.l ub_UtilBase(a5),a1
-	beq.s .end
+	move.l ub_UtilBase(a5),d0
+	beq.s .free_base
+	move.l d0,a1
 	move.l ub_SysLib(a5),a6
 	call CloseLibrary
 	clr.l ub_UtilBase(a5)
+.free_base
+	; the base was never added to the library list: free it here
+	move.l ub_SysLib(a5),a6
+	moveq #0,d0
+	move.l a5,a1
+	move.w LIB_NEGSIZE(a5),d0
+	sub.l d0,a1
+	add.w LIB_POSSIZE(a5),d0
+	call FreeMem
 .end
 	move.l a4,d0
 	movem.l	(sp)+,d1/a0/a1/a4/a5/a6

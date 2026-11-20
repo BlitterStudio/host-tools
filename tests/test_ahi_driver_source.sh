@@ -212,3 +212,77 @@ if grep -F -q 'IFD DEBUG=1' "$V2_DRIVER_SOURCE"; then
 	echo "UAESND v2 debug blocks must be value-gated so release builds do not write to DEBUG_ADDR" >&2
 	exit 1
 fi
+
+# v2: EXTER chain, register preservation, disable nesting and capture masking
+grep -A3 '^\.notours$' "$V2_DRIVER_SOURCE" | grep -F -q 'moveq #0,d0'
+if grep -A3 '^\.notours$' "$V2_DRIVER_SOURCE" | grep -F -q 'moveq #1,d0'; then
+	echo "UAESND interrupt server must return Z set when nothing is pending so the EXTER chain continues" >&2
+	exit 1
+fi
+grep -A2 '^interrupt_code$' "$V2_DRIVER_SOURCE" | grep -F -q 'tst.w p_DisableCount(a1)'
+grep -A2 '^AHIsub_Disable$' "$V2_DRIVER_SOURCE" | grep -F -q 'movem.l a0/a1,-(sp)'
+grep -A8 '^AHIsub_Disable$' "$V2_DRIVER_SOURCE" | grep -F -q 'movem.l (sp)+,a0/a1'
+grep -A2 '^AHIsub_Enable$' "$V2_DRIVER_SOURCE" | grep -F -q 'movem.l a0/a1,-(sp)'
+grep -A14 '^AHIsub_Enable$' "$V2_DRIVER_SOURCE" | grep -F -q 'movem.l (sp)+,a0/a1'
+grep -A8 '^uaesnd_mask$' "$V2_DRIVER_SOURCE" | grep -F -q 'move.l #UAESND_CAPTURE_CONTROL_ENABLE,base_capture_control(a1)'
+grep -A8 '^uaesnd_unmask$' "$V2_DRIVER_SOURCE" | grep -F -q 'UAESND_CAPTURE_CONTROL_ENABLE|UAESND_CAPTURE_CONTROL_IRQ_ENABLE,base_capture_control(a1)'
+grep -A14 '^AHIsub_Update$' "$V2_DRIVER_SOURCE" | grep -F -q 'bsr.w AHIsub_Disable'
+grep -A14 '^AHIsub_Update$' "$V2_DRIVER_SOURCE" | grep -F -q 'bsr.w AHIsub_Enable'
+if grep -F -q 'uaesnd_enable' "$V2_DRIVER_SOURCE" || grep -F -q 'uaesnd_disable' "$V2_DRIVER_SOURCE"; then
+	echo "UAESND v2 must mask and unmask only through the nesting-aware Disable/Enable" >&2
+	exit 1
+fi
+
+# v2: exclusive board ownership, capture start errors, initializer cleanup
+grep -F -q 'APTR	ub_Owner' "$V2_DRIVER_SOURCE"
+grep -F -q 'move.l a3,ub_Owner(a5)' "$V2_DRIVER_SOURCE"
+grep -F -q 'clr.l ub_Owner(a5)' "$V2_DRIVER_SOURCE"
+grep -B3 -F 'move.l a3,ub_Owner(a5)' "$V2_DRIVER_SOURCE" | grep -F -q 'tst.l ub_Owner(a5)'
+grep -A30 '^start_recording$' "$V2_DRIVER_SOURCE" | grep -F -q 'moveq #AHIE_UNKNOWN,d0'
+grep -A12 '^AHIsub_Start$' "$V2_DRIVER_SOURCE" | grep -F -q 'moveq #AHIE_OK,d3'
+grep -A32 '^AHIsub_Start$' "$V2_DRIVER_SOURCE" | grep -F -q 'move.l d3,d0'
+grep -A16 '^\.free_base$' "$V2_DRIVER_SOURCE" | grep -F -q 'move.w LIB_NEGSIZE(a5),d0'
+grep -A16 '^\.free_base$' "$V2_DRIVER_SOURCE" | grep -F -q 'add.w LIB_POSSIZE(a5),d0'
+grep -A16 '^\.free_base$' "$V2_DRIVER_SOURCE" | grep -F -q 'call FreeMem'
+if grep -A4 'call OpenLibrary' "$V2_DRIVER_SOURCE" | grep -F -q 'beq.s .end'; then
+	echo "UAESND initializer must free its base when a dependency fails to open" >&2
+	exit 1
+fi
+
+# v1: interrupt server, driver data, init cleanup, buffer and recording handling
+grep -B1 -F 'jsr _LVOCause(a6)' "$DRIVER_SOURCE" | grep -F -q 'move.l $4,a6'
+grep -A30 '^AHIsub_FreeAudio:' "$DRIVER_SOURCE" | grep -F -q 'call  FreeVec'
+grep -A30 '^AHIsub_FreeAudio:' "$DRIVER_SOURCE" | grep -F -q 'CLR.l ahiac_DriverData(a2)'
+grep -A8 '^\.error1$' "$DRIVER_SOURCE" | grep -F -q 'call  FreeVec'
+if grep -A12 '^\.error_nopaula$' "$DRIVER_SOURCE" | grep -q 'clr.l alloc_1'; then
+	echo "A failed allocation must not release the hardware another allocation owns" >&2
+	exit 1
+fi
+grep -A12 '^\.free_base$' "$DRIVER_SOURCE" | grep -F -q 'MOVE.w  LIB_NEGSIZE(a5),d0'
+grep -A12 '^\.free_base$' "$DRIVER_SOURCE" | grep -F -q 'call  FreeMem'
+grep -A1 -F 'ALERT AG_OpenLib!AO_UtilityLib' "$DRIVER_SOURCE" | grep -F -q 'BRA .close_gfx'
+grep -A1 -F 'ALERT AG_OpenLib!AO_DOSLib' "$DRIVER_SOURCE" | grep -F -q 'BRA .close_util'
+grep -A1 -F 'ALERT AG_OpenLib!AO_GraphicsLib' "$DRIVER_SOURCE" | grep -F -q 'BRA .free_base'
+grep -F -q 'BCLR  #PSB_PLAY,p_Streams(a3)' "$DRIVER_SOURCE"
+grep -F -q 'BCLR  #PSB_REC,p_Streams(a3)' "$DRIVER_SOURCE"
+grep -F -q 'BSET  #PSB_REC,p_Streams(a3)' "$DRIVER_SOURCE"
+v1_start=$(awk '/^AHIsub_Start:/ {on=1} /^initahisound:/ {on=0} on' "$DRIVER_SOURCE")
+if printf '%s\n' "$v1_start" | grep -q -i 'clr.l p_RecBuffer[12](a3)'; then
+	echo "v1 Start must free existing recording buffers instead of dropping the pointers" >&2
+	exit 1
+fi
+printf '%s\n' "$v1_start" | grep -F -q 'bsr rec_free'
+printf '%s\n' "$v1_start" | grep -F -q 'bsr engine_stop'
+v1_stop=$(awk '/^AHIsub_Stop:/ {on=1} /^;in:/ {on=0} on' "$DRIVER_SOURCE")
+if printf '%s\n' "$v1_stop" | grep -q '^ *;'; then
+	echo "v1 Stop must not carry commented-out branches" >&2
+	exit 1
+fi
+printf '%s\n' "$v1_stop" | grep -F -q 'BTST  #AHISB_PLAY,d2'
+printf '%s\n' "$v1_stop" | grep -F -q 'BTST  #AHISB_RECORD,d2'
+printf '%s\n' "$v1_stop" | grep -F -q 'tst.b p_Streams(a3)'
+grep -A30 '^engine_stop:' "$DRIVER_SOURCE" | grep -F -q 'call  FreeVec'
+grep -A30 '^engine_stop:' "$DRIVER_SOURCE" | grep -B6 -F '.notrunning' | grep -F -q 'RemIntServer'
+
+# root build must rebuild the MHI library when only its ABI header changes
+grep -A8 '^MHI_SOURCES' "$ROOT_MAKEFILE" | grep -F -q 'drivers/mhi/src/mhi_abi.h'

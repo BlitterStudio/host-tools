@@ -192,12 +192,18 @@ static void test_text_encoding(void)
     require_string(out, "caf\xc3\xa9", "Latin-1 is converted exactly once");
     require(!host_copy_to_host_utf8("caf\xc3\xa9", out, 5), "UTF-8 passthrough must respect the buffer");
 
-    require(host_copy_to_ps_text("caf\xc3\xa9 \xc3\xbf", out, sizeof(out)), "UTF-8 for PowerShell");
-    require_string(out, "caf\xe9 \xff", "UTF-8 up to U+00FF becomes ISO-8859-1 for the script");
-    require(host_copy_to_ps_text("caf\xe9", out, sizeof(out)), "Latin-1 for PowerShell");
-    require_string(out, "caf\xe9", "Latin-1 is passed unchanged to the script");
-    require(host_copy_to_ps_text("\xe2\x82\xac", out, sizeof(out)), "a euro sign stays as written");
-    require_string(out, "\xe2\x82\xac", "UTF-8 beyond U+00FF is not decoded");
+    out[0] = '\0';
+    require(host_copy_append_ps_text(out, sizeof(out), "caf\xe9 it's"), "Latin-1 for PowerShell");
+    require_string(out, "'caf\xc3\xa9 it''s'", "Latin-1 is converted once and quotes are doubled");
+    out[0] = '\0';
+    require(host_copy_append_ps_text(out, sizeof(out), "caf\xc3\xa9 it's"), "UTF-8 for PowerShell");
+    require_string(out, "'caf\xc3\xa9 it''s'", "UTF-8 is quoted as written");
+    out[0] = '\0';
+    require(host_copy_append_ps_text(out, sizeof(out), "\xe2\x82\xac"), "a euro sign");
+    require_string(out, "'\xe2\x82\xac'", "UTF-8 beyond U+00FF survives");
+    out[0] = '\0';
+    require(!host_copy_append_ps_text(out, 6, "caf\xc3\xa9"), "a small buffer fails");
+    require_string(out, "", "the buffer is left unchanged on failure");
 }
 
 static void test_put_events(void)
@@ -305,7 +311,7 @@ static void test_get_command_shape(void)
             "get command should build");
     require_contains(command, "f='/tmp/it'\\''s here.bin';");
     require_contains(command, "[ -f \"$f\" ] || exit 2");
-    require_contains(command, "wc -c <\"$f\"; cat -- \"$f\"");
+    require_contains(command, "wc -c <\"$f\"; cat <\"$f\"");
 
     command[0] = '\0';
     require(host_append_copy_get_command(command, sizeof(command), "~/My Files/x.bin"),
@@ -628,6 +634,22 @@ static void test_put_runs(void)
     require(rc == 0, "get of a relative dash-named file should exit 0");
     n = read_file(out, actual, sizeof(actual));
     require(n == 4 + 256 && memcmp(actual, "256\n", 4) == 0, "dash-named file is read");
+
+    /* a file named "-" is a file, not standard input */
+    path_in(target, sizeof(target), "-");
+    write_file(target, (const unsigned char *)"dash!", 5);
+    command[0] = '\0';
+    require(host_append_copy_get_command(command, sizeof(command), "-"), "get of - should build");
+    rc = run_command(command, NULL, out);
+    require(rc == 0, "get of a file named - should exit 0");
+    n = read_file(out, actual, sizeof(actual));
+    require(n == 2 + 5 && memcmp(actual, "5\ndash!", 7) == 0, "a file named - is read, not stdin");
+    unlink(target);
+    put_command(command, "-", "x", 256, 0);
+    rc = run_command(command, in, out);
+    require(rc == 0, "put to a file named - should exit 0");
+    require(read_file(target, actual, sizeof(actual)) == 256 && leftover_temp_files(workdir) == 0,
+            "the file named - is stored and no temporary file remains");
     run_cwd = NULL;
 
     /* text a guest already sends as UTF-8 is not converted again */
@@ -670,12 +692,28 @@ static void decode_ps(const char *command, char *script, size_t script_size)
     require(strncmp(command, prefix, sizeof(prefix) - 1) == 0, "command should start with the powershell prefix");
     host_base64_init(&st);
     n = host_base64_feed(&st, command + sizeof(prefix) - 1, (long)strlen(command + sizeof(prefix) - 1), decoded);
-    require(n > 0 && n % 2 == 0 && (size_t)n / 2 < script_size, "decoded script should fit");
-    for (long i = 0; i < n / 2; i++) {
-        require(decoded[i * 2 + 1] == 0, "script characters should be ISO-8859-1");
-        script[i] = (char)decoded[i * 2];
+    require(n > 0 && n % 2 == 0, "decoded script should be UTF-16");
+    {
+        size_t pos = 0;
+
+        /* UTF-16LE back to UTF-8 (BMP only, which is all the tests use) */
+        for (long i = 0; i < n; i += 2) {
+            unsigned long unit = decoded[i] | ((unsigned long)decoded[i + 1] << 8);
+
+            require(pos + 4 < script_size, "decoded script should fit");
+            if (unit < 0x80) {
+                script[pos++] = (char)unit;
+            } else if (unit < 0x800) {
+                script[pos++] = (char)(0xC0 | (unit >> 6));
+                script[pos++] = (char)(0x80 | (unit & 0x3F));
+            } else {
+                script[pos++] = (char)(0xE0 | (unit >> 12));
+                script[pos++] = (char)(0x80 | ((unit >> 6) & 0x3F));
+                script[pos++] = (char)(0x80 | (unit & 0x3F));
+            }
+        }
+        script[pos] = '\0';
     }
-    script[n / 2] = '\0';
 }
 
 static void test_windows_get(void)
@@ -688,7 +726,7 @@ static void test_windows_get(void)
             "Windows get should build");
     decode_ps(command, script, sizeof(script));
     require_contains(script, "$ErrorActionPreference='Stop';");
-    require_contains(script, "Get-Item -Force -LiteralPath 'C:\\Users\\it''s me\\caf\xe9.bin'}catch{exit 2}");
+    require_contains(script, "Get-Item -Force -LiteralPath 'C:\\Users\\it''s me\\caf\xc3\xa9.bin'}catch{exit 2}");
     require_contains(script, "-isnot [IO.FileInfo]");
     require_contains(script, "[Console]::OpenStandardOutput()");
     require_contains(script, "$s.CopyTo($o)");
@@ -725,31 +763,33 @@ static void test_windows_put(void)
                                                  123456, 0),
             "Windows put should build");
     decode_ps(command, script, sizeof(script));
-    require_contains(script, "$p='C:\\Out\\it''s';$n='caf\xe9 ''x''.bin';$l=123456;$f=0;");
-    require_contains(script, "'.htput.'+$PID");
+    require_contains(script, "$p='C:\\Out\\it''s';$n='caf\xc3\xa9 ''x''.bin';$l=123456;$f=0;");
+    require_contains(script, "'.htput.'+$IP::GetRandomFileName()");
+    require_contains(script, "$o=$IF::Open($t,'CreateNew','Write');$c=1;");
+    require_contains(script, "if($c -and $t){try{$IF::Delete($t)}catch{}}");
     require_contains(script, "[Console]::OpenStandardInput()");
-    require_contains(script, "[Console]::Out.Write(\"READY`n\")");
-    require_contains(script, "Write(\"OK $l`n\")");
-    require_contains(script, "if(!$f -and [IO.File]::Exists($p)){$e='EXISTS';throw 1}");
-    require_contains(script, "if($f){Move-Item -Force -LiteralPath $t -Destination $p}else{[IO.File]::Move($t,$p)};");
-    require_contains(script, "if($e -eq 'MOVE' -and !$f -and [IO.File]::Exists($p)){$e='EXISTS'}");
+    require_contains(script, "$w.Write(\"READY`n\")");
+    require_contains(script, "$w.Write(\"OK $l`n\")");
+    require_contains(script, "if(!$f -and $IF::Exists($p)){$e='EXISTS';throw 1}");
+    require_contains(script, "if($f){Move-Item -Force -ErrorAction Stop -LiteralPath $t -Destination $p}else{$IF::Move($t,$p)};");
+    require_contains(script, "if($e -eq 'MOVE' -and !$f -and $IF::Exists($p)){$e='EXISTS'}");
     require_contains(script, "if($d -and $r -gt 0){try{");
 
-    /* UTF-8 text from a guest is decoded once for the ISO-8859-1 script */
+    /* UTF-8 text from a guest is not converted a second time */
     command[0] = '\0';
     require(host_append_copy_put_command_windows(command, sizeof(command), "C:\\Out\\caf\xc3\xa9", "na\xc3\xafve.bin", 5, 0),
             "UTF-8 Windows put should build");
     decode_ps(command, script, sizeof(script));
-    require_contains(script, "$p='C:\\Out\\caf\xe9';$n='na\xefve.bin';");
+    require_contains(script, "$p='C:\\Out\\caf\xc3\xa9';$n='na\xc3\xafve.bin';");
 
     command[0] = '\0';
     require(host_append_copy_put_command_windows(command, sizeof(command), "~\\x", "a", 0, 1), "forced put should build");
     decode_ps(command, script, sizeof(script));
     require_contains(script, "$p=([Environment]::GetFolderPath('UserProfile')+'\\x');$n='a';$l=0;$f=1;");
 
-    /* a folder and file name that together stay under the Windows MAX_PATH of 260 fit the 4096-byte trap buffer */
+    /* a folder and file name of 260 characters together fit the 4096-byte trap buffer */
     {
-        char longpath[241];
+        char longpath[161];
         char longname[101];
 
         memset(longpath, 'p', sizeof(longpath) - 1);
@@ -759,7 +799,7 @@ static void test_windows_put(void)
         command[0] = '\0';
         require(host_append_copy_put_command_windows(command, sizeof(command), longpath, longname,
                                                      2147483647UL, 1),
-                "a 240 character path and 100 character name should fit");
+                "a 160 character path and 100 character name should fit");
         require(strlen(command) < HOST_MAX_COMMAND_LEN, "command stays below the trap limit");
     }
 

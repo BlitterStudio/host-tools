@@ -164,7 +164,7 @@ The host path is a host path, typed the way the host writes it: `/home/me/notes.
 
 The destination may be a folder. `get` then keeps the host file's name, and `put` keeps the Amiga file's name. An existing destination file is not overwritten unless you give `FORCE`. A folder where the file would go is never replaced.
 
-`get` writes to a temporary file next to the Amiga destination, checks that the byte count matches the size the host reported, and only then moves it into place. With `FORCE` the old file is kept until the new one is ready. `put` has the host write a temporary file named `.htput.<number>` next to the host target, check its size, and move it into place. Without `FORCE`, `put` never replaces a file that appears on the host during the upload. The Amiga side reports success only after the host has confirmed the stored size. A failed or aborted copy leaves the old destination alone.
+`get` writes to a temporary file next to the Amiga destination, checks that the byte count matches the size the host reported, and only then moves it into place. With `FORCE` the old file is kept until the new one is ready. `put` has the host write a temporary file whose name starts with `.htput.` next to the host target, check its size, and move it into place. Without `FORCE`, `put` never replaces a file that appears on the host during the upload. The Amiga side reports success only after the host has confirmed the stored size. A failed or aborted copy leaves the old destination alone.
 
 A copy has no time limit while the host process is running, and Ctrl-C aborts it. `host-copy` prints the progress while it copies. It needs an Amiberry build with host pipe sessions (the same builds that stream `host-download`).
 
@@ -174,7 +174,7 @@ host-copy put Work:Projects/notes.txt ~/Documents/notes.txt FORCE
 host-copy get C:\Users\me\Desktop\song.mod Work:Music/
 ```
 
-On Linux and macOS the host needs `sh`, `head`, `wc`, `cat`, `tr` and `mv`. On Windows the host needs PowerShell 5.1, which Windows 10 and later include. The Windows command line has room for a host folder path and a file name of about 350 characters together.
+On Linux and macOS the host needs `sh`, `head`, `wc`, `cat`, `tr` and `mv`. On Windows the host needs PowerShell 5.1, which Windows 10 and later include. The Windows command line has room for a host folder path and a file name of about 260 characters together.
 
 ## host-env
 

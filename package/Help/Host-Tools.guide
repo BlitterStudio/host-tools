@@ -256,7 +256,7 @@ The host path is typed the way the host writes it, for example /home/me/notes.tx
 
 The destination may be a folder, in which case the file keeps its name. An existing destination file is overwritten only when FORCE is given.
 
-get writes a temporary file beside the Amiga destination, checks its size and moves it into place. put has the host write a temporary file named .htput.<number> beside the host target, check its size and move it into place. host-copy reports success only after the host confirms the size. Without FORCE, put never replaces a file that appears on the host during the upload. A failed or aborted copy leaves the old destination alone.
+get writes a temporary file beside the Amiga destination, checks its size and moves it into place. put has the host write a temporary file whose name starts with .htput. beside the host target, check its size and move it into place. host-copy reports success only after the host confirms the size. Without FORCE, put never replaces a file that appears on the host during the upload. A failed or aborted copy leaves the old destination alone.
 
 There is no time limit while the host process runs. Press Ctrl-C to abort. host-copy needs an Amiberry build with host pipe sessions. Linux and macOS hosts need sh, head, wc, cat, tr and mv, and Windows hosts need PowerShell.
 

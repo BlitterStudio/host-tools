@@ -131,41 +131,34 @@ static inline int host_copy_to_host_utf8(const char *src, char *dest, size_t des
 }
 
 /*
- * Guest text for a PowerShell script, which takes ISO-8859-1 bytes as
- * UTF-16 code units. UTF-8 text whose characters are all below U+0100 is
- * decoded to ISO-8859-1 first; any other text is used as written.
+ * Guest text as a PowerShell single-quoted literal. Scripts are composed
+ * in UTF-8, so UTF-8 text from the guest is quoted as written and
+ * ISO-8859-1 is converted once by host_append_ps_quoted.
  */
-static inline int host_copy_to_ps_text(const char *src, char *dest, size_t dest_size)
+static inline int host_copy_append_ps_text(char *script, size_t script_size, const char *text)
 {
-    size_t pos = 0;
-    int decode = host_copy_is_utf8(src);
+    size_t start = strlen(script);
+    size_t pos = start;
 
-    for (const unsigned char *p = (const unsigned char *)src; decode && *p;) {
-        unsigned long cp;
-        int len = host_copy_utf8_sequence(p, &cp);
-
-        decode = cp <= 0xFF;
-        p += len;
+    if (!host_copy_is_utf8(text)) {
+        return host_append_ps_quoted(script, script_size, text);
     }
-    if (!decode) {
-        size_t len = strlen(src);
-
-        if (len >= dest_size) {
+    if (pos + 3 >= script_size) {
+        return 0;
+    }
+    script[pos++] = '\'';
+    for (const char *c = text; *c; c++) {
+        if (pos + 3 >= script_size) {
+            script[start] = '\0';
             return 0;
         }
-        memcpy(dest, src, len + 1);
-        return 1;
-    }
-    for (const unsigned char *p = (const unsigned char *)src; *p;) {
-        unsigned long cp;
-
-        p += host_copy_utf8_sequence(p, &cp);
-        if (pos + 1 >= dest_size) {
-            return 0;
+        script[pos++] = *c;
+        if (*c == '\'') {
+            script[pos++] = '\'';
         }
-        dest[pos++] = (char)cp;
     }
-    dest[pos] = '\0';
+    script[pos++] = '\'';
+    script[pos] = '\0';
     return 1;
 }
 
@@ -272,23 +265,22 @@ static inline int host_copy_append_posix_path(char *command, size_t command_size
  * folder. The home form is parenthesized so it also works as a command
  * argument.
  */
-static inline int host_copy_append_ps_path(char *script, size_t script_size, const char *guest_path)
+static inline int host_copy_append_ps_path(char *script, size_t script_size, const char *path)
 {
-    static char text[HOST_MAX_PATH_LEN];
-    const char *path = text;
+    if (host_copy_home_prefix(path) || (path[0] == '~' && path[1] == '\\')) {
+        size_t start = strlen(script);
 
-    if (!host_copy_to_ps_text(guest_path, text, sizeof(text))) {
+        if (host_append_literal(script, script_size, "([Environment]::GetFolderPath('UserProfile')") &&
+            (path[1] == '\0' ||
+             (host_append_literal(script, script_size, "+") &&
+              host_copy_append_ps_text(script, script_size, path + 1))) &&
+            host_append_literal(script, script_size, ")")) {
+            return 1;
+        }
+        script[start] = '\0';
         return 0;
     }
-    if (host_copy_home_prefix(path) || (path[0] == '~' && path[1] == '\\')) {
-        return host_append_literal(script, script_size,
-                                   "([Environment]::GetFolderPath('UserProfile')") &&
-               (path[1] == '\0' ||
-                (host_append_literal(script, script_size, "+") &&
-                 host_append_ps_quoted(script, script_size, path + 1))) &&
-               host_append_literal(script, script_size, ")");
-    }
-    return host_append_ps_quoted(script, script_size, path);
+    return host_copy_append_ps_text(script, script_size, path);
 }
 
 static inline int host_copy_append_number(char *command, size_t command_size, unsigned long value)
@@ -310,7 +302,7 @@ static inline int host_append_copy_get_command(char *command, size_t command_siz
            host_copy_append_posix_path(command, command_size, path) &&
            host_append_literal(command, command_size,
                                "; [ -f \"$f\" ] || exit 2; [ -r \"$f\" ] || exit 3;"
-                               " wc -c <\"$f\"; cat -- \"$f\"");
+                               " wc -c <\"$f\"; cat <\"$f\"");
 }
 
 /* get, Windows host: same protocol as the POSIX command, through PowerShell. */
@@ -402,41 +394,38 @@ static inline int host_append_copy_put_command_windows(char *command, size_t com
                                                        unsigned long len, int force)
 {
     static char script[HOST_MAX_COMMAND_LEN];
-    static char ps_name[HOST_MAX_PATH_LEN];
 
     script[0] = '\0';
-    if (!host_copy_to_ps_text(name, ps_name, sizeof(ps_name))) {
-        return 0;
-    }
-    if (!host_append_literal(script, sizeof(script), HOST_PS_STOP_ON_ERROR "$p=") ||
+    if (!host_append_literal(script, sizeof(script), "$p=") ||
         !host_copy_append_ps_path(script, sizeof(script), path) ||
         !host_append_literal(script, sizeof(script), ";$n=") ||
-        !host_append_ps_quoted(script, sizeof(script), ps_name) ||
+        !host_copy_append_ps_text(script, sizeof(script), name) ||
         !host_append_literal(script, sizeof(script), ";$l=") ||
         !host_copy_append_number(script, sizeof(script), len) ||
         !host_append_literal(script, sizeof(script), ";$f=") ||
         !host_append_literal(script, sizeof(script), force ? "1" : "0") ||
         !host_append_literal(script, sizeof(script),
-                             ";$e='OPEN';$t=$o=$null;$d=0;$r=$l;$b=New-Object byte[] 65536;$i=[Console]::OpenStandardInput();"
-                             "try{$h=$p.EndsWith('\\')-or $p.EndsWith('/');"
-                             "$p=[IO.Path]::GetFullPath($p);"
-                             "if([IO.Directory]::Exists($p)){if(!$n){$e='NONAME';throw 1};$p=[IO.Path]::Combine($p,$n)}"
+                             ";$e='OPEN';$t=$o=$null;$c=$d=0;$r=$l;$b=[byte[]]::new(65536);"
+                             "$i=[Console]::OpenStandardInput();$w=[Console]::Out;"
+                             "$IP=[IO.Path];$IF=[IO.File];$ID=[IO.Directory];"
+                             "try{$h=$p -match '[\\\\/]$';$p=$IP::GetFullPath($p);"
+                             "if($ID::Exists($p)){if(!$n){$e='NONAME';throw 1};$p=$IP::Combine($p,$n)}"
                              "elseif($h){$e='NOTDIR';throw 1};"
-                             "if([IO.Directory]::Exists($p)){$e='ISDIR';throw 1};"
-                             "if(!$f -and [IO.File]::Exists($p)){$e='EXISTS';throw 1};"
-                             "$t=[IO.Path]::Combine([IO.Path]::GetDirectoryName($p),'.htput.'+$PID);"
-                             "$o=[IO.File]::Open($t,'CreateNew','Write');"
-                             "[Console]::Out.Write(\"READY`n\");$d=1;$e='WRITE';"
+                             "if($ID::Exists($p)){$e='ISDIR';throw 1};"
+                             "if(!$f -and $IF::Exists($p)){$e='EXISTS';throw 1};"
+                             "$t=$IP::Combine($IP::GetDirectoryName($p),'.htput.'+$IP::GetRandomFileName());"
+                             "$o=$IF::Open($t,'CreateNew','Write');$c=1;"
+                             "$w.Write(\"READY`n\");$d=1;$e='WRITE';"
                              "while($r -gt 0){$k=$i.Read($b,0,[Math]::Min(65536,$r));if($k -le 0){break};"
                              "$o.Write($b,0,$k);$r-=$k};"
                              "$o.Dispose();$o=$null;if($r){$e='SIZE';throw 1};$e='MOVE';"
-                             "if($f){Move-Item -Force -LiteralPath $t -Destination $p}"
-                             "else{[IO.File]::Move($t,$p)};"
-                             "$t=$null;[Console]::Out.Write(\"OK $l`n\")}"
-                             "catch{if($e -eq 'MOVE' -and !$f -and [IO.File]::Exists($p)){$e='EXISTS'};"
+                             "if($f){Move-Item -Force -ErrorAction Stop -LiteralPath $t -Destination $p}"
+                             "else{$IF::Move($t,$p)};"
+                             "$t=$null;$w.Write(\"OK $l`n\")}"
+                             "catch{if($e -eq 'MOVE' -and !$f -and $IF::Exists($p)){$e='EXISTS'};"
                              "if($o){try{$o.Dispose()}catch{}};"
-                             "if($t){try{[IO.File]::Delete($t)}catch{}};"
-                             "[Console]::Out.Write(\"ERR $e`n\");"
+                             "if($c -and $t){try{$IF::Delete($t)}catch{}};"
+                             "$w.Write(\"ERR $e`n\");"
                              "if($d -and $r -gt 0){try{while($i.Read($b,0,65536) -gt 0){}}catch{}};"
                              "exit 3}")) {
         return 0;

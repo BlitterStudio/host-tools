@@ -13,8 +13,8 @@ All commands work on Linux, macOS and Windows hosts. On Windows, `host-shell` ne
 
 The commands call these programs on the host:
 
-- Linux: `xdg-utils` and `notify-send`, plus `gtk-launch`, `gdbus`, `iconv` or a clipboard backend (`wl-clipboard`, `xclip`, `xsel`) depending on the command.
-- macOS: `open`, `osascript`, `pbcopy` and `pbpaste`.
+- Linux: `xdg-utils` and `notify-send`, plus `gtk-launch`, `gdbus`, `iconv`, a clipboard backend (`wl-clipboard`, `xclip`, `xsel`) or a speech program (`spd-say`, `espeak-ng`, `espeak`) depending on the command.
+- macOS: `open`, `osascript`, `pbcopy`, `pbpaste` and `say`.
 - Windows: PowerShell, Explorer and Notepad.
 - Downloads: `curl` or `wget` on Linux and macOS, `curl.exe` on Windows (included in Windows 10 and later).
 

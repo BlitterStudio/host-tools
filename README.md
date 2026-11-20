@@ -11,7 +11,7 @@ A classic AmigaOS 68k package for [Amiberry](https://github.com/BlitterStudio/am
 
 | Component | What it does | Installed location |
 | --- | --- | --- |
-| Command tools | Run commands on the host, open a host shell, open or edit files and URLs, show files in the host file manager, send notifications, use the host clipboard and environment, download files, quit Amiberry | `C:` |
+| Command tools | Run commands on the host, open a host shell, open or edit files and URLs, show files in the host file manager, send notifications, use the host clipboard and environment, speak text, download files, quit Amiberry | `C:` |
 | UAE AHI driver | Classic UAE 16-bit stereo AHI output | `DEVS:AHI/uae.audio`, `DEVS:AudioModes/UAE` |
 | UAESND AHI driver | AHI output through Amiberry's UAESND sound board | `DEVS:AHI/uaesnd.audio`, `DEVS:AudioModes/UAESND` |
 | UAE MHI MP3 decoder | Offloads MP3 decoding to Amiberry | `LIBS:MHI/mhiuae.library` |

@@ -85,6 +85,7 @@ host-reveal
 host-notify
 host-edit
 host-clip
+host-say
 host-info
 host-download
 host-env

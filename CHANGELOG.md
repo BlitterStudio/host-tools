@@ -12,8 +12,12 @@ versioning for release tags.
 
 ### Added
 
+- `host-say <text...>` speaks text on the host and returns when the speech ends.
+  It reads standard input when given no text, and Ctrl-C stops the speech. It
+  uses `say` on macOS, `spd-say`, `espeak-ng` or `espeak` on Linux, and
+  `System.Speech` through PowerShell on Windows.
 - `host-run`, `host-multiview`, `host-edit`, `host-notify`, and `host-shell` now
-  work on Windows hosts, so all 12 command tools support Linux, macOS, and
+  work on Windows hosts, so every command tool supports Linux, macOS, and
   Windows. `host-run` and `host-multiview` use PowerShell's `Start-Process`,
   `host-edit` opens Notepad, and `host-notify` shows a toast that Windows lists
   as Windows PowerShell. `host-shell` opens `%ComSpec%` in a ConPTY pseudo

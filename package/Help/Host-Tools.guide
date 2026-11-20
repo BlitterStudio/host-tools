@@ -28,6 +28,7 @@ Select "Command tools" in the installer to copy the programs to C:. They all wor
 @{"host-notify" link HostNotify} sends host desktop notifications.
 @{"host-edit" link HostEdit} opens files in the host text editor.
 @{"host-clip" link HostClip} copies text to and from the host clipboard.
+@{"host-say" link HostSay} speaks text through the host speech synthesizer.
 @{"host-info" link HostInfo} prints host integration details.
 @{"host-download" link HostDownload} downloads files through the host.
 @{"host-env" link HostEnv} gets and sets host environment variables.
@@ -196,6 +197,22 @@ Without text arguments, host-clip copy reads standard input unchanged, including
 
 @endnode
 
+@node HostSay "host-say"
+host-say speaks text through the host speech synthesizer and returns when the speech ends.
+
+Usage:
+
+host-say <text...>
+host-say < file
+
+Without text arguments, host-say reads standard input. Typing host-say alone at a console is an error. Ctrl-C stops the speech. The text is limited to 2047 characters, or about 1000 on Windows, and may start with a dash.
+
+macOS uses say. Linux uses spd-say, then espeak-ng, then espeak, whichever is installed first, and host-say fails if none is. Windows uses the System.Speech synthesizer through PowerShell. Text is converted from ISO-8859-1 to UTF-8 through iconv on Linux and macOS and through PowerShell on Windows.
+
+host-say keeps waiting for as long as the host reports the speech program running, even past the 30 second limit of the other tools. On Amiberry builds without status support it gives up after about 5 seconds.
+
+@endnode
+
 @node HostInfo "host-info"
 host-info prints the host operating system and user, and the shell, editor, opener and clipboard backend that the other tools use.
 
@@ -262,6 +279,6 @@ Enable Native Code execution in Amiberry to use the command tools (except host-q
 
 All command tools work on Linux, macOS and Windows hosts with a current Amiberry. The exception is host-shell on Windows, which needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later for the ConPTY pseudo console.
 
-host-reveal, host-notify, host-clip, host-info and host-env can be cancelled with Ctrl-C, and so can host-run, host-multiview and host-edit on Windows. They give up when the host sends no output for about 30 seconds on Amiberry builds with status support, or 5 seconds on older builds.
+host-reveal, host-notify, host-clip, host-say, host-info and host-env can be cancelled with Ctrl-C, and so can host-run, host-multiview and host-edit on Windows. They give up when the host sends no output for about 30 seconds on Amiberry builds with status support, or 5 seconds on older builds. host-say is the exception on builds with status support: it waits until the speech ends.
 
 @endnode

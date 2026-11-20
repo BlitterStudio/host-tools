@@ -55,8 +55,10 @@ static void test_absolute_edit_command(void)
             "absolute edit command should build");
 
     require_contains(command, "target='/tmp/a b.txt'; target_uri='file:///tmp/a%20b.txt'");
+    require_contains(command, "xdg-mime query default text/plain");
     require_contains(command, "gtk-launch \"$desktop_file\" \"$target_uri\"");
     require_contains(command, "xdg-open \"$target\"");
+    require_not_contains(command, "query filetype");
     require_contains(command, "sh -c 'exec $HOST_EDITOR \"$1\"' sh \"$target\"");
     require_not_contains(command, "xdg-open '/tmp/a b.txt'");
 }
@@ -70,7 +72,8 @@ static void test_relative_edit_command(void)
             "relative edit command should build");
 
     require_contains(command, "target=newfile.txt; target_uri=;");
-    require_contains(command, "xdg-mime query filetype \"$target\"");
+    require_contains(command, "xdg-mime query default text/plain");
+    require_not_contains(command, "query filetype");
     require_contains(command, "xdg-open \"$target\"");
 }
 

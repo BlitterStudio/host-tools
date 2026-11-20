@@ -77,10 +77,43 @@ static inline int host_append_env_export_line(char *line, size_t line_size,
     return host_append_literal(line, line_size, "'");
 }
 
+/*
+ * The scripts keep their own state in the positional parameters ($1 is
+ * the environment file, $2 the lock directory when one is held, $3 the
+ * temporary file) rather than in named variables, because "get" looks
+ * up a variable chosen by the user: a scratch variable called f or t
+ * would shadow the user's.
+ */
 static inline int host_append_env_file_prefix(char *command, size_t command_size)
 {
     return host_append_literal(command, command_size,
-                               "umask 077; f=\"${HOME:?}/.host-tools-env\"; ");
+                               "umask 077; set -- \"${HOME:?}/.host-tools-env\" '' ''; ");
+}
+
+/*
+ * Serialize read/modify/write of the environment file: two host-env commands
+ * running set or unset at once would otherwise each read the old file
+ * and the later rename would drop the earlier change. flock is used
+ * where it exists (the lock goes away with the process); otherwise a
+ * lock directory created with mkdir, removed on exit and on signals.
+ * It waits up to five seconds.
+ */
+static inline int host_append_env_lock_prefix(char *command, size_t command_size)
+{
+    return host_append_env_file_prefix(command, command_size) &&
+           host_append_literal(command, command_size,
+                               "trap 'rm -f \"$3\"; [ -z \"$2\" ] || rmdir \"$2\"' 0; "
+                               "trap 'exit 1' 1 2 15; n=0; "
+                               "if command -v flock >/dev/null 2>&1; then "
+                               "exec 9>\"$1.lock\" || exit 1; "
+                               "until flock -n 9; do n=$((n+1)); "
+                               "if [ \"$n\" -ge 50 ]; then echo 'Cannot lock the environment file'; exit 1; fi; "
+                               "sleep 0.1 2>/dev/null || sleep 1; done; "
+                               "else "
+                               "until mkdir \"$1.lock.d\" 2>/dev/null; do n=$((n+1)); "
+                               "if [ \"$n\" -ge 50 ]; then echo \"Cannot lock the environment file (remove $1.lock.d if no other host-env is running)\"; exit 1; fi; "
+                               "sleep 0.1 2>/dev/null || sleep 1; done; "
+                               "set -- \"$1\" \"$1.lock.d\" ''; fi; ");
 }
 
 static inline int host_append_env_get_command(char *command, size_t command_size,
@@ -95,7 +128,7 @@ static inline int host_append_env_get_command(char *command, size_t command_size
            host_append_literal(command, command_size, name) &&
            host_append_literal(command, command_size, "+x}\" = x ]; then printf '%s\\n' \"$") &&
            host_append_literal(command, command_size, name) &&
-           host_append_literal(command, command_size, "\"; elif [ -r \"$f\" ]; then . \"$f\"; if [ \"${") &&
+           host_append_literal(command, command_size, "\"; elif [ -r \"$1\" ]; then . \"$1\"; if [ \"${") &&
            host_append_literal(command, command_size, name) &&
            host_append_literal(command, command_size, "+x}\" = x ]; then printf '%s\\n' \"$") &&
            host_append_literal(command, command_size, name) &&
@@ -116,18 +149,17 @@ static inline int host_append_env_set_command(char *command, size_t command_size
         return 0;
     }
 
-    return host_append_env_file_prefix(command, command_size) &&
+    return host_append_env_lock_prefix(command, command_size) &&
            host_append_literal(command, command_size,
-                               "t=$(mktemp \"${f}.XXXXXX\") || exit 1; "
-                               "trap 'rm -f \"$t\"' 0 1 2 15; "
-                               "if [ -f \"$f\" ]; then grep -v '^export ") &&
+                               "t=$(mktemp \"$1.XXXXXX\") || exit 1; set -- \"$1\" \"$2\" \"$t\"; "
+                               "if [ -f \"$1\" ]; then grep -v '^export ") &&
            host_append_literal(command, command_size, name) &&
            host_append_literal(command, command_size,
-                               "=' \"$f\" > \"$t\"; s=$?; [ \"$s\" -le 1 ] || exit \"$s\"; fi; "
+                               "=' \"$1\" > \"$3\"; s=$?; [ \"$s\" -le 1 ] || exit \"$s\"; fi; "
                                "printf '%s\\n' ") &&
            host_append_shell_arg(command, command_size, line, 0) &&
            host_append_literal(command, command_size,
-                               " >> \"$t\" || exit $?; chmod 600 \"$t\" || exit $?; mv \"$t\" \"$f\"");
+                               " >> \"$3\" || exit $?; chmod 600 \"$3\" || exit $?; mv \"$3\" \"$1\"");
 }
 
 static inline int host_append_env_unset_command(char *command, size_t command_size,
@@ -137,21 +169,21 @@ static inline int host_append_env_unset_command(char *command, size_t command_si
         return 0;
     }
 
-    return host_append_env_file_prefix(command, command_size) &&
+    return host_append_env_lock_prefix(command, command_size) &&
            host_append_literal(command, command_size,
-                               "if [ -f \"$f\" ]; then t=$(mktemp \"${f}.XXXXXX\") || exit 1; "
-                               "trap 'rm -f \"$t\"' 0 1 2 15; grep -v '^export ") &&
+                               "if [ -f \"$1\" ]; then t=$(mktemp \"$1.XXXXXX\") || exit 1; "
+                               "set -- \"$1\" \"$2\" \"$t\"; grep -v '^export ") &&
            host_append_literal(command, command_size, name) &&
            host_append_literal(command, command_size,
-                               "=' \"$f\" > \"$t\"; s=$?; [ \"$s\" -le 1 ] || exit \"$s\"; "
-                               "chmod 600 \"$t\" || exit $?; mv \"$t\" \"$f\"; fi");
+                               "=' \"$1\" > \"$3\"; s=$?; [ \"$s\" -le 1 ] || exit \"$s\"; "
+                               "chmod 600 \"$3\" || exit $?; mv \"$3\" \"$1\"; fi");
 }
 
 static inline int host_append_env_list_command(char *command, size_t command_size)
 {
     return host_append_env_file_prefix(command, command_size) &&
            host_append_literal(command, command_size,
-                               "if [ -r \"$f\" ]; then . \"$f\"; fi; env | sort");
+                               "if [ -r \"$1\" ]; then . \"$1\"; fi; env | sort");
 }
 
 static inline int host_append_env_get_command_windows(char *command, size_t command_size,

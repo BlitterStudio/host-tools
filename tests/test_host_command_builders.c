@@ -103,9 +103,8 @@ static void test_notify_command(void)
     require_contains(command, "t='Build'\\''s Done'");
     require_contains(command, "m='Hello $USER & goodbye'");
     require_contains(command, "iconv -f ISO-8859-1 -t UTF-8");
-    require_contains(command, "notify-send \"$t\" \"$m\"");
-    require_contains(command, "osascript -e 'on run argv'");
-    require_contains(command, "'end run' \"$t\" \"$m\"; else exit 127; fi");
+    require_contains(command, "notify-send -- \"$t\" \"$m\"");
+    require_contains(command, "osascript - \"$t\" \"$m\"; else exit 127; fi");
     require_shell_syntax(command);
 }
 
@@ -205,9 +204,11 @@ static void test_env_get_command(void)
     require(host_append_env_get_command(command, sizeof(command), "FOO"),
             "env get command should build");
 
-    require_contains(command, "umask 077; f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "umask 077; set -- \"${HOME:?}/.host-tools-env\" '' ''; ");
     require_contains(command, "if [ \"${FOO+x}\" = x ]; then printf '%s\\n' \"$FOO\"");
-    require_contains(command, ". \"$f\"");
+    require_contains(command, ". \"$1\"");
+    require(strstr(command, "$f") == NULL && strstr(command, "f=") == NULL,
+            "env get must not use a scratch variable that a lookup of f would find");
     require_contains(command, "else exit 1; fi");
     require_shell_syntax(command);
 }
@@ -249,13 +250,15 @@ static void test_env_set_command(void)
                                         "FOO", "a b's $HOME"),
             "env set command should build");
 
-    require_contains(command, "umask 077; f=\"${HOME:?}/.host-tools-env\"");
-    require_contains(command, "t=$(mktemp \"${f}.XXXXXX\")");
-    require_contains(command, "trap 'rm -f \"$t\"' 0 1 2 15");
-    require_contains(command, "grep -v '^export FOO=' \"$f\"");
+    require_contains(command, "umask 077; set -- \"${HOME:?}/.host-tools-env\" '' ''; ");
+    require_contains(command, "trap 'rm -f \"$3\"; [ -z \"$2\" ] || rmdir \"$2\"' 0; trap 'exit 1' 1 2 15");
+    require_contains(command, "flock -n 9");
+    require_contains(command, "mkdir \"$1.lock.d\"");
+    require_contains(command, "t=$(mktemp \"$1.XXXXXX\")");
+    require_contains(command, "grep -v '^export FOO=' \"$1\"");
     require_contains(command, "printf '%s\\n' 'export FOO='\\''a b'\\''\\'\\'''\\''s $HOME'\\'''");
-    require_contains(command, "mv \"$t\" \"$f\"");
-    require_contains(command, "chmod 600 \"$t\"");
+    require_contains(command, "mv \"$3\" \"$1\"");
+    require_contains(command, "chmod 600 \"$3\"");
     require_shell_syntax(command);
 
     command[0] = '\0';
@@ -271,11 +274,12 @@ static void test_env_unset_command(void)
     require(host_append_env_unset_command(command, sizeof(command), "FOO"),
             "env unset command should build");
 
-    require_contains(command, "umask 077; f=\"${HOME:?}/.host-tools-env\"");
-    require_contains(command, "t=$(mktemp \"${f}.XXXXXX\")");
-    require_contains(command, "grep -v '^export FOO=' \"$f\" > \"$t\"");
-    require_contains(command, "mv \"$t\" \"$f\"");
-    require_contains(command, "chmod 600 \"$t\"");
+    require_contains(command, "umask 077; set -- \"${HOME:?}/.host-tools-env\" '' ''; ");
+    require_contains(command, "flock -n 9");
+    require_contains(command, "t=$(mktemp \"$1.XXXXXX\")");
+    require_contains(command, "grep -v '^export FOO=' \"$1\" > \"$3\"");
+    require_contains(command, "mv \"$3\" \"$1\"");
+    require_contains(command, "chmod 600 \"$3\"");
     require_shell_syntax(command);
 }
 
@@ -320,6 +324,9 @@ static void test_env_set_behavior(void)
             "env file should contain the requested export");
 
     require(unlink(env_path) == 0, "env behavior file should be removed");
+    /* the lock file (flock) stays behind; the lock directory (mkdir) must not */
+    snprintf(env_path, sizeof(env_path), "%s/.host-tools-env.lock", temp_dir);
+    unlink(env_path);
     require(rmdir(temp_dir) == 0, "env behavior temp directory should be removed");
 }
 
@@ -331,9 +338,9 @@ static void test_env_list_command(void)
     require(host_append_env_list_command(command, sizeof(command)),
             "env list command should build");
 
-    require_contains(command, "f=\"${HOME:?}/.host-tools-env\"");
+    require_contains(command, "set -- \"${HOME:?}/.host-tools-env\" '' ''");
     require_contains(command, "env");
-    require_contains(command, ". \"$f\"");
+    require_contains(command, ". \"$1\"");
     require_contains(command, "sort");
     require_shell_syntax(command);
 }

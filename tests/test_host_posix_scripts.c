@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include "host_clip_command.h"
 #include "host_download_command.h"
@@ -120,6 +121,26 @@ static const char *read_file(const char *path)
     buffer[n] = '\0';
     fclose(f);
     return buffer;
+}
+
+/*
+ * VISUAL, EDITOR and xdg-open start in the background, so the script can
+ * end before they have logged. Wait until the log stops changing.
+ */
+static const char *read_file_when_settled(const char *path)
+{
+    static char previous[16384];
+    struct timespec pause = { 0, 100000000L };
+    const char *current = read_file(path);
+    int stable = 0;
+
+    for (int i = 0; i < 30 && stable < 3; i++) {
+        nanosleep(&pause, NULL);
+        snprintf(previous, sizeof(previous), "%s", current);
+        current = read_file(path);
+        stable = strcmp(previous, current) == 0 ? stable + 1 : 0;
+    }
+    return current;
 }
 
 /* A PATH directory holding only the system tools the scripts use. */
@@ -691,7 +712,7 @@ static const char *run_edit(const char *bin, const char *home, const char *path,
     command[0] = '\0';
     require(host_append_edit_command(command, sizeof(command), path), "edit command should build");
     *rc = run_command(bin, home, env, command, out);
-    return read_file(log);
+    return read_file_when_settled(log);
 }
 
 static void test_edit_selects_text_editor(void)

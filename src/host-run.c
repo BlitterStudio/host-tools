@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
     static char command[HOST_MAX_COMMAND_LEN];
     static char plain[HOST_MAX_COMMAND_LEN];
     static char filename[HOST_MAX_PATH_LEN];
+    static char utf8[HOST_MAX_PATH_LEN * 2];
     static char program[HOST_MAX_PATH_LEN];
     static char arguments[HOST_MAX_COMMAND_LEN];
     static char crt_arguments[HOST_MAX_COMMAND_LEN];
@@ -79,11 +80,8 @@ int main(int argc, char *argv[])
         }
 
         if (windows_host) {
-            /* argv[1] is the program, the rest is its Windows command line (UTF-8) */
-            if (!host_path_utf8_target(argv[i], filename, sizeof(filename), &target)) {
-                printf("Command is too long\n");
-                return HOST_RETURN_ERROR;
-            }
+            /* argv[1] is the program, the rest is its Windows command line;
+             * the script builder converts ISO-8859-1 to UTF-8 as it quotes */
             if (i == 1) {
                 if (!host_append_literal(program, sizeof(program), target)) {
                     printf("Command is too long\n");
@@ -101,9 +99,10 @@ int main(int argc, char *argv[])
                 printf("Command is too long\n");
                 return HOST_RETURN_ERROR;
             }
-        } else if (i == 1
+        } else if (!host_path_to_utf8_target(utf8, sizeof(utf8), &target) ||
+                   (i == 1
                        ? !host_append_shell_arg(program, sizeof(program), target, 0)
-                       : !host_append_shell_arg(arguments, sizeof(arguments), target, 1)) {
+                       : !host_append_shell_arg(arguments, sizeof(arguments), target, 1))) {
             printf("Command is too long\n");
             return HOST_RETURN_ERROR;
         }

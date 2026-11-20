@@ -38,7 +38,8 @@ static inline int host_append_run_command(char *command, size_t command_size,
 
 /*
  * Windows: start a program without waiting for it. program and
- * arguments are UTF-8. arguments is the finished argument string (see
+ * arguments are ISO-8859-1 (host paths from NativeDosOp are too).
+ * arguments is the finished argument string (see
  * host_append_cmd_word and host_append_cmdline_arg), empty for none. A
  * missing program makes Start-Process fail.
  *
@@ -57,15 +58,15 @@ static inline int host_append_run_command_windows(char *command, size_t command_
     if (batch_safe) {
         return host_append_literal(script, sizeof(script),
                                    HOST_PS_STOP_ON_ERROR "Start-Process -FilePath ") &&
-               host_append_ps_quoted_utf8(script, sizeof(script), program) &&
+               host_append_ps_quoted(script, sizeof(script), program) &&
                (arguments[0] == '\0' ||
                 (host_append_literal(script, sizeof(script), " -ArgumentList ") &&
-                 host_append_ps_quoted_utf8(script, sizeof(script), arguments))) &&
+                 host_append_ps_quoted(script, sizeof(script), arguments))) &&
                host_append_ps_encoded_command(command, command_size, script);
     }
 
     return host_append_literal(script, sizeof(script), HOST_PS_STOP_ON_ERROR "$f=") &&
-           host_append_ps_quoted_utf8(script, sizeof(script), program) &&
+           host_append_ps_quoted(script, sizeof(script), program) &&
            host_append_literal(script, sizeof(script),
                                ";$e=[IO.Path]::GetExtension($f);"
                                "if(-not $e){$c=Get-Command -Name $f -CommandType Application"
@@ -74,7 +75,7 @@ static inline int host_append_run_command_windows(char *command, size_t command_
                                "if($e -match '^\\.(bat|cmd)$'){throw 'Arguments with quotes or"
                                " percent signs cannot be passed to a batch file'};"
                                "Start-Process -FilePath $f -ArgumentList ") &&
-           host_append_ps_quoted_utf8(script, sizeof(script), arguments) &&
+           host_append_ps_quoted(script, sizeof(script), arguments) &&
            host_append_ps_encoded_command(command, command_size, script);
 }
 

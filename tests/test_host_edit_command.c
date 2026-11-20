@@ -240,6 +240,18 @@ static void test_editor_fallback_behavior(void)
     require(strcmp(contents, "-w|/tmp/some file.txt\n") == 0,
             "the editor should get its options and the file");
 
+    /* xdg-open can stay alive as long as the editor does: it runs detached too */
+    snprintf(path, sizeof(path), "%s/xdg-open", dir);
+    f = fopen(path, "w");
+    require(f != NULL, "fake xdg-open should be created");
+    fprintf(f, "#!/bin/sh\nsleep 5\n");
+    fclose(f);
+    chmod(path, 0755);
+    require(run_edit_script(dir, "", "/tmp/a.txt", &elapsed) == 0,
+            "starting xdg-open should succeed");
+    require(elapsed < 3.0, "the script must not wait for xdg-open to quit");
+    unlink(path);
+
     /* a missing editor is a failure the guest can see (it used to be invisible) */
     require(run_edit_script(dir, "no-such-editor-xyz", "/tmp/a.txt", &elapsed) == 127,
             "a missing editor should exit 127");

@@ -472,27 +472,11 @@ static void test_ps_encoding(void)
     char command[HOST_MAX_COMMAND_LEN];
     static char decoded[HOST_MAX_COMMAND_LEN * 2];
 
-    /* guest text is ISO-8859-1 and becomes UTF-8 in the script */
+    /* guest text and NativeDosOp paths are ISO-8859-1 and become UTF-8 in the script */
     dest[0] = '\0';
     require(host_append_ps_quoted(dest, sizeof(dest), "caf\xE9 \xFF's"),
             "guest text should quote");
     require_string(dest, "'caf\xC3\xA9 \xC3\xBF''s'", "guest text should become UTF-8");
-
-    /* native paths are already UTF-8 and must not be converted again */
-    dest[0] = '\0';
-    require(host_append_ps_quoted_utf8(dest, sizeof(dest), "caf\xC3\xA9 \xCE\xB1's"),
-            "native text should quote");
-    require_string(dest, "'caf\xC3\xA9 \xCE\xB1''s'", "native text should be copied");
-
-    /* PowerShell reads U+2018 to U+201B as quotes too */
-    dest[0] = '\0';
-    require(host_append_ps_quoted_utf8(dest, sizeof(dest),
-                                       "a\xE2\x80\x98" "b\xE2\x80\x99" "c\xE2\x80\x9A" "d\xE2\x80\x9B" "e\xE2\x80\x9C"),
-            "smart quotes should quote");
-    require_string(dest,
-                   "'a\xE2\x80\x98\xE2\x80\x98" "b\xE2\x80\x99\xE2\x80\x99"
-                   "c\xE2\x80\x9A\xE2\x80\x9A" "d\xE2\x80\x9B\xE2\x80\x9B" "e\xE2\x80\x9C'",
-                   "single smart quotes must be doubled, double ones not");
 
     dest[0] = '\0';
     require(!host_append_ps_quoted(dest, 5, "caf\xE9"),
@@ -567,15 +551,16 @@ static void test_windows_reveal_command(void)
     require(strstr(command, "explorer /select") == NULL,
             "windows reveal must not go through cmd.exe");
 
-    /* a percent sign is data now, not an environment variable; the UTF-8 path survives */
+    /* a percent sign is data now, not an environment variable; the ISO-8859-1
+     * path (as NativeDosOp returns it) reaches PowerShell as UTF-8 */
     command[0] = '\0';
     require(host_append_reveal_command_windows(command, sizeof(command),
-                                               "C:\\Files\\%USERNAME% caf\xC3\xA9 \xCE\xB1.txt"),
-            "windows reveal command should keep percent signs and UTF-8");
+                                               "C:\\Files\\%USERNAME% caf\xE9 \xDF.txt"),
+            "windows reveal command should keep percent signs and accents");
     require_ps_script(command,
                       "$ErrorActionPreference='Stop';"
                       "Start-Process -FilePath 'explorer.exe' "
-                      "-ArgumentList '/select,\"C:\\Files\\%USERNAME% caf\xC3\xA9 \xCE\xB1.txt\"'");
+                      "-ArgumentList '/select,\"C:\\Files\\%USERNAME% caf\xC3\xA9 \xC3\x9F.txt\"'");
 
     command[0] = '\0';
     require(!host_append_reveal_command_windows(command, sizeof(command), "C:\\a\"b.txt"),
@@ -760,12 +745,12 @@ static void test_windows_edit_command(void)
 
     command[0] = '\0';
     require(host_append_edit_command_windows(command, sizeof(command),
-                                             "C:\\Users\\Jos\xC3\xA9\\\xCE\xB1 b.txt"),
-            "windows edit command should build for a UTF-8 path");
+                                             "C:\\Users\\Jos\xE9\\\xDF b.txt"),
+            "windows edit command should build for an ISO-8859-1 path");
     require_ps_script(command,
                       "$ErrorActionPreference='Stop';"
                       "Start-Process -FilePath 'notepad.exe' "
-                      "-ArgumentList '\"C:\\Users\\Jos\xC3\xA9\\\xCE\xB1 b.txt\"'");
+                      "-ArgumentList '\"C:\\Users\\Jos\xC3\xA9\\\xC3\x9F b.txt\"'");
 
     command[0] = '\0';
     require(host_append_edit_command_windows(command, sizeof(command),
@@ -789,11 +774,11 @@ static void test_windows_multiview_command(void)
 
     command[0] = '\0';
     require(host_append_multiview_command_windows(command, sizeof(command),
-                                                  "C:\\Users\\Jos\xC3\xA9\\\xCE\xB1 it\xE2\x80\x99s.png"),
-            "windows multiview command should build for a UTF-8 path");
+                                                  "C:\\Users\\Jos\xE9\\\xDF it's.png"),
+            "windows multiview command should build for an ISO-8859-1 path");
     require_ps_script(command,
                       "$ErrorActionPreference='Stop';"
-                      "Start-Process -FilePath 'C:\\Users\\Jos\xC3\xA9\\\xCE\xB1 it\xE2\x80\x99\xE2\x80\x99s.png'");
+                      "Start-Process -FilePath 'C:\\Users\\Jos\xC3\xA9\\\xC3\x9F it''s.png'");
 
     command[0] = '\0';
     require(host_append_multiview_command_windows(command, sizeof(command),
@@ -838,14 +823,14 @@ static void test_windows_run_command(void)
                       "Start-Process -FilePath 'notepad' -ArgumentList "
                       "'-f \"C:\\My Files\\a.txt\" \"it''s & more\" \"\"'");
 
-    /* native paths are UTF-8 and reach the script unchanged */
+    /* native paths are ISO-8859-1, like guest text, and reach the script as UTF-8 */
     command[0] = '\0';
     require(host_append_run_command_windows(command, sizeof(command),
-                                            "C:\\Users\\Jos\xC3\xA9\\\xCE\xB1.exe", "x", 1),
-            "windows run command with a UTF-8 path should build");
+                                            "C:\\Users\\Jos\xE9\\\xDF.exe", "x", 1),
+            "windows run command with an ISO-8859-1 path should build");
     require_ps_script(command,
                       "$ErrorActionPreference='Stop';"
-                      "Start-Process -FilePath 'C:\\Users\\Jos\xC3\xA9\\\xCE\xB1.exe' "
+                      "Start-Process -FilePath 'C:\\Users\\Jos\xC3\xA9\\\xC3\x9F.exe' "
                       "-ArgumentList 'x'");
 
     /* arguments cmd.exe cannot carry: native programs run, batch files are refused */

@@ -22,6 +22,7 @@ static int print_usage(void)
 int main(int argc, char *argv[])
 {
     static char filename[HOST_MAX_PATH_LEN];
+    static char utf8[HOST_MAX_PATH_LEN * 2];
     static char command[HOST_MAX_COMMAND_LEN];
     int status = 0;
     int platform;
@@ -77,8 +78,10 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        if (platform == HOST_PLATFORM_WINDOWS &&
-            !host_path_utf8_target(argv[i], filename, sizeof(filename), &target)) {
+        /* paths and text are ISO-8859-1 on the Amiga; POSIX hosts want UTF-8
+         * (the Windows script builders convert as they quote) */
+        if (platform != HOST_PLATFORM_WINDOWS &&
+            !host_path_to_utf8_target(utf8, sizeof(utf8), &target)) {
             printf("Command is too long\n");
             status = HOST_RETURN_ERROR;
             continue;

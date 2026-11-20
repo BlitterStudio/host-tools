@@ -59,7 +59,7 @@ struct host_path_ops {
     void (*unlock)(host_lock_t lock);
     /* 1 for a directory, 0 for anything else, -1 when it cannot be told */
     int (*is_dir)(host_lock_t lock);
-    /* native host path of the locked object (UTF-8); 0 on success */
+    /* native host path of the locked object (ISO-8859-1, as Amiberry keeps it); 0 on success */
     int (*native)(host_lock_t lock, char *out, size_t out_size);
     /* is name (without the colon) a device, volume or assign in the DOS list? */
     int (*dos_name_exists)(const char *name);
@@ -124,7 +124,7 @@ static inline int host_path_resolve_new(const struct host_path_ops *ops, const c
     const char *leaf;
     host_lock_t lock;
     long ioerr = 0;
-    char sep = '/';
+    int windows;
     size_t len;
     int status;
     int dir;
@@ -154,22 +154,21 @@ static inline int host_path_resolve_new(const struct host_path_ops *ops, const c
         return status;
     }
 
-    if (strchr(out, '\\') != NULL) {
-        sep = '\\';
-    }
+    /* a Windows path has a drive or UNC prefix; a POSIX name may hold a backslash */
+    windows = host_path_looks_like_windows_path(out);
     len = strlen(out);
-    if (len > 0 && out[len - 1] != '/' && out[len - 1] != '\\' &&
-        !host_append_literal(out, out_size, sep == '\\' ? "\\" : "/")) {
+    if (len > 0 && out[len - 1] != '/' && !(windows && out[len - 1] == '\\') &&
+        !host_append_literal(out, out_size, windows ? "\\" : "/")) {
         return HOST_PATH_TOO_LONG;
     }
-    if (!host_append_latin1_as_utf8(out, out_size, leaf)) {
+    if (!host_append_literal(out, out_size, leaf)) {
         return HOST_PATH_TOO_LONG;
     }
     return HOST_PATH_OK;
 }
 
 /*
- * Resolve arg. HOST_PATH_OK: out holds the native path (UTF-8).
+ * Resolve arg. HOST_PATH_OK: out holds the native path (ISO-8859-1).
  * HOST_PATH_URI and HOST_PATH_HOST: not an Amiga path, use arg as
  * written. Anything else is an error for host_path_error().
  *

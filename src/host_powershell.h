@@ -15,9 +15,10 @@
 
 /*
  * PowerShell scripts are composed in UTF-8 and converted to UTF-16 by
- * host_append_ps_encoded_command. Guest text is ISO-8859-1 and native
- * host paths are UTF-8, so there are two quoting functions; mixing them
- * up garbles every non-ASCII character.
+ * host_append_ps_encoded_command. Everything the tools pass in is
+ * ISO-8859-1: guest text, and the host paths from NativeDosOp, which
+ * Amiberry keeps in ISO-8859-1 on every host. host_append_ps_quoted
+ * converts it to UTF-8 as it quotes.
  */
 
 static inline int host_ps_put(char *dest, size_t dest_size, size_t *pos, char c)
@@ -29,19 +30,12 @@ static inline int host_ps_put(char *dest, size_t dest_size, size_t *pos, char c)
     return 1;
 }
 
-/* Windows PowerShell also treats U+2018 to U+201B as single quotes */
-static inline int host_ps_is_smart_quote(const unsigned char *p)
-{
-    return p[0] == 0xE2 && p[1] == 0x80 && p[2] >= 0x98 && p[2] <= 0x9B;
-}
-
 /*
- * Append text as a PowerShell single-quoted string literal, where the
- * only escape is doubling embedded quotes. latin1 selects the encoding
- * of text: ISO-8859-1 guest text (converted to UTF-8) or UTF-8.
+ * Append ISO-8859-1 text as a PowerShell single-quoted string literal
+ * (in UTF-8), where the only escape is doubling embedded quotes. dest is
+ * left unchanged on failure.
  */
-static inline int host_append_ps_quoted_text(char *dest, size_t dest_size, const char *text,
-                                             int latin1)
+static inline int host_append_ps_quoted(char *dest, size_t dest_size, const char *text)
 {
     size_t start = strlen(dest);
     size_t pos = start;
@@ -51,34 +45,20 @@ static inline int host_append_ps_quoted_text(char *dest, size_t dest_size, const
         return 0;
     }
 
-    while (*p) {
-        size_t len = 1;
-        int repeat = 1;
+    for (; *p; p++) {
+        int ok;
 
-        if (latin1 && *p >= 0x80) {
-            if (!host_ps_put(dest, dest_size, &pos, (char)(0xC0 | (*p >> 6))) ||
-                !host_ps_put(dest, dest_size, &pos, (char)(0x80 | (*p & 0x3F)))) {
-                dest[start] = '\0';
-                return 0;
-            }
-            p++;
-            continue;
+        if (*p >= 0x80) {
+            ok = host_ps_put(dest, dest_size, &pos, (char)(0xC0 | (*p >> 6))) &&
+                 host_ps_put(dest, dest_size, &pos, (char)(0x80 | (*p & 0x3F)));
+        } else {
+            ok = host_ps_put(dest, dest_size, &pos, (char)*p) &&
+                 (*p != '\'' || host_ps_put(dest, dest_size, &pos, '\''));
         }
-        if (*p == '\'') {
-            repeat = 2;
-        } else if (!latin1 && host_ps_is_smart_quote(p)) {
-            len = 3;
-            repeat = 2;
+        if (!ok) {
+            dest[start] = '\0';
+            return 0;
         }
-        for (int r = 0; r < repeat; r++) {
-            for (size_t i = 0; i < len; i++) {
-                if (!host_ps_put(dest, dest_size, &pos, (char)p[i])) {
-                    dest[start] = '\0';
-                    return 0;
-                }
-            }
-        }
-        p += len;
     }
 
     if (!host_ps_put(dest, dest_size, &pos, '\'')) {
@@ -87,18 +67,6 @@ static inline int host_append_ps_quoted_text(char *dest, size_t dest_size, const
     }
     dest[pos] = '\0';
     return 1;
-}
-
-/* Guest text (ISO-8859-1) as a PowerShell string literal */
-static inline int host_append_ps_quoted(char *dest, size_t dest_size, const char *text)
-{
-    return host_append_ps_quoted_text(dest, dest_size, text, 1);
-}
-
-/* Native host text (a path from NativeDosOp, UTF-8) as a PowerShell string literal */
-static inline int host_append_ps_quoted_utf8(char *dest, size_t dest_size, const char *text)
-{
-    return host_append_ps_quoted_text(dest, dest_size, text, 0);
 }
 
 /*

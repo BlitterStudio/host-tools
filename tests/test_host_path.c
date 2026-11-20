@@ -20,13 +20,17 @@ static const struct object objects[] = {
     { "HT:", 1, "/home/u/ht", 0 },
     { "HT:docs", 1, "/home/u/ht/docs", 0 },
     { "HT:docs/a.txt", 0, "/home/u/ht/docs/a.txt", 0 },
-    { "HT:caf\xE9.txt", 0, "/home/u/ht/caf\xC3\xA9.txt", 0 },
+    { "HT:caf\xE9.txt", 0, "/home/u/ht/caf\xE9.txt", 0 },
+    { "BS:", 1, "/home/u/we\\ird\\", 0 },
+    { "BS2:", 1, "/home/u/we\\ird", 0 },
+    { "UNC:", 1, "\\\\srv\\share", 0 },
+    { "WSL:", 1, "C:\\dir\\", 0 },
     { "DATA:", 1, "/data", 0 },
     { "DATA:readme", 0, "/data/readme", 0 },
     { "FILE:x", 0, "/files/x", 0 },
     { "SYS:", 1, "/sys", 0 },
     { "SYS:ghost", 0, NULL, 218 },
-    { "WH:", 1, "C:\\Users\\caf\xC3\xA9", 0 },
+    { "WH:", 1, "C:\\Users\\caf\xE9", 0 },
     { "WROOT:", 1, "C:\\", 0 },
     { "RAM:", 1, NULL, 0 },
     { "DF0:", 1, NULL, 226 },
@@ -37,7 +41,7 @@ static const struct object objects[] = {
 };
 
 static const char *const dos_names[] = {
-    "HT", "DATA", "FILE", "SYS", "WH", "WROOT", "RAM", "DF0", "C", NULL
+    "HT", "DATA", "FILE", "SYS", "WH", "WROOT", "RAM", "DF0", "C", "BS", "BS2", "UNC", "WSL", NULL
 };
 
 static int lock_calls;
@@ -164,8 +168,8 @@ static void test_existing_paths(void)
     require_status(HOST_PATH_MODE_FILE, ":top", HOST_PATH_OK, "/sys/top", 1,
                    "path on the current volume should translate");
     require_status(HOST_PATH_MODE_FILE, "HT:caf\xE9.txt", HOST_PATH_OK,
-                   "/home/u/ht/caf\xC3\xA9.txt", 1,
-                   "translated path should be returned as the UTF-8 the host gave");
+                   "/home/u/ht/caf\xE9.txt", 1,
+                   "translated path should be returned in the ISO-8859-1 the host op gave");
 }
 
 static void test_missing_amiga_paths_are_errors(void)
@@ -294,13 +298,22 @@ static void test_new_files(void)
     require_status(HOST_PATH_MODE_NEW, "newfile.txt", HOST_PATH_OK, "/cwd/newfile.txt", 2,
                    "a new relative file goes into the current directory");
     require_status(HOST_PATH_MODE_NEW, "HT:docs/caf\xE9.txt", HOST_PATH_OK,
-                   "/home/u/ht/docs/caf\xC3\xA9.txt", 2,
-                   "the new name is converted from ISO-8859-1 to UTF-8");
+                   "/home/u/ht/docs/caf\xE9.txt", 2,
+                   "the new name stays ISO-8859-1, like the translated parent");
     require_status(HOST_PATH_MODE_NEW, "WH:new.txt", HOST_PATH_OK,
-                   "C:\\Users\\caf\xC3\xA9\\new.txt", 2,
+                   "C:\\Users\\caf\xE9\\new.txt", 2,
                    "a Windows parent gets a backslash");
     require_status(HOST_PATH_MODE_NEW, "WROOT:new.txt", HOST_PATH_OK, "C:\\new.txt", 2,
                    "a parent that ends in a separator gets no second one");
+    /* POSIX directory names may hold backslashes: only a drive or UNC prefix means Windows */
+    require_status(HOST_PATH_MODE_NEW, "BS2:new.txt", HOST_PATH_OK, "/home/u/we\\ird/new.txt", 2,
+                   "a POSIX parent with a backslash gets a slash");
+    require_status(HOST_PATH_MODE_NEW, "BS:new.txt", HOST_PATH_OK, "/home/u/we\\ird\\/new.txt", 2,
+                   "a trailing backslash on a POSIX parent is part of its name");
+    require_status(HOST_PATH_MODE_NEW, "UNC:new.txt", HOST_PATH_OK, "\\\\srv\\share\\new.txt", 2,
+                   "a UNC parent gets a backslash");
+    require_status(HOST_PATH_MODE_NEW, "WSL:new.txt", HOST_PATH_OK, "C:\\dir\\new.txt", 2,
+                   "a drive parent that ends in a backslash gets no second one");
     require_status(HOST_PATH_MODE_NEW, "DATA:readme", HOST_PATH_OK, "/data/readme", 1,
                    "an existing file is not treated as new");
 

@@ -13,7 +13,7 @@ Where a command takes file arguments, existing Amiga paths are translated to hos
 
 The part of an argument before the first colon decides whether it is an Amiga path. A device, volume or assign in the DOS list makes it one, so `DATA:`, `FILE:` and `FTP:` are Amiga paths when such a volume exists, even though they look like URL schemes. If the object is missing, the tool prints `path not found` and returns `10`. It never hands the text to the host as a file name. An argument whose volume is not in the DOS list is a URL or, for `host-run`, an ordinary host argument. Windows paths such as `C:\Users\me\a.txt` are always passed through as written, even when an assign named `C:` exists. AmigaDOS paths are limited to 255 characters. A longer path is refused, and `host-run` passes a longer ordinary argument to the host unchanged without looking it up.
 
-Amiga text is ISO-8859-1 and host paths are UTF-8. The tools convert between the two, so a file named `café.txt` or `Ωmega.txt` on the host keeps its name. On Windows the tools run PowerShell, and when it fails they print its error message before their own.
+Amiga text and the host paths Amiberry returns are ISO-8859-1, while hosts expect UTF-8. The tools convert before they hand text or a path to the host, so a file named `café.txt` keeps its name. Names with characters outside ISO-8859-1 are not covered. On Windows the tools run PowerShell, and when it fails they print its error message before their own.
 
 ## host-run
 

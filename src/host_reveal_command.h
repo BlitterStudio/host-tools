@@ -15,7 +15,7 @@
  * Windows: Explorer selects the file directly. Explorer returns exit
  * code 1 even when it works, and Start-Process does not wait for it, so
  * the script's status only says whether Explorer could be started. The
- * path is UTF-8 and goes through PowerShell, not cmd.exe, which would
+ * path is ISO-8859-1 and goes through PowerShell, not cmd.exe, which would
  * expand percent signs and read it in the ANSI code page. A path with a
  * quote cannot be a Windows path and is rejected.
  */
@@ -36,7 +36,7 @@ static inline int host_append_reveal_command_windows(char *command, size_t comma
            host_append_literal(argument, sizeof(argument), "\"") &&
            host_append_literal(script, sizeof(script),
                                HOST_PS_STOP_ON_ERROR "Start-Process -FilePath 'explorer.exe' -ArgumentList ") &&
-           host_append_ps_quoted_utf8(script, sizeof(script), argument) &&
+           host_append_ps_quoted(script, sizeof(script), argument) &&
            host_append_ps_encoded_command(command, command_size, script);
 }
 

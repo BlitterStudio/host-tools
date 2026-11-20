@@ -74,7 +74,7 @@ static inline int host_append_edit_command(char *command, size_t command_size, c
 
 /*
  * Windows: open the file in Notepad, the editor host-info reports. The
- * path (UTF-8) is passed as a single quoted argument.
+ * path (ISO-8859-1) is passed as a single quoted argument.
  */
 static inline int host_append_edit_command_windows(char *command, size_t command_size,
                                                    const char *path)
@@ -87,7 +87,7 @@ static inline int host_append_edit_command_windows(char *command, size_t command
     return host_append_cmdline_arg(argument, sizeof(argument), path, 0) &&
            host_append_literal(script, sizeof(script),
                                HOST_PS_STOP_ON_ERROR "Start-Process -FilePath 'notepad.exe' -ArgumentList ") &&
-           host_append_ps_quoted_utf8(script, sizeof(script), argument) &&
+           host_append_ps_quoted(script, sizeof(script), argument) &&
            host_append_ps_encoded_command(command, command_size, script);
 }
 

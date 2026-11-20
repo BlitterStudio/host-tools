@@ -72,8 +72,8 @@ static const struct host_path_ops host_amiga_path_ops = {
 
 /*
  * Resolve arg (see host_path_resolve_with). On HOST_PATH_OK *target is
- * out, the native path (UTF-8). On HOST_PATH_URI and HOST_PATH_HOST it
- * is arg, which is ISO-8859-1 guest text.
+ * out, the native path. On HOST_PATH_URI and HOST_PATH_HOST it is arg.
+ * Both are ISO-8859-1.
  */
 static inline int host_resolve_path(int mode, const char *arg, char *out, size_t out_size,
                                     const char **target)
@@ -99,17 +99,15 @@ static inline int host_path_usable(int status)
 }
 
 /*
- * Windows scripts are UTF-8. A translated path already is; an argument
- * passed on as written is ISO-8859-1 and is converted into out.
+ * Native paths and guest text are both ISO-8859-1, but POSIX hosts want
+ * UTF-8 in file names and arguments. Convert target into out and point
+ * *target at it. Windows scripts convert as they quote, so Windows
+ * callers do not use this.
  */
-static inline int host_path_utf8_target(const char *arg, char *out, size_t out_size,
-                                        const char **target)
+static inline int host_path_to_utf8_target(char *out, size_t out_size, const char **target)
 {
-    if (*target != arg) {
-        return 1;
-    }
     out[0] = '\0';
-    if (!host_append_latin1_as_utf8(out, out_size, arg)) {
+    if (!host_append_latin1_as_utf8(out, out_size, *target)) {
         return 0;
     }
     *target = out;

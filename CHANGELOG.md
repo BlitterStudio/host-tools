@@ -71,9 +71,11 @@ versioning for release tags.
   `host-run` no longer looks up a long ordinary argument as a path.
 - `host-edit` creates a new file only in a directory that exists and has a host
   path.
-- On Windows, paths and arguments with characters outside ASCII, such as `é` or
-  `α`, reach PowerShell intact. Native host paths are UTF-8 and were read as
-  ISO-8859-1.
+- Paths and arguments with accented characters, such as `café.txt`, reach the
+  host intact. Amiberry hands paths to the tools in ISO-8859-1. On Windows the
+  PowerShell scripts now carry them as UTF-16, and on Linux and macOS
+  `host-run`, `host-multiview`, `host-edit` and `host-reveal` convert them to
+  UTF-8 before they reach the shell.
 - `host-reveal` on Windows starts Explorer through PowerShell. A percent sign in
   the path is no longer expanded as an environment variable, and non-ASCII names
   no longer depend on the ANSI code page.

@@ -23,6 +23,7 @@ static int print_usage(void)
 int main(int argc, char *argv[])
 {
     static char filename[HOST_MAX_PATH_LEN];
+    static char utf8[HOST_MAX_PATH_LEN * 2];
     static char command[HOST_MAX_COMMAND_LEN];
     int status = 0;
     int windows_host;
@@ -73,12 +74,6 @@ int main(int argc, char *argv[])
         }
 
         if (windows_host) {
-            if (!host_path_utf8_target(argv[i], filename, sizeof(filename),
-                                       &target)) {
-                printf("Command is too long\n");
-                status = HOST_RETURN_ERROR;
-                continue;
-            }
             command[0] = '\0';
             if (!host_append_multiview_command_windows(command, sizeof(command), target)) {
                 printf("Command is too long\n");
@@ -87,6 +82,13 @@ int main(int argc, char *argv[])
                 printf("Failed to open on host: %s\n", argv[i]);
                 status = HOST_RETURN_ERROR;
             }
+            continue;
+        }
+
+        /* POSIX hosts want UTF-8; the Amiga side is ISO-8859-1 */
+        if (!host_path_to_utf8_target(utf8, sizeof(utf8), &target)) {
+            printf("Command is too long\n");
+            status = HOST_RETURN_ERROR;
             continue;
         }
 

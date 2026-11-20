@@ -11,10 +11,11 @@ Run the classic AmigaOS 68k tools in Amiberry v6.0+ or a build with the required
 
 | Host | Supported commands |
 | --- | --- |
-| Linux and macOS | All 12 commands |
-| Windows (current Amiberry) | `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env`, `host-quit` |
+| Linux, macOS, and Windows | All 12 commands |
 
-Linux desktop integration uses `xdg-utils`, `notify-send`, and, depending on the operation, `gtk-launch`, `gdbus`, `iconv`, or a clipboard backend (`wl-clipboard`, `xclip`, `xsel`). Downloads use host `curl` or `wget`; on Windows they use `curl.exe` (included in Windows 10 and later). Windows desktop integrations use PowerShell and Explorer. Check the [command reference](Command-Tools) for individual requirements and exit codes.
+On Windows, `host-shell` needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later, which provides the ConPTY pseudo console. The other commands work with a current Amiberry.
+
+Linux desktop integration uses `xdg-utils`, `notify-send`, and, depending on the operation, `gtk-launch`, `gdbus`, `iconv`, or a clipboard backend (`wl-clipboard`, `xclip`, `xsel`). Downloads use host `curl` or `wget`; on Windows they use `curl.exe` (included in Windows 10 and later). Windows desktop integrations use PowerShell, Explorer, and Notepad. Check the [command reference](Command-Tools) for individual requirements and exit codes.
 
 ## Install from a release
 
@@ -30,19 +31,19 @@ For manual installation, copy the command programs from the archive's `C/` drawe
 
 These are Amiga CLI examples. Files must already exist where the example expects them; host applications can use Amiga paths backed by host-visible mounts.
 
-Open a URL in the Linux or macOS host browser:
+Open a URL in the host browser:
 
 ```text
 host-multiview https://github.com/BlitterStudio/amiberry
 ```
 
-Open a video on a host-visible Amiga volume using the host's default application (Linux/macOS):
+Open a video on a host-visible Amiga volume using the host's default application:
 
 ```text
 host-multiview "Work:Videos/My Holiday.mp4"
 ```
 
-To use a particular host application instead, run it explicitly (Linux/macOS, with the application installed on the host):
+To use a particular host application instead, run it explicitly (with the application installed on the host):
 
 ```text
 host-run vlc "Work:Videos/My Holiday.mp4"
@@ -54,6 +55,6 @@ Download an archive onto the Amiga RAM disk on any supported host:
 host-download https://github.com/BlitterStudio/host-tools/releases/download/v2.6/Host-Tools-2.6.lha RAM:
 ```
 
-To open a class of files on the host from Workbench, set its **DefIcons** default tool to `host-multiview` (Linux/macOS). `host-path Work:Videos` prints the host path for a mounted directory when you need to check where it resolves.
+To open a class of files on the host from Workbench, set its **DefIcons** default tool to `host-multiview`. `host-path Work:Videos` prints the host path for a mounted directory when you need to check where it resolves.
 
 For usage and behavior of the remaining commands, see [Command tools](Command-Tools). For choosing and installing audio modes, see [Audio and MP3](Audio-and-MP3).

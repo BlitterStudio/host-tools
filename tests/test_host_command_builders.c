@@ -13,11 +13,14 @@
 #include <unistd.h>
 #include "host_base64.h"
 #include "host_clip_command.h"
+#include "host_edit_command.h"
 #include "host_env_command.h"
 #include "host_info_command.h"
+#include "host_multiview_command.h"
 #include "host_notify_command.h"
 #include "host_powershell.h"
 #include "host_reveal_command.h"
+#include "host_run_command.h"
 #include "host_shell_command.h"
 
 static void require(int condition, const char *message)
@@ -481,6 +484,244 @@ static void test_windows_env_commands(void)
                       "Sort-Object Name|ForEach-Object{[Console]::Out.WriteLine(($_.Name)+'='+($_.Value))}");
 }
 
+static void require_cmdline_arg(const char *arg, const char *expected)
+{
+    char dest[64];
+
+    dest[0] = '\0';
+    require(host_append_cmdline_arg(dest, sizeof(dest), arg, 0),
+            "command line argument should fit");
+    require_string(dest, expected, "command line argument quoting");
+}
+
+/* Split a command line the way CommandLineToArgvW does */
+static int split_cmdline(const char *line, char args[][64], int max_args)
+{
+    const char *p = line;
+    int count = 0;
+
+    for (;;) {
+        char *out;
+        int in_quotes = 0;
+
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (*p == '\0') {
+            return count;
+        }
+        require(count < max_args, "too many arguments in parsed command line");
+        out = args[count++];
+
+        for (;;) {
+            size_t backslashes = 0;
+
+            while (*p == '\\') {
+                backslashes++;
+                p++;
+            }
+            if (*p == '"') {
+                for (size_t i = 0; i < backslashes / 2; i++) {
+                    *out++ = '\\';
+                }
+                if (backslashes % 2) {
+                    *out++ = '"';
+                } else {
+                    in_quotes = !in_quotes;
+                }
+                p++;
+                continue;
+            }
+            for (size_t i = 0; i < backslashes; i++) {
+                *out++ = '\\';
+            }
+            if (*p == '\0' || (!in_quotes && (*p == ' ' || *p == '\t'))) {
+                break;
+            }
+            *out++ = *p++;
+        }
+        *out = '\0';
+    }
+}
+
+static void test_cmdline_arg_quoting(void)
+{
+    static const char *const nasty[] = {
+        "", "plain", "with space", "tab\there", "say \"hi\"", "C:\\dir\\",
+        "C:\\my dir\\", "a\\\"b", "a\\\\\"b", "\\\\server\\share name\\", "\"", "\\",
+        "end\\\\", "a\\b c", "\" \"", "x\\\\ \\\\\\\"y"
+    };
+    char line[HOST_MAX_COMMAND_LEN];
+    char parsed[32][64];
+    int count = (int)(sizeof(nasty) / sizeof(nasty[0]));
+    char dest[6];
+
+    require_cmdline_arg("", "\"\"");
+    require_cmdline_arg("plain", "plain");
+    require_cmdline_arg("a b", "\"a b\"");
+    require_cmdline_arg("say \"hi\"", "\"say \\\"hi\\\"\"");
+    require_cmdline_arg("C:\\dir\\", "C:\\dir\\");
+    require_cmdline_arg("C:\\my dir\\", "\"C:\\my dir\\\\\"");
+    require_cmdline_arg("a\\\"b", "\"a\\\\\\\"b\"");
+    require_cmdline_arg("a\\b c", "\"a\\b c\"");
+
+    line[0] = '\0';
+    for (int i = 0; i < count; i++) {
+        require(host_append_cmdline_arg(line, sizeof(line), nasty[i], i > 0),
+                "command line should fit");
+    }
+    require(split_cmdline(line, parsed, 32) == count,
+            "quoted command line should split into the original argument count");
+    for (int i = 0; i < count; i++) {
+        require_string(parsed[i], nasty[i], "command line arguments should round trip");
+    }
+
+    strcpy(dest, "ab");
+    require(!host_append_cmdline_arg(dest, sizeof(dest), "c d", 1),
+            "command line argument that does not fit should fail");
+    require_string(dest, "ab", "failed command line argument should leave the buffer unchanged");
+}
+
+static void test_windows_notify_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+    static char message[1200];
+
+    command[0] = '\0';
+    require(host_append_notify_command_windows(command, sizeof(command), "Amiga", "it's done"),
+            "windows notify command should build");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "$m=[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime];"
+                      "$x=$m::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02);"
+                      "$e=$x.GetElementsByTagName('text');"
+                      "[void]$e.Item(0).AppendChild($x.CreateTextNode('Amiga'));"
+                      "[void]$e.Item(1).AppendChild($x.CreateTextNode('it''s done'));"
+                      "$m::CreateToastNotifier('{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe')"
+                      ".Show([Windows.UI.Notifications.ToastNotification]::new($x))");
+
+    /* the size limit quoted in host-notify's error message */
+    memset(message, 'm', 880);
+    command[0] = '\0';
+    require(host_append_notify_command_windows(command, sizeof(command), "Amiga", message),
+            "windows notify command should fit about 900 characters");
+    memset(message, 'm', sizeof(message) - 1);
+    message[sizeof(message) - 1] = '\0';
+    command[0] = '\0';
+    require(!host_append_notify_command_windows(command, sizeof(command), "Amiga", message),
+            "windows notify command over the encoded size limit should fail");
+}
+
+static void test_windows_edit_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_edit_command_windows(command, sizeof(command),
+                                             "C:\\My Files\\it's.txt"),
+            "windows edit command should build");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'notepad.exe' -ArgumentList '\"C:\\My Files\\it''s.txt\"'");
+
+    command[0] = '\0';
+    require(host_append_edit_command_windows(command, sizeof(command), "C:\\dir\\a.txt"),
+            "windows edit command without spaces should build");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'notepad.exe' -ArgumentList 'C:\\dir\\a.txt'");
+}
+
+static void test_windows_multiview_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    command[0] = '\0';
+    require(host_append_multiview_command_windows(command, sizeof(command),
+                                                  "C:\\My Files\\it's.png"),
+            "windows multiview command should build");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'C:\\My Files\\it''s.png'");
+
+    command[0] = '\0';
+    require(host_append_multiview_command_windows(command, sizeof(command),
+                                                  "https://example.com/a?b=1&c=2"),
+            "windows multiview URL command should build");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'https://example.com/a?b=1&c=2'");
+}
+
+static void test_windows_run_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+    char arguments[256];
+
+    command[0] = '\0';
+    require(host_append_run_command_windows(command, sizeof(command), "C:\\Tools\\app.exe", ""),
+            "windows run command without arguments should build");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'C:\\Tools\\app.exe'");
+
+    arguments[0] = '\0';
+    require(host_append_cmdline_arg(arguments, sizeof(arguments), "-f", 0) &&
+            host_append_cmdline_arg(arguments, sizeof(arguments), "C:\\My Files\\a.txt", 1) &&
+            host_append_cmdline_arg(arguments, sizeof(arguments), "it's \"x\"", 1) &&
+            host_append_cmdline_arg(arguments, sizeof(arguments), "", 1),
+            "windows run arguments should build");
+    command[0] = '\0';
+    require(host_append_run_command_windows(command, sizeof(command), "notepad", arguments),
+            "windows run command with arguments should build");
+    require_ps_script(command,
+                      "$ErrorActionPreference='Stop';"
+                      "Start-Process -FilePath 'notepad' -ArgumentList "
+                      "'-f \"C:\\My Files\\a.txt\" \"it''s \\\"x\\\"\" \"\"'");
+}
+
+static void test_windows_shell_command(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+    char *none[] = { "host-shell" };
+    char *single[] = { "host-shell", "dir \"C:\\My Files\" & echo done" };
+    char *several[] = { "host-shell", "type", "C:\\My Files\\a b.txt", "", "x&y", "plain-1.txt" };
+    char *quoted[] = { "host-shell", "echo", "say \"hi\"" };
+    char *newline[] = { "host-shell", "echo", "a\nb" };
+    char small[16];
+
+    command[0] = '\0';
+    require(host_append_shell_windows_command(command, sizeof(command), 1, none),
+            "windows shell command without arguments should build");
+    require_string(command, "", "no arguments should leave an interactive cmd.exe session");
+
+    command[0] = '\0';
+    require(host_append_shell_windows_command(command, sizeof(command), 2, single),
+            "windows shell command with one argument should build");
+    require_string(command, "dir \"C:\\My Files\" & echo done",
+                   "a single argument should be used as written");
+
+    command[0] = '\0';
+    require(host_append_shell_windows_command(command, sizeof(command), 6, several),
+            "windows shell command with several arguments should build");
+    require_string(command, "type \"C:\\My Files\\a b.txt\" \"\" \"x&y\" plain-1.txt",
+                   "several arguments should be joined as cmd.exe words");
+
+    command[0] = '\0';
+    require(!host_append_shell_windows_command(command, sizeof(command), 3, quoted),
+            "argument with a quote should be rejected");
+    command[0] = '\0';
+    require(!host_append_shell_windows_command(command, sizeof(command), 3, newline),
+            "argument with a line break should be rejected");
+    require(!host_cmd_word_valid("a\"b") && !host_cmd_word_valid("a\rb") &&
+            host_cmd_word_valid("a b&c"),
+            "cmd word validation should reject only quotes and line breaks");
+
+    small[0] = '\0';
+    require(!host_append_shell_windows_command(small, sizeof(small), 6, several),
+            "windows shell command over the buffer size should fail");
+}
+
 static void test_small_buffer_failures(void)
 {
     char command[32];
@@ -526,6 +767,12 @@ int main(void)
     test_windows_reveal_command();
     test_windows_info_command();
     test_windows_env_commands();
+    test_cmdline_arg_quoting();
+    test_windows_notify_command();
+    test_windows_edit_command();
+    test_windows_multiview_command();
+    test_windows_run_command();
+    test_windows_shell_command();
     test_small_buffer_failures();
     return 0;
 }

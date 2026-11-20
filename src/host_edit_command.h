@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "host_common.h"
+#include "host_powershell.h"
 
 #define HOST_EDIT_COMMAND_TAIL "; if [ \"$(uname -s)\" = Darwin ] && command -v open >/dev/null 2>&1; then open -t \"$target\"; else mime_type=text/plain; desktop_file=; if command -v xdg-mime >/dev/null 2>&1; then detected_mime=$(xdg-mime query filetype \"$target\" 2>/dev/null); [ -n \"$detected_mime\" ] && mime_type=$detected_mime; desktop_file=$(xdg-mime query default \"$mime_type\" 2>/dev/null); [ -n \"$desktop_file\" ] || desktop_file=$(xdg-mime query default text/plain 2>/dev/null); fi; if [ -n \"$target_uri\" ] && [ -n \"$desktop_file\" ] && command -v gtk-launch >/dev/null 2>&1 && gtk-launch \"$desktop_file\" \"$target_uri\"; then :; elif command -v xdg-open >/dev/null 2>&1 && xdg-open \"$target\"; then :; else host_editor=${VISUAL:-${EDITOR:-}}; if [ -n \"$host_editor\" ]; then HOST_EDITOR=\"$host_editor\" sh -c 'exec $HOST_EDITOR \"$1\"' sh \"$target\"; else exit 127; fi; fi; fi"
 
@@ -44,6 +45,25 @@ static inline int host_append_edit_command(char *command, size_t command_size, c
     }
 
     return host_append_edit_command_with_uri(command, command_size, path, "");
+}
+
+/*
+ * Windows: open the file in Notepad, the editor host-info reports. The
+ * path is passed as a single quoted argument.
+ */
+static inline int host_append_edit_command_windows(char *command, size_t command_size,
+                                                   const char *path)
+{
+    static char script[HOST_MAX_COMMAND_LEN];
+    static char argument[HOST_MAX_COMMAND_LEN];
+
+    script[0] = '\0';
+    argument[0] = '\0';
+    return host_append_cmdline_arg(argument, sizeof(argument), path, 0) &&
+           host_append_literal(script, sizeof(script),
+                               HOST_PS_STOP_ON_ERROR "Start-Process -FilePath 'notepad.exe' -ArgumentList ") &&
+           host_append_ps_quoted(script, sizeof(script), argument) &&
+           host_append_ps_encoded_command(command, command_size, script);
 }
 
 #endif

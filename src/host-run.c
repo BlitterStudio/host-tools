@@ -6,7 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "host_capture.h"
 #include "host_path.h"
+#include "host_run_command.h"
 
 static const char version[] = "$VER: Host-Run " VERSION_STR " (" DATE_STR ")";
 
@@ -22,8 +24,13 @@ int main(int argc, char *argv[])
 {
     static char command[HOST_MAX_COMMAND_LEN];
     static char filename[HOST_MAX_PATH_LEN];
+    static char program[HOST_MAX_PATH_LEN];
+    static char arguments[HOST_MAX_COMMAND_LEN];
+    int windows_host;
 
     command[0] = '\0';
+    program[0] = '\0';
+    arguments[0] = '\0';
 
     if (!InitUAEResource())
     {
@@ -43,6 +50,8 @@ int main(int argc, char *argv[])
         return print_usage();
     }
 
+    windows_host = (GetHostPlatform() == HOST_PLATFORM_WINDOWS);
+
     for (int i = 1; i < argc; i++)
     {
         // Try to resolve as a file path first (skip URLs to avoid volume requester)
@@ -55,11 +64,30 @@ int main(int argc, char *argv[])
         }
         is_resolved_file = (target == filename);
 
-        if (!host_append_shell_arg(command, sizeof(command),
-                                   is_resolved_file ? filename : target, i > 1)) {
+        if (windows_host) {
+            /* argv[1] is the program, the rest is its Windows command line */
+            if (i == 1 ? !host_append_literal(program, sizeof(program), target)
+                       : !host_append_cmdline_arg(arguments, sizeof(arguments), target, i > 2)) {
+                printf("Command is too long\n");
+                return HOST_RETURN_ERROR;
+            }
+        } else if (!host_append_shell_arg(command, sizeof(command),
+                                          is_resolved_file ? filename : target, i > 1)) {
             printf("Command is too long\n");
             return HOST_RETURN_ERROR;
         }
+    }
+
+    if (windows_host) {
+        if (!host_append_run_command_windows(command, sizeof(command), program, arguments)) {
+            printf("Command is too long\n");
+            return HOST_RETURN_ERROR;
+        }
+        if (host_print_command_output(command) != 0) {
+            printf("Failed to run on host: %s\n", argv[1]);
+            return HOST_RETURN_ERROR;
+        }
+        return 0;
     }
 
 #ifdef DEBUG

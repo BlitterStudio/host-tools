@@ -161,6 +161,91 @@ static inline int host_append_cmd_arg(char *command, size_t command_size, const 
            host_append_literal(command, command_size, "\"");
 }
 
+static inline int host_put_char(char *dest, size_t max_len, size_t *pos, char c)
+{
+    if (*pos + 1 >= max_len) {
+        return 0;
+    }
+    dest[(*pos)++] = c;
+    return 1;
+}
+
+static inline int host_put_repeat(char *dest, size_t max_len, size_t *pos, char c, size_t count)
+{
+    while (count-- > 0) {
+        if (!host_put_char(dest, max_len, pos, c)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/*
+ * Append one argument to a Windows command line using the quoting that
+ * CommandLineToArgvW and the Microsoft C runtime undo: the argument is
+ * quoted when it is empty or holds a space, tab or quote; a quote
+ * becomes \" and backslashes in front of a quote, or in front of the
+ * closing quote, are doubled. dest is left unchanged on failure.
+ */
+static inline int host_append_cmdline_arg(char *dest, size_t max_len, const char *src,
+                                          int add_separator)
+{
+    size_t start;
+    size_t pos;
+    size_t backslashes = 0;
+    int quote;
+    int ok = 1;
+
+    if (max_len == 0 || dest == NULL || src == NULL) {
+        return 0;
+    }
+
+    quote = (src[0] == '\0');
+    start = strlen(dest);
+    if (start >= max_len) {
+        return 0;
+    }
+    pos = start;
+
+    for (const char *p = src; *p; p++) {
+        if (*p == ' ' || *p == '\t' || *p == '"') {
+            quote = 1;
+        }
+    }
+
+    if (add_separator) {
+        ok = host_put_char(dest, max_len, &pos, ' ');
+    }
+    if (ok && quote) {
+        ok = host_put_char(dest, max_len, &pos, '"');
+    }
+    for (const char *p = src; ok && *p; p++) {
+        if (*p == '\\') {
+            backslashes++;
+            continue;
+        }
+        if (*p == '"') {
+            ok = host_put_repeat(dest, max_len, &pos, '\\', backslashes * 2 + 1) &&
+                 host_put_char(dest, max_len, &pos, '"');
+        } else {
+            ok = host_put_repeat(dest, max_len, &pos, '\\', backslashes) &&
+                 host_put_char(dest, max_len, &pos, *p);
+        }
+        backslashes = 0;
+    }
+    if (ok) {
+        ok = host_put_repeat(dest, max_len, &pos, '\\', quote ? backslashes * 2 : backslashes) &&
+             (!quote || host_put_char(dest, max_len, &pos, '"'));
+    }
+
+    if (!ok) {
+        dest[start] = '\0';
+        return 0;
+    }
+    dest[pos] = '\0';
+    return 1;
+}
+
 static inline char host_ascii_lower(char c)
 {
     if (c >= 'A' && c <= 'Z') {

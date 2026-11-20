@@ -9,8 +9,8 @@ Run these commands in an AmigaOS CLI under Amiberry with **Native Code** enabled
 
 | Host support | Tools |
 | --- | --- |
-| Linux, macOS, Windows (current Amiberry) | `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env`, `host-quit` |
-| Linux and macOS | `host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify` |
+| Linux, macOS, Windows (current Amiberry) | `host-run`, `host-multiview`, `host-path`, `host-reveal`, `host-edit`, `host-notify`, `host-clip`, `host-info`, `host-download`, `host-env`, `host-quit` |
+| Linux, macOS, Windows (Amiberry 8.6.0 or newer, Windows 10 version 1809 or later) | `host-shell` |
 
 ## host-run
 
@@ -18,7 +18,9 @@ Run these commands in an AmigaOS CLI under Amiberry with **Native Code** enabled
 host-run <command> [arguments...]
 ```
 
-Runs a command on a Linux or macOS host. Existing Amiga file arguments (such as `Work:Videos/clip.mp4`) are resolved to host paths. Arguments are quoted for the host shell, but the command must be installed on the host; `host-run` does not install software or make files inside an unmapped Amiga volume visible to host applications.
+Runs a command on the host. Existing Amiga file arguments (such as `Work:Videos/clip.mp4`) are resolved to host paths. Arguments are quoted for the host shell, but the command must be installed on the host; `host-run` does not install software or make files inside an unmapped Amiga volume visible to host applications.
+
+On Windows the first argument is the program and the rest are its arguments. `host-run` starts it with PowerShell's `Start-Process` and returns at once without waiting for it to finish. The arguments are joined into one command line using the usual Windows quoting rules. A console program opens in its own window. If the program is not found, `host-run` prints a message and returns `10`.
 
 ```text
 host-run vlc "Work:Videos/My Holiday.mp4"
@@ -32,7 +34,7 @@ For the host's default file or URL handler, use `host-multiview` instead of choo
 host-multiview <filename|URL> [filename2|URL2 ...]
 ```
 
-Opens each file or URL with the Linux or macOS host's default application. An existing Amiga path is translated before it is handed to the host. A URL is passed through as a URL.
+Opens each file or URL with the host's default application. An existing Amiga path is translated before it is handed to the host. A URL is passed through as a URL. On Windows this uses PowerShell's `Start-Process`, which asks Windows for the default handler of the file or URL.
 
 ```text
 host-multiview https://github.com/BlitterStudio/amiberry
@@ -48,6 +50,8 @@ host-shell [command]
 ```
 
 Opens an interactive Linux or macOS login shell inside the Amiga CLI, or runs the supplied command in that login shell. Host shell startup files can supply its environment. Full-screen terminal programs work in the Amiga console; the host terminal's size is taken from the Amiga window when `host-shell` starts. Restart it after resizing the window.
+
+On Windows the session runs in a ConPTY pseudo console, so it needs Amiberry 8.6.0 or newer on Windows 10 version 1809 or later. Without arguments it opens an interactive `%ComSpec%` (normally `cmd.exe`). A single argument is run through `cmd /C` as written. Several arguments are joined into one command line, quoted where needed; an argument that contains a double quote or a line break is refused, so pass such a command as one argument. There is no login shell on Windows. With an older Amiberry the tool reports that it could not open the session.
 
 ## host-path
 
@@ -72,7 +76,7 @@ host-notify <message>
 host-notify <title> <message...>
 ```
 
-Sends a desktop notification using `notify-send` on Linux or `osascript` on macOS. The one-argument form uses the message as the notification text; the second form supplies a title and message. Windows is not supported.
+Sends a desktop notification using `notify-send` on Linux, `osascript` on macOS, or a Windows toast on Windows. The one-argument form uses the message as the notification text; the second form supplies a title and message. The Windows toast is attributed to Windows PowerShell, so it appears under that name, and title and message together are limited to about 900 characters.
 
 ## host-edit
 
@@ -80,7 +84,7 @@ Sends a desktop notification using `notify-send` on Linux or `osascript` on macO
 host-edit <path> [path2 ...]
 ```
 
-Opens files in the Linux or macOS host's desktop text editor. macOS uses `open -t`; on Linux the tool looks for a default GUI text editor through `xdg-mime` and `gtk-launch`, then falls back to `xdg-open`, `VISUAL`, or `EDITOR` where available.
+Opens files in the host's desktop text editor. macOS uses `open -t`; on Linux the tool looks for a default GUI text editor through `xdg-mime` and `gtk-launch`, then falls back to `xdg-open`, `VISUAL`, or `EDITOR` where available. On Windows the file opens in Notepad.
 
 ## host-clip
 
@@ -144,4 +148,4 @@ Closes Amiberry, as quitting from its menu does. Amiberry's WHDLoad booter runs 
 
 Commands return `0` on success, `10` for missing/invalid arguments or failed operations, and `2` if `uae.resource` is unavailable (for example, outside Amiberry or with Native Code disabled). The `?` help request returns `0` when `uae.resource` is available.
 
-Linux desktop commands depend on the corresponding host utilities (`xdg-utils`, `notify-send`, clipboard backends, and optionally `gdbus` or `iconv`). Downloads require `curl` or `wget` on POSIX hosts and `curl.exe` on Windows. Status-aware host commands can be cancelled with Ctrl-C; idle operations time out after about 30 seconds with newer Amiberry `HostShell_Status` support or 5 seconds without it. See [Getting started](Getting-Started) for installation and host support.
+Linux desktop commands depend on the corresponding host utilities (`xdg-utils`, `notify-send`, clipboard backends, and optionally `gdbus` or `iconv`). Downloads require `curl` or `wget` on POSIX hosts and `curl.exe` on Windows. On Windows, `host-run`, `host-multiview`, `host-edit`, and `host-notify` run PowerShell, and `host-edit` needs Notepad. Status-aware host commands can be cancelled with Ctrl-C; idle operations time out after about 30 seconds with newer Amiberry `HostShell_Status` support or 5 seconds without it. See [Getting started](Getting-Started) for installation and host support.

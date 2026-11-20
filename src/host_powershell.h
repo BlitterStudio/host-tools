@@ -10,6 +10,9 @@
 #include "host_base64.h"
 #include "host_common.h"
 
+/* Script prefix that turns any PowerShell error into a non-zero exit code */
+#define HOST_PS_STOP_ON_ERROR "$ErrorActionPreference='Stop';"
+
 /*
  * Append text as a PowerShell single-quoted string literal, where the
  * only escape is doubling embedded quotes.

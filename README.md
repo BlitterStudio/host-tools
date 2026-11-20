@@ -24,12 +24,13 @@ For detailed usage, see the [command reference](https://github.com/BlitterStudio
 ## Requirements
 
 -   **Amiberry v6.0+** (or a build with the required `uae.resource`/`uaelib` support); enable **Native Code** execution in Amiberry settings for the command tools and MHI library. UAESND AHI also needs the UAESND sound board enabled.
--   The command tools run on **Linux and macOS hosts** except where the Windows support table below adds support. Audio components use Amiberry's emulated interfaces; the table describes command tools only.
+-   The command tools run on **Linux, macOS, and Windows hosts**. Audio components use Amiberry's emulated interfaces; the table describes command tools only.
+-   On Windows, `host-shell` needs **Amiberry 8.6.0 or newer** on Windows 10 version 1809 or later, which provides the ConPTY pseudo console. The other command tools need a current Amiberry.
 
 | Tool | Linux | macOS | Windows |
 | --- | :---: | :---: | :---: |
-| `host-run`, `host-multiview`, `host-shell`, `host-edit`, `host-notify` | Yes | Yes | — |
-| `host-path`, `host-reveal`, `host-clip`, `host-info`, `host-download`, `host-env`, `host-quit` | Yes | Yes | Yes |
+| `host-run`, `host-multiview`, `host-path`, `host-reveal`, `host-edit`, `host-notify`, `host-clip`, `host-info`, `host-download`, `host-env`, `host-quit` | Yes | Yes | Yes |
+| `host-shell` | Yes | Yes | Yes (Amiberry 8.6.0+) |
 
 ## Exit Codes
 

@@ -34,7 +34,14 @@ static inline int host_capture_status_rc(ULONG status)
     return exit_code == 0 ? 0 : HOST_RETURN_ERROR;
 }
 
-static inline int host_print_command_output(const char *command)
+/*
+ * Run a host command and copy its output to standard output. With
+ * wait_for_exit set, a host that reports status (HostShell_Status) is
+ * waited on for as long as the process runs, however long it stays
+ * silent. Without it, or on builds without status support, the session
+ * is dropped after the idle limit.
+ */
+static inline int host_print_command_output_ex(const char *command, int wait_for_exit)
 {
     long handle;
     char buffer[1024];
@@ -92,6 +99,9 @@ static inline int host_print_command_output(const char *command)
                 return HOST_RETURN_ERROR;
             }
             Delay(1);
+            if (wait_for_exit && status == HOST_SHELL_STATUS_RUNNING) {
+                continue;
+            }
             idle_count++;
             idle_limit = status_supported ? HOST_CAPTURE_STATUS_IDLE_LIMIT
                                           : HOST_CAPTURE_LEGACY_IDLE_LIMIT;
@@ -104,6 +114,11 @@ static inline int host_print_command_output(const char *command)
     HostShell_Close(handle);
     printf("\nTimed out waiting for host command output.\n");
     return HOST_RETURN_ERROR;
+}
+
+static inline int host_print_command_output(const char *command)
+{
+    return host_print_command_output_ex(command, 0);
 }
 
 #endif

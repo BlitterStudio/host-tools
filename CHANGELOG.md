@@ -10,6 +10,16 @@ versioning for release tags.
 
 ## [Unreleased]
 
+### Added
+
+- `host-run`, `host-multiview`, `host-edit`, `host-notify`, and `host-shell` now
+  work on Windows hosts, so all 12 command tools support Linux, macOS, and
+  Windows. `host-run` and `host-multiview` use PowerShell's `Start-Process`,
+  `host-edit` opens Notepad, and `host-notify` shows a toast that Windows lists
+  as Windows PowerShell. `host-shell` opens `%ComSpec%` in a ConPTY pseudo
+  console through the new `HostShell_OpenSized` call; it needs Amiberry 8.6.0 or
+  newer on Windows 10 version 1809 or later.
+
 ### Changed
 
 - Build with `amigadev/crosstools:m68k-amigaos` (AmigaDev GCC 16.2-rc24-9,

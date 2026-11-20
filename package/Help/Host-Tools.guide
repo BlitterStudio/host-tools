@@ -17,7 +17,7 @@ Choose a topic:
 @endnode
 
 @node Commands "Command Tools"
-Select "Command tools" in the installer to copy all 12 programs to C:. Linux and macOS support all 12; seven also work on Windows with a current Amiberry (see Installation Notes). Each command accepts ? for usage help.
+Select "Command tools" in the installer to copy all 12 programs to C:. All 12 work on Linux, macOS, and Windows hosts; host-shell on Windows needs Amiberry 8.6.0 or newer (see Installation Notes). Each command accepts ? for usage help.
 
 @{"host-run" link HostRun} executes host commands.
 @{"host-multiview" link HostMultiView} opens files or URLs with the host default application.
@@ -92,6 +92,8 @@ host-run <command> [arguments...]
 
 Arguments that name existing Amiga paths are translated to host paths before the command is sent to the host.
 
+On Windows the first argument is the program and the rest are its arguments. The program is started with PowerShell Start-Process and host-run returns without waiting for it. A console program opens in its own window. If the program cannot be started, host-run prints a message and returns 10.
+
 @endnode
 
 @node HostMultiView "host-multiview"
@@ -100,6 +102,8 @@ host-multiview opens one or more files or URLs with the host operating system's 
 Usage:
 
 host-multiview <filename|URL> [filename2|URL2 ...]
+
+On Windows the default handler is found with PowerShell Start-Process.
 
 @endnode
 
@@ -114,7 +118,7 @@ The host user's login shell is used, so shell profile files can set paths and en
 
 The host terminal is sized to match the Amiga console window, so full-screen host programs render correctly. Resize the Amiga window and restart host-shell to apply a new size.
 
-host-shell requires a Linux or macOS host.
+On Windows, host-shell opens %ComSpec% (normally cmd.exe) in a ConPTY pseudo console and runs commands through cmd /C. No login shell is used. A single argument is run as written; several arguments are joined and quoted, and an argument containing a double quote, a percent sign, or a line break is refused. This needs Amiberry 8.6.0 or newer on Windows 10 version 1809 or later.
 
 @endnode
 
@@ -146,7 +150,7 @@ Usage:
 host-notify <message>
 host-notify <title> <message...>
 
-host-notify requires a Linux or macOS host.
+On Linux the notification is sent with notify-send, on macOS with osascript, and on Windows as a toast. The Windows toast is shown under the name Windows PowerShell. Title and message together are limited to about 900 characters on Windows.
 
 @endnode
 
@@ -156,6 +160,8 @@ host-edit opens files with the host desktop text editor.
 Usage:
 
 host-edit <path> [path2 ...]
+
+On Windows the files are opened in Notepad.
 
 @endnode
 
@@ -234,8 +240,8 @@ The guide is installed to HELP:<language>/Host-Tools.guide (English if no langua
 
 Enable Native Code execution in Amiberry to use the command tools and MHI decoder. Enable the UAESND sound board in Amiberry before using the UAESND AHI modes. Choose your preferred AHI mode in AHI preferences yourself.
 
-All command tools work on Linux and macOS hosts. On Windows hosts, host-path, host-download, host-clip, host-reveal, host-info, host-env, and host-quit are supported with a current Amiberry; the remaining command tools require a Linux or macOS host.
+All command tools work on Linux, macOS, and Windows hosts with a current Amiberry. The exception is host-shell on Windows, which needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later for the ConPTY pseudo console.
 
-Host commands used by host-reveal, host-notify, host-clip, host-info, and host-env can be cancelled with Ctrl-C. Idle commands time out after approximately 30 seconds on status-aware Amiberry builds or 5 seconds on older builds.
+Host commands used by host-reveal, host-notify, host-clip, host-info, and host-env (and, on Windows, host-run, host-multiview, and host-edit) can be cancelled with Ctrl-C. Idle commands time out after approximately 30 seconds on status-aware Amiberry builds or 5 seconds on older builds.
 
 @endnode

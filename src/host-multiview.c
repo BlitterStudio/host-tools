@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "host_capture.h"
+#include "host_multiview_command.h"
 #include "host_path.h"
 
 static const char version[] = "$VER: Host-MultiView " VERSION_STR " (" DATE_STR ")";
@@ -21,7 +23,9 @@ static int print_usage(void)
 int main(int argc, char *argv[])
 {
     static char filename[HOST_MAX_PATH_LEN];
+    static char command[HOST_MAX_COMMAND_LEN];
     int status = 0;
+    int windows_host;
 
     if (!InitUAEResource())
     {
@@ -41,6 +45,8 @@ int main(int argc, char *argv[])
         return print_usage();
     }
 
+    windows_host = (GetHostPlatform() == HOST_PLATFORM_WINDOWS);
+
     /* Iterate through all arguments and request the host to view them */
     for (int i = 1; i < argc; i++)
     {
@@ -59,7 +65,19 @@ int main(int argc, char *argv[])
             status = HOST_RETURN_ERROR;
             continue;
         }
-        
+
+        if (windows_host) {
+            command[0] = '\0';
+            if (!host_append_multiview_command_windows(command, sizeof(command), target)) {
+                printf("Command is too long\n");
+                status = HOST_RETURN_ERROR;
+            } else if (host_print_command_output(command) != 0) {
+                printf("Failed to open on host: %s\n", argv[i]);
+                status = HOST_RETURN_ERROR;
+            }
+            continue;
+        }
+
         /* Send the request to Amiberry */
         /* Opcode 89 handles the quoting and OS-specific command (open/xdg-open) */
         if (!HostShell_View((UBYTE *)target)) {

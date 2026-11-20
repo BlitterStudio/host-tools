@@ -201,6 +201,12 @@ static int UAE_UNUSED HostShell_OpenPipe(UBYTE *command)
     return calltrap(95, command);
 }
 
+/* Like HostShell_Open, with the terminal size given; 0 rows/cols mean the default size */
+static int UAE_UNUSED HostShell_OpenSized(UBYTE *command, ULONG rows, ULONG cols)
+{
+    return calltrap(97, command, rows, cols);
+}
+
 #define HOST_PLATFORM_UNKNOWN 0
 #define HOST_PLATFORM_POSIX 1
 #define HOST_PLATFORM_MACOS 2

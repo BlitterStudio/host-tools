@@ -140,6 +140,7 @@ int main(int argc, char *argv[])
     int term_rows = 0;
     int term_cols = 0;
     int pending_len = 0;
+    int windows_host;
 
     command[0] = '\0';
     session_command[0] = '\0';
@@ -158,7 +159,22 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if (argc == 2) {
+    windows_host = (GetHostPlatform() == HOST_PLATFORM_WINDOWS);
+
+    if (windows_host) {
+        /* no arguments: interactive cmd.exe; the terminal host runs the rest through cmd /C */
+        for (int i = 1; argc > 2 && i < argc; i++) {
+            if (!host_cmd_word_valid(argv[i])) {
+                printf("Arguments with quotes, percent signs or line breaks are not supported on Windows hosts: %s\n"
+                       "Pass the whole command as a single argument instead.\n", argv[i]);
+                return HOST_RETURN_ERROR;
+            }
+        }
+        if (!host_append_shell_windows_command(command, sizeof(command), argc, argv)) {
+            printf("Command is too long\n");
+            return HOST_RETURN_ERROR;
+        }
+    } else if (argc == 2) {
         size_t command_len = strlen(argv[1]);
         if (command_len >= sizeof(command)) {
             printf("Command is too long\n");
@@ -193,26 +209,44 @@ int main(int argc, char *argv[])
     raw_mode = TRUE;
 
     /*
-     * The host pty is created without a window size; pass the console
-     * size through stty so full-screen host programs render correctly.
+     * POSIX: the host pty is created without a window size; pass the
+     * console size through stty so full-screen host programs render
+     * correctly. Windows: the size is passed to the pseudo console
+     * when it is created.
      */
     if (query_console_size(in, out, &term_rows, &term_cols,
                            pending, sizeof(pending), &pending_len) &&
+        !windows_host &&
         !append_size_prefix(session_command, sizeof(session_command), term_rows, term_cols)) {
         session_command[0] = '\0';
     }
 
-    if (!host_append_shell_login_command(session_command, sizeof(session_command), command)) {
-        printf("Command is too long\n");
-        return_code = HOST_RETURN_ERROR;
-        goto cleanup;
-    }
+    if (windows_host) {
+        /*
+         * The pseudo console starts by asking for the cursor position
+         * (CSI 6n). The Amiga console answers it as raw input, which the
+         * loop below forwards, so host output continues below the prompt.
+         */
+        handle = HostShell_OpenSized((UBYTE *)command, (ULONG)term_rows, (ULONG)term_cols);
+        if (handle == 0) {
+            printf("Failed to open host shell session.\n"
+                   "Host shell sessions on Windows need Amiberry 8.6.0 or newer with native code enabled.\n");
+            return_code = HOST_RETURN_ERROR;
+            goto cleanup;
+        }
+    } else {
+        if (!host_append_shell_login_command(session_command, sizeof(session_command), command)) {
+            printf("Command is too long\n");
+            return_code = HOST_RETURN_ERROR;
+            goto cleanup;
+        }
 
-    handle = HostShell_Open((UBYTE *)session_command);
-    if (handle == 0) {
-        printf("Failed to open host shell session.\n");
-        return_code = HOST_RETURN_ERROR;
-        goto cleanup;
+        handle = HostShell_Open((UBYTE *)session_command);
+        if (handle == 0) {
+            printf("Failed to open host shell session.\n");
+            return_code = HOST_RETURN_ERROR;
+            goto cleanup;
+        }
     }
 
     if (pending_len > 0) {

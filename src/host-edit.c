@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "host_capture.h"
 #include "host_edit_command.h"
 #include "host_path.h"
 
@@ -23,6 +24,7 @@ int main(int argc, char *argv[])
     static char filename[HOST_MAX_PATH_LEN];
     static char command[HOST_MAX_COMMAND_LEN];
     int status = 0;
+    int windows_host;
 
     if (!InitUAEResource())
     {
@@ -41,6 +43,8 @@ int main(int argc, char *argv[])
     {
         return print_usage();
     }
+
+    windows_host = (GetHostPlatform() == HOST_PLATFORM_WINDOWS);
 
     for (int i = 1; i < argc; i++) {
         const char *target = argv[i];
@@ -67,13 +71,20 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        if (!host_append_edit_command(command, sizeof(command), target)) {
+        if (windows_host
+                ? !host_append_edit_command_windows(command, sizeof(command), target)
+                : !host_append_edit_command(command, sizeof(command), target)) {
             printf("Command is too long\n");
             status = HOST_RETURN_ERROR;
             continue;
         }
 
-        if (!ExecuteOnHost((UBYTE *)command)) {
+        if (windows_host) {
+            if (host_print_command_output(command) != 0) {
+                printf("Failed to edit on host: %s\n", argv[i]);
+                status = HOST_RETURN_ERROR;
+            }
+        } else if (!ExecuteOnHost((UBYTE *)command)) {
             printf("Failed to edit on host: %s\n", argv[i]);
             status = HOST_RETURN_ERROR;
         }

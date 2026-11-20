@@ -344,7 +344,6 @@ static int do_put(const char *srcpath, const char *hostpath, int force, int wind
     unsigned long total;
     unsigned long sent = 0;
     unsigned long shown = (unsigned long)-1;
-    unsigned long value = 0;
     const char *code = NULL;
     const char *failure = NULL;
     int ready = 0;
@@ -411,11 +410,11 @@ static int do_put(const char *srcpath, const char *hostpath, int force, int wind
             break;
         }
         if (reply_take_line(&replies, line, sizeof(line))) {
-            enum host_copy_reply_kind kind = host_copy_parse_reply(line, &value, &code);
+            enum host_copy_put_event event = host_copy_put_event_for(line, 0, total, &code);
 
-            if (kind == HOST_COPY_REPLY_READY) {
+            if (event == HOST_COPY_PUT_READY) {
                 ready = 1;
-            } else if (kind == HOST_COPY_REPLY_ERR) {
+            } else if (event == HOST_COPY_PUT_ERROR) {
                 failure = host_copy_error_text(code);
             } else {
                 failure = "Unexpected reply from the host";
@@ -462,7 +461,7 @@ static int do_put(const char *srcpath, const char *hostpath, int force, int wind
                     long got = reply_pump(handle, &replies);
 
                     if (reply_take_line(&replies, line, sizeof(line)) &&
-                        host_copy_parse_reply(line, &value, &code) == HOST_COPY_REPLY_ERR) {
+                        host_copy_put_event_for(line, sent, total, &code) == HOST_COPY_PUT_ERROR) {
                         failure = host_copy_error_text(code);
                     } else if (got < 0) {
                         break;
@@ -486,10 +485,17 @@ static int do_put(const char *srcpath, const char *hostpath, int force, int wind
             break;
         }
 
-        /* an answer before the end of the file can only be an error */
+        /*
+         * Before the end of the file an answer can only be an error. After
+         * the last write it may already be the final confirmation.
+         */
         reply_pump(handle, &replies);
         if (reply_take_line(&replies, line, sizeof(line))) {
-            if (host_copy_parse_reply(line, &value, &code) == HOST_COPY_REPLY_ERR) {
+            enum host_copy_put_event event = host_copy_put_event_for(line, sent, total, &code);
+
+            if (event == HOST_COPY_PUT_CONFIRMED) {
+                confirmed = 1;
+            } else if (event == HOST_COPY_PUT_ERROR) {
                 failure = host_copy_error_text(code);
             } else {
                 failure = "Unexpected reply from the host";
@@ -512,11 +518,11 @@ static int do_put(const char *srcpath, const char *hostpath, int force, int wind
             break;
         }
         if (reply_take_line(&replies, line, sizeof(line))) {
-            enum host_copy_reply_kind kind = host_copy_parse_reply(line, &value, &code);
+            enum host_copy_put_event event = host_copy_put_event_for(line, sent, total, &code);
 
-            if (kind == HOST_COPY_REPLY_OK && value == total) {
+            if (event == HOST_COPY_PUT_CONFIRMED) {
                 confirmed = 1;
-            } else if (kind == HOST_COPY_REPLY_ERR) {
+            } else if (event == HOST_COPY_PUT_ERROR) {
                 failure = host_copy_error_text(code);
             } else {
                 failure = "The host did not confirm the size of the file";

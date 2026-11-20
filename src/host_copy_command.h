@@ -47,6 +47,128 @@ static inline int host_copy_latin1_to_utf8(const char *src, char *dest, size_t d
     return 1;
 }
 
+/*
+ * Length of the UTF-8 sequence at s and its code point, or 0 when the
+ * bytes are not a well-formed sequence (overlong forms, surrogates and
+ * values above U+10FFFF included).
+ */
+static inline int host_copy_utf8_sequence(const unsigned char *s, unsigned long *cp)
+{
+    int len;
+    unsigned long min;
+
+    if (s[0] < 0x80) {
+        *cp = s[0];
+        return 1;
+    }
+    if (s[0] >= 0xC2 && s[0] <= 0xDF) {
+        len = 2;
+        min = 0x80;
+        *cp = s[0] & 0x1F;
+    } else if (s[0] >= 0xE0 && s[0] <= 0xEF) {
+        len = 3;
+        min = 0x800;
+        *cp = s[0] & 0x0F;
+    } else if (s[0] >= 0xF0 && s[0] <= 0xF4) {
+        len = 4;
+        min = 0x10000;
+        *cp = s[0] & 0x07;
+    } else {
+        return 0;
+    }
+    for (int i = 1; i < len; i++) {
+        if ((s[i] & 0xC0) != 0x80) {
+            return 0;
+        }
+        *cp = (*cp << 6) | (s[i] & 0x3F);
+    }
+    if (*cp < min || *cp > 0x10FFFF || (*cp >= 0xD800 && *cp <= 0xDFFF)) {
+        return 0;
+    }
+    return len;
+}
+
+/*
+ * True when text has non-ASCII bytes and all of them form well-formed
+ * UTF-8. A guest whose shell already hands over UTF-8 (AROS, for one)
+ * must not have its text converted a second time. Real ISO-8859-1 text
+ * is practically never valid UTF-8: a Latin-1 accented letter would
+ * have to be followed by exactly the right symbol characters.
+ */
+static inline int host_copy_is_utf8(const char *text)
+{
+    int multibyte = 0;
+
+    for (const unsigned char *p = (const unsigned char *)text; *p;) {
+        unsigned long cp;
+        int len = host_copy_utf8_sequence(p, &cp);
+
+        if (len == 0) {
+            return 0;
+        }
+        multibyte |= len > 1;
+        p += len;
+    }
+    return multibyte;
+}
+
+/*
+ * Guest text for a POSIX host: UTF-8 passes through unchanged and
+ * ISO-8859-1 is converted once.
+ */
+static inline int host_copy_to_host_utf8(const char *src, char *dest, size_t dest_size)
+{
+    if (host_copy_is_utf8(src)) {
+        size_t len = strlen(src);
+
+        if (len >= dest_size) {
+            return 0;
+        }
+        memcpy(dest, src, len + 1);
+        return 1;
+    }
+    return host_copy_latin1_to_utf8(src, dest, dest_size);
+}
+
+/*
+ * Guest text for a PowerShell script, which takes ISO-8859-1 bytes as
+ * UTF-16 code units. UTF-8 text whose characters are all below U+0100 is
+ * decoded to ISO-8859-1 first; any other text is used as written.
+ */
+static inline int host_copy_to_ps_text(const char *src, char *dest, size_t dest_size)
+{
+    size_t pos = 0;
+    int decode = host_copy_is_utf8(src);
+
+    for (const unsigned char *p = (const unsigned char *)src; decode && *p;) {
+        unsigned long cp;
+        int len = host_copy_utf8_sequence(p, &cp);
+
+        decode = cp <= 0xFF;
+        p += len;
+    }
+    if (!decode) {
+        size_t len = strlen(src);
+
+        if (len >= dest_size) {
+            return 0;
+        }
+        memcpy(dest, src, len + 1);
+        return 1;
+    }
+    for (const unsigned char *p = (const unsigned char *)src; *p;) {
+        unsigned long cp;
+
+        p += host_copy_utf8_sequence(p, &cp);
+        if (pos + 1 >= dest_size) {
+            return 0;
+        }
+        dest[pos++] = (char)cp;
+    }
+    dest[pos] = '\0';
+    return 1;
+}
+
 /* The part of a host path after its last separator ("" for a trailing one). */
 static inline const char *host_copy_host_basename(const char *path, int windows)
 {
@@ -135,7 +257,7 @@ static inline int host_copy_append_posix_path(char *command, size_t command_size
 {
     static char utf8[HOST_MAX_PATH_LEN];
 
-    if (!host_copy_latin1_to_utf8(path, utf8, sizeof(utf8))) {
+    if (!host_copy_to_host_utf8(path, utf8, sizeof(utf8))) {
         return 0;
     }
     if (host_copy_home_prefix(utf8)) {
@@ -150,8 +272,14 @@ static inline int host_copy_append_posix_path(char *command, size_t command_size
  * folder. The home form is parenthesized so it also works as a command
  * argument.
  */
-static inline int host_copy_append_ps_path(char *script, size_t script_size, const char *path)
+static inline int host_copy_append_ps_path(char *script, size_t script_size, const char *guest_path)
 {
+    static char text[HOST_MAX_PATH_LEN];
+    const char *path = text;
+
+    if (!host_copy_to_ps_text(guest_path, text, sizeof(text))) {
+        return 0;
+    }
     if (host_copy_home_prefix(path) || (path[0] == '~' && path[1] == '\\')) {
         return host_append_literal(script, script_size,
                                    "([Environment]::GetFolderPath('UserProfile')") &&
@@ -217,7 +345,7 @@ static inline int host_append_copy_put_command(char *command, size_t command_siz
 {
     static char utf8_name[HOST_MAX_PATH_LEN];
 
-    if (!host_copy_latin1_to_utf8(name, utf8_name, sizeof(utf8_name))) {
+    if (!host_copy_to_host_utf8(name, utf8_name, sizeof(utf8_name))) {
         return 0;
     }
     if (!host_append_literal(command, command_size, "p=") ||
@@ -239,7 +367,7 @@ static inline int host_append_copy_put_command(char *command, size_t command_siz
                              " case \"$p\" in */*) d=\"${p%/*}\"; [ -n \"$d\" ] || d=/;; *) d=.;; esac;"
                              " t=\"$d/.htput.$$\";"
                              " if ! (set -C; : >\"$t\") 2>/dev/null; then echo ERR OPEN; exit 3; fi;"
-                             " trap 'rm -f \"$t\"' 0; trap 'exit 1' 1 2 15;"
+                             " trap 'rm -f -- \"$t\"' 0; trap 'exit 1' 1 2 15;"
                              " echo READY; head -c ") ||
         !host_copy_append_number(command, command_size, len) ||
         !host_append_literal(command, command_size,
@@ -249,11 +377,23 @@ static inline int host_append_copy_put_command(char *command, size_t command_siz
         !host_copy_append_number(command, command_size, len) ||
         !host_append_literal(command, command_size,
                              " ]; then echo ERR SIZE; cat >/dev/null; exit 3; fi;"
-                             " if mv -f \"$t\" \"$p\" 2>/dev/null; then echo \"OK $s\"; exit 0; fi;"
-                             " echo ERR MOVE; exit 3")) {
+                             " if [ -d \"$p\" ]; then echo ERR ISDIR; exit 3; fi;")) {
         return 0;
     }
-    return 1;
+    /*
+     * Without FORCE the file is hard-linked into place: ln fails when the
+     * name exists, so a file created during the upload is never
+     * replaced. Only a file system without hard links falls back to mv.
+     */
+    if (!force &&
+        !host_append_literal(command, command_size,
+                             " if ln -- \"$t\" \"$p\" 2>/dev/null; then rm -f -- \"$t\"; echo \"OK $s\"; exit 0; fi;"
+                             " if [ -e \"$p\" ] || [ -L \"$p\" ]; then echo ERR EXISTS; exit 3; fi;")) {
+        return 0;
+    }
+    return host_append_literal(command, command_size,
+                               " if mv -f -- \"$t\" \"$p\" 2>/dev/null; then echo \"OK $s\"; exit 0; fi;"
+                               " echo ERR MOVE; exit 3");
 }
 
 /* put, Windows host: same protocol as the POSIX command, through PowerShell. */
@@ -262,18 +402,22 @@ static inline int host_append_copy_put_command_windows(char *command, size_t com
                                                        unsigned long len, int force)
 {
     static char script[HOST_MAX_COMMAND_LEN];
+    static char ps_name[HOST_MAX_PATH_LEN];
 
     script[0] = '\0';
+    if (!host_copy_to_ps_text(name, ps_name, sizeof(ps_name))) {
+        return 0;
+    }
     if (!host_append_literal(script, sizeof(script), HOST_PS_STOP_ON_ERROR "$p=") ||
         !host_copy_append_ps_path(script, sizeof(script), path) ||
         !host_append_literal(script, sizeof(script), ";$n=") ||
-        !host_append_ps_quoted(script, sizeof(script), name) ||
+        !host_append_ps_quoted(script, sizeof(script), ps_name) ||
         !host_append_literal(script, sizeof(script), ";$l=") ||
         !host_copy_append_number(script, sizeof(script), len) ||
         !host_append_literal(script, sizeof(script), ";$f=") ||
         !host_append_literal(script, sizeof(script), force ? "1" : "0") ||
         !host_append_literal(script, sizeof(script),
-                             ";$e='OPEN';$t=$o=$null;$d=0;$r=$l;$i=[Console]::OpenStandardInput();"
+                             ";$e='OPEN';$t=$o=$null;$d=0;$r=$l;$b=New-Object byte[] 65536;$i=[Console]::OpenStandardInput();"
                              "try{$h=$p.EndsWith('\\')-or $p.EndsWith('/');"
                              "$p=[IO.Path]::GetFullPath($p);"
                              "if([IO.Directory]::Exists($p)){if(!$n){$e='NONAME';throw 1};$p=[IO.Path]::Combine($p,$n)}"
@@ -281,18 +425,19 @@ static inline int host_append_copy_put_command_windows(char *command, size_t com
                              "if([IO.Directory]::Exists($p)){$e='ISDIR';throw 1};"
                              "if(!$f -and [IO.File]::Exists($p)){$e='EXISTS';throw 1};"
                              "$t=[IO.Path]::Combine([IO.Path]::GetDirectoryName($p),'.htput.'+$PID);"
-                             "$o=New-Object IO.FileStream($t,'CreateNew','Write');"
+                             "$o=[IO.File]::Open($t,'CreateNew','Write');"
                              "[Console]::Out.Write(\"READY`n\");$d=1;$e='WRITE';"
-                             "$b=New-Object byte[] 65536;"
                              "while($r -gt 0){$k=$i.Read($b,0,[Math]::Min(65536,$r));if($k -le 0){break};"
                              "$o.Write($b,0,$k);$r-=$k};"
                              "$o.Dispose();$o=$null;if($r){$e='SIZE';throw 1};$e='MOVE';"
-                             "Move-Item -Force -LiteralPath $t -Destination $p;"
+                             "if($f){Move-Item -Force -LiteralPath $t -Destination $p}"
+                             "else{[IO.File]::Move($t,$p)};"
                              "$t=$null;[Console]::Out.Write(\"OK $l`n\")}"
-                             "catch{if($o){try{$o.Dispose()}catch{}};"
-                             "if($t){Remove-Item -Force -LiteralPath $t -ErrorAction SilentlyContinue};"
+                             "catch{if($e -eq 'MOVE' -and !$f -and [IO.File]::Exists($p)){$e='EXISTS'};"
+                             "if($o){try{$o.Dispose()}catch{}};"
+                             "if($t){try{[IO.File]::Delete($t)}catch{}};"
                              "[Console]::Out.Write(\"ERR $e`n\");"
-                             "if($d -and $r -gt 0){try{$b=New-Object byte[] 65536;while($i.Read($b,0,65536) -gt 0){}}catch{}};"
+                             "if($d -and $r -gt 0){try{while($i.Read($b,0,65536) -gt 0){}}catch{}};"
                              "exit 3}")) {
         return 0;
     }
@@ -332,6 +477,37 @@ static inline enum host_copy_reply_kind host_copy_parse_reply(char *line, unsign
         return HOST_COPY_REPLY_ERR;
     }
     return HOST_COPY_REPLY_INVALID;
+}
+
+enum host_copy_put_event {
+    HOST_COPY_PUT_UNEXPECTED = 0,
+    HOST_COPY_PUT_READY,
+    HOST_COPY_PUT_CONFIRMED,
+    HOST_COPY_PUT_ERROR
+};
+
+/*
+ * What a reply line means for a put that has sent sent of total bytes.
+ * "OK" counts only once everything was sent and the host stored exactly
+ * total bytes; it may arrive before the guest looks for it, right after
+ * the last write.
+ */
+static inline enum host_copy_put_event host_copy_put_event_for(char *line, unsigned long sent,
+                                                               unsigned long total,
+                                                               const char **code)
+{
+    unsigned long value = 0;
+
+    switch (host_copy_parse_reply(line, &value, code)) {
+    case HOST_COPY_REPLY_READY:
+        return HOST_COPY_PUT_READY;
+    case HOST_COPY_REPLY_ERR:
+        return HOST_COPY_PUT_ERROR;
+    case HOST_COPY_REPLY_OK:
+        return sent == total && value == total ? HOST_COPY_PUT_CONFIRMED : HOST_COPY_PUT_UNEXPECTED;
+    default:
+        return HOST_COPY_PUT_UNEXPECTED;
+    }
 }
 
 static inline const char *host_copy_error_text(const char *code)

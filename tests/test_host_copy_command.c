@@ -107,13 +107,31 @@ static int leftover_temp_files(const char *dir)
  * Run "<input> | sh -c <command> > out" the way a pipe session does and
  * return the shell's exit status. input may be NULL for no stdin data.
  */
+static const char *run_cwd;
+static const char *run_producer;
+
 static int run_command(const char *command, const char *input_file, const char *out_file)
 {
     static char line[HOST_MAX_COMMAND_LEN * 2];
     int status;
 
     line[0] = '\0';
-    if (input_file != NULL) {
+    if (run_cwd != NULL) {
+        require(host_append_literal(line, sizeof(line), "cd ") &&
+                host_append_shell_arg(line, sizeof(line), run_cwd, 0) &&
+                host_append_literal(line, sizeof(line), " && "),
+                "cd prefix should fit");
+    }
+    if (run_producer != NULL) {
+        /* a shell fragment that runs before the data, while the host is already waiting for it */
+        require(host_append_literal(line, sizeof(line), "{ ") &&
+                host_append_literal(line, sizeof(line), run_producer) &&
+                host_append_literal(line, sizeof(line), "; ") &&
+                host_append_literal(line, sizeof(line), "cat ") &&
+                host_append_shell_arg(line, sizeof(line), input_file, 0) &&
+                host_append_literal(line, sizeof(line), "; } | "),
+                "producer should fit");
+    } else if (input_file != NULL) {
         require(host_append_literal(line, sizeof(line), "cat ") &&
                 host_append_shell_arg(line, sizeof(line), input_file, 0) &&
                 host_append_literal(line, sizeof(line), " | "),
@@ -154,6 +172,57 @@ static void test_latin1_to_utf8(void)
     require(!host_copy_latin1_to_utf8("\xe9\xe9", out, 4), "two-byte expansion must respect the buffer");
     require(host_copy_latin1_to_utf8("\xe9", out, 3), "exact fit should convert");
     require(!host_copy_latin1_to_utf8("ab", out, 2), "no room for the terminator should fail");
+}
+
+static void test_text_encoding(void)
+{
+    char out[64];
+
+    require(host_copy_is_utf8("caf\xc3\xa9"), "UTF-8 e acute is UTF-8");
+    require(!host_copy_is_utf8("caf\xe9"), "Latin-1 e acute is not UTF-8");
+    require(!host_copy_is_utf8("plain"), "ASCII has nothing to convert");
+    require(!host_copy_is_utf8("\xc3"), "a lone lead byte is not UTF-8");
+    require(!host_copy_is_utf8("\xc0\x80"), "an overlong form is not UTF-8");
+    require(!host_copy_is_utf8("\xed\xa0\x80"), "a surrogate is not UTF-8");
+    require(!host_copy_is_utf8("a\xc3\xa9\xe9"), "mixed text is Latin-1");
+
+    require(host_copy_to_host_utf8("caf\xc3\xa9", out, sizeof(out)), "UTF-8 should pass");
+    require_string(out, "caf\xc3\xa9", "UTF-8 must not be converted a second time");
+    require(host_copy_to_host_utf8("caf\xe9", out, sizeof(out)), "Latin-1 should convert");
+    require_string(out, "caf\xc3\xa9", "Latin-1 is converted exactly once");
+    require(!host_copy_to_host_utf8("caf\xc3\xa9", out, 5), "UTF-8 passthrough must respect the buffer");
+
+    require(host_copy_to_ps_text("caf\xc3\xa9 \xc3\xbf", out, sizeof(out)), "UTF-8 for PowerShell");
+    require_string(out, "caf\xe9 \xff", "UTF-8 up to U+00FF becomes ISO-8859-1 for the script");
+    require(host_copy_to_ps_text("caf\xe9", out, sizeof(out)), "Latin-1 for PowerShell");
+    require_string(out, "caf\xe9", "Latin-1 is passed unchanged to the script");
+    require(host_copy_to_ps_text("\xe2\x82\xac", out, sizeof(out)), "a euro sign stays as written");
+    require_string(out, "\xe2\x82\xac", "UTF-8 beyond U+00FF is not decoded");
+}
+
+static void test_put_events(void)
+{
+    char line[64];
+    const char *code = NULL;
+
+    strcpy(line, "READY");
+    require(host_copy_put_event_for(line, 0, 100, &code) == HOST_COPY_PUT_READY, "READY");
+    strcpy(line, "OK 100");
+    require(host_copy_put_event_for(line, 100, 100, &code) == HOST_COPY_PUT_CONFIRMED,
+            "OK right after the last write confirms the copy");
+    strcpy(line, "OK 100");
+    require(host_copy_put_event_for(line, 4096, 100000, &code) == HOST_COPY_PUT_UNEXPECTED,
+            "OK before the end of the file is unexpected");
+    strcpy(line, "OK 99");
+    require(host_copy_put_event_for(line, 100, 100, &code) == HOST_COPY_PUT_UNEXPECTED,
+            "OK with the wrong size is unexpected");
+    strcpy(line, "OK 0");
+    require(host_copy_put_event_for(line, 0, 0, &code) == HOST_COPY_PUT_CONFIRMED, "empty file confirmation");
+    strcpy(line, "ERR SIZE");
+    require(host_copy_put_event_for(line, 10, 100, &code) == HOST_COPY_PUT_ERROR, "ERR at any point");
+    require_string(code, "SIZE", "ERR code is passed on");
+    strcpy(line, "nonsense");
+    require(host_copy_put_event_for(line, 10, 100, &code) == HOST_COPY_PUT_UNEXPECTED, "garbage");
 }
 
 static void test_names(void)
@@ -353,11 +422,15 @@ static void test_put_command_shape(void)
     require_contains(command, "echo ERR EXISTS");
     require_contains(command, "head -c 512 >\"$t\"");
     require_contains(command, "if [ \"$s\" != 512 ]");
-    require_contains(command, "mv -f \"$t\" \"$p\"");
+    require_contains(command, "ln -- \"$t\" \"$p\"");
+    require_contains(command, "mv -f -- \"$t\" \"$p\"");
+    require_contains(command, "rm -f -- \"$t\"");
 
     command[0] = '\0';
     require(host_append_copy_put_command(command, sizeof(command), "/tmp/x", "x", 5, 1), "forced put should build");
     require(strstr(command, "ERR EXISTS") == NULL, "FORCE must skip the existing-file check");
+    require(strstr(command, "ln --") == NULL, "FORCE replaces the file, so it must not use the no-clobber link");
+    require_contains(command, "mv -f -- \"$t\" \"$p\"");
 
     command[0] = '\0';
     require(host_append_copy_put_command(command, sizeof(command), "~/Downloads", "caf\xe9", 5, 0),
@@ -502,6 +575,75 @@ static void test_put_runs(void)
     n = read_file(target, actual, sizeof(actual));
     require(n == 100 && memcmp(actual, data, 100) == 0, "only the announced bytes are stored");
 
+    /* a target that appears while the upload runs is not replaced without FORCE */
+    path_in(target, sizeof(target), "race.bin");
+    {
+        char producer[1200];
+
+        snprintf(producer, sizeof(producer),
+                 "while ! ls %s/.htput.* >/dev/null 2>&1; do sleep 0.05; done; printf winner >%s",
+                 workdir, target);
+        run_producer = producer;
+        put_command(command, target, "race.bin", 256, 0);
+        rc = run_command(command, in, out);
+        run_producer = NULL;
+    }
+    require(rc == 3, "a target created during the upload should exit 3");
+    n = read_file(out, actual, sizeof(actual));
+    require(n == 17 && memcmp(actual, "READY\nERR EXISTS\n", 17) == 0, "reply is READY then ERR EXISTS");
+    n = read_file(target, actual, sizeof(actual));
+    require(n == 6 && memcmp(actual, "winner", 6) == 0, "the file created during the upload must stay");
+    require(leftover_temp_files(workdir) == 0, "no temporary file after losing the race");
+
+    /* with FORCE the same race replaces the file, as asked */
+    {
+        char producer[1200];
+
+        unlink(target);
+        snprintf(producer, sizeof(producer),
+                 "while ! ls %s/.htput.* >/dev/null 2>&1; do sleep 0.05; done; printf winner >%s",
+                 workdir, target);
+        run_producer = producer;
+        put_command(command, target, "race.bin", 256, 1);
+        rc = run_command(command, in, out);
+        run_producer = NULL;
+    }
+    require(rc == 0, "FORCE should replace a target created during the upload");
+    require(read_file(target, actual, sizeof(actual)) == 256, "FORCE stores the uploaded content");
+
+    /* relative names that start with a dash are operands, not options */
+    run_cwd = workdir;
+    path_in(target, sizeof(target), "-dash.bin");
+    put_command(command, "-dash.bin", "x", 256, 0);
+    rc = run_command(command, in, out);
+    require(rc == 0, "a relative target starting with a dash should copy");
+    require(read_file(target, actual, sizeof(actual)) == 256 && leftover_temp_files(workdir) == 0,
+            "the dash-named file is stored and no temporary file remains");
+    put_command(command, "-dash.bin", "x", 256, 1);
+    rc = run_command(command, in, out);
+    require(rc == 0, "FORCE over a dash-named file should copy");
+    command[0] = '\0';
+    require(host_append_copy_get_command(command, sizeof(command), "-dash.bin"), "get should build");
+    rc = run_command(command, NULL, out);
+    require(rc == 0, "get of a relative dash-named file should exit 0");
+    n = read_file(out, actual, sizeof(actual));
+    require(n == 4 + 256 && memcmp(actual, "256\n", 4) == 0, "dash-named file is read");
+    run_cwd = NULL;
+
+    /* text a guest already sends as UTF-8 is not converted again */
+    path_in(target, sizeof(target), "caf\xc3\xa9 utf8.bin");
+    {
+        char guest_utf8[512];
+
+        path_in(guest_utf8, sizeof(guest_utf8), "caf\xc3\xa9 utf8.bin");
+        put_command(command, guest_utf8, "x", 256, 0);
+        rc = run_command(command, in, out);
+        require(rc == 0, "UTF-8 target should copy");
+        require(read_file(target, actual, sizeof(actual)) == 256, "the UTF-8 name is used as written");
+        path_in(target, sizeof(target), "caf\xc3\x83\xc2\xa9 utf8.bin");
+        require(!file_exists(target), "no double-encoded name may be created");
+    }
+
     /* Latin-1 target name reaches the UTF-8 file name */
     {
         char latin1[512];
@@ -589,18 +731,26 @@ static void test_windows_put(void)
     require_contains(script, "[Console]::Out.Write(\"READY`n\")");
     require_contains(script, "Write(\"OK $l`n\")");
     require_contains(script, "if(!$f -and [IO.File]::Exists($p)){$e='EXISTS';throw 1}");
-    require_contains(script, "Move-Item -Force -LiteralPath $t -Destination $p;");
+    require_contains(script, "if($f){Move-Item -Force -LiteralPath $t -Destination $p}else{[IO.File]::Move($t,$p)};");
+    require_contains(script, "if($e -eq 'MOVE' -and !$f -and [IO.File]::Exists($p)){$e='EXISTS'}");
     require_contains(script, "if($d -and $r -gt 0){try{");
+
+    /* UTF-8 text from a guest is decoded once for the ISO-8859-1 script */
+    command[0] = '\0';
+    require(host_append_copy_put_command_windows(command, sizeof(command), "C:\\Out\\caf\xc3\xa9", "na\xc3\xafve.bin", 5, 0),
+            "UTF-8 Windows put should build");
+    decode_ps(command, script, sizeof(script));
+    require_contains(script, "$p='C:\\Out\\caf\xe9';$n='na\xefve.bin';");
 
     command[0] = '\0';
     require(host_append_copy_put_command_windows(command, sizeof(command), "~\\x", "a", 0, 1), "forced put should build");
     decode_ps(command, script, sizeof(script));
     require_contains(script, "$p=([Environment]::GetFolderPath('UserProfile')+'\\x');$n='a';$l=0;$f=1;");
 
-    /* a MAX_PATH folder and the longest Amiga file name still fit the 4096-byte trap buffer */
+    /* a folder and file name that together stay under the Windows MAX_PATH of 260 fit the 4096-byte trap buffer */
     {
-        char longpath[256];
-        char longname[108];
+        char longpath[241];
+        char longname[101];
 
         memset(longpath, 'p', sizeof(longpath) - 1);
         longpath[sizeof(longpath) - 1] = '\0';
@@ -609,7 +759,7 @@ static void test_windows_put(void)
         command[0] = '\0';
         require(host_append_copy_put_command_windows(command, sizeof(command), longpath, longname,
                                                      2147483647UL, 1),
-                "a 255 character path and 107 character name should fit");
+                "a 240 character path and 100 character name should fit");
         require(strlen(command) < HOST_MAX_COMMAND_LEN, "command stays below the trap limit");
     }
 
@@ -650,6 +800,8 @@ int main(void)
     char cleanup[320];
 
     test_latin1_to_utf8();
+    test_text_encoding();
+    test_put_events();
     test_names();
     test_parse_reply();
     test_get_command_shape();

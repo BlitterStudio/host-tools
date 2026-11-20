@@ -160,11 +160,11 @@ host-copy put <Amiga source> <host path> [FORCE]
 
 Copies one file between any host path and the Amiga. The host folder does not have to be mounted as an Amiga volume, so this works for a host Downloads folder, a home directory or any other place the emulated Amiga cannot see. `get` copies a host file to the Amiga, `put` copies an Amiga file to the host. Only single files are copied, not folders or wildcards, and a file must be smaller than 2 GB.
 
-The host path is a host path, typed the way the host writes it: `/home/me/notes.txt` on Linux and macOS, `C:\Users\me\notes.txt` on Windows. A leading `~` stands for the host user's home folder. A relative path starts in the folder Amiberry was started from. Characters typed on the Amiga are ISO-8859-1. On Linux and macOS `host-copy` converts the host path to UTF-8 before it reaches the host, so a host file named `Café` is found when you type the name with the Amiga's é.
+The host path is a host path, typed the way the host writes it: `/home/me/notes.txt` on Linux and macOS, `C:\Users\me\notes.txt` on Windows. A leading `~` stands for the host user's home folder. A relative path starts in the folder Amiberry was started from. Characters typed on the Amiga are ISO-8859-1. On Linux and macOS `host-copy` converts the host path to UTF-8 before it reaches the host, so a host file named `Café` is found when you type the name with the Amiga's é. Text that is already valid UTF-8, which AROS sends, is passed through unchanged, so the name is never encoded twice.
 
 The destination may be a folder. `get` then keeps the host file's name, and `put` keeps the Amiga file's name. An existing destination file is not overwritten unless you give `FORCE`. A folder where the file would go is never replaced.
 
-`get` writes to a temporary file next to the Amiga destination, checks that the byte count matches the size the host reported, and only then moves it into place. With `FORCE` the old file is kept until the new one is ready. `put` has the host write a temporary file named `.htput.<number>` next to the host target, check its size, and move it into place. The Amiga side reports success only after the host has confirmed the stored size. A failed or aborted copy leaves the old destination alone.
+`get` writes to a temporary file next to the Amiga destination, checks that the byte count matches the size the host reported, and only then moves it into place. With `FORCE` the old file is kept until the new one is ready. `put` has the host write a temporary file named `.htput.<number>` next to the host target, check its size, and move it into place. Without `FORCE`, `put` never replaces a file that appears on the host during the upload. The Amiga side reports success only after the host has confirmed the stored size. A failed or aborted copy leaves the old destination alone.
 
 A copy has no time limit while the host process is running, and Ctrl-C aborts it. `host-copy` prints the progress while it copies. It needs an Amiberry build with host pipe sessions (the same builds that stream `host-download`).
 
@@ -174,7 +174,7 @@ host-copy put Work:Projects/notes.txt ~/Documents/notes.txt FORCE
 host-copy get C:\Users\me\Desktop\song.mod Work:Music/
 ```
 
-On Linux and macOS the host needs `sh`, `head`, `wc`, `cat`, `tr` and `mv`. On Windows the host needs PowerShell 5.1, which Windows 10 and later include. The Windows command line has room for a host folder path and a file name of about 380 characters together.
+On Linux and macOS the host needs `sh`, `head`, `wc`, `cat`, `tr` and `mv`. On Windows the host needs PowerShell 5.1, which Windows 10 and later include. The Windows command line has room for a host folder path and a file name of about 350 characters together.
 
 ## host-env
 

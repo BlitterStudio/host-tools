@@ -20,6 +20,31 @@ versioning for release tags.
   console through the new `HostShell_OpenSized` call; it needs Amiberry 8.6.0 or
   newer on Windows 10 version 1809 or later.
 
+### Fixed
+
+- `host-download` can no longer be sent outside the destination by a URL that
+  ends in something like `OUT:file`. A file name taken from the URL must be a
+  single name; otherwise the tool asks for a destination. A name cut to fit
+  107 characters now produces a warning.
+- `host-download` no longer saves a stray `0` at the start of a file when the
+  server refuses HEAD but serves GET. The expected size now comes from the
+  Content-Length header, so the size check and the progress percentage work,
+  and curl no longer expands `{}` or `[]` in the URL.
+- `host-download` on older Linux and macOS builds no longer gives up on a
+  download that takes more than about 30 seconds.
+- `host-download` on Windows passes the URL to `curl.exe` through PowerShell,
+  so `%NAME%` in a URL is no longer replaced by an environment variable.
+- `host-env get NAME` no longer prints the path of the environment file for
+  names such as `f`, and two `host-env set` or `unset` commands that run at the
+  same time no longer lose one of the changes.
+- `host-clip copy` refuses standard input that contains a NUL byte or cannot be
+  read, with a message of its own, instead of copying a shortened text.
+- `host-notify` on Linux and macOS shows titles and messages that start with `-`
+  as text instead of passing them to the notification program as options.
+- `host-edit` on Linux opens files with the desktop's plain-text association, then
+  `VISUAL` or `EDITOR`, and `xdg-open` last, so an image or a PDF no longer opens
+  in a viewer.
+
 ### Changed
 
 - Build with `amigadev/crosstools:m68k-amigaos` (AmigaDev GCC 16.2-rc24-9,

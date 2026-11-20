@@ -77,7 +77,7 @@ host-notify <message>
 host-notify <title> <message...>
 ```
 
-Sends a desktop notification with `notify-send` on Linux, `osascript` on macOS, or a toast on Windows. With one argument the argument is the message and the title is `Amiga`. With more, the first argument is the title and the rest is the message. The Windows toast is attributed to Windows PowerShell, so it appears under that name, and title and message together are limited to about 900 characters.
+Sends a desktop notification with `notify-send` on Linux, `osascript` on macOS, or a toast on Windows. With one argument the argument is the message and the title is `Amiga`. With more, the first argument is the title and the rest is the message. A title or message that starts with `-` is shown as text, not read as an option by the host utility. The Windows toast is attributed to Windows PowerShell, so it appears under that name, and title and message together are limited to about 900 characters.
 
 ## host-edit
 
@@ -85,7 +85,7 @@ Sends a desktop notification with `notify-send` on Linux, `osascript` on macOS, 
 host-edit <path> [path2 ...]
 ```
 
-Opens files in the host's desktop text editor. macOS uses `open -t`. On Linux the tool looks for the default GUI text editor through `xdg-mime` and `gtk-launch`, then falls back to `xdg-open`, `VISUAL` or `EDITOR` where available. On Windows the file opens in Notepad. URLs are refused.
+Opens files in the host's desktop text editor. macOS uses `open -t`. On Linux the tool uses the application the desktop associates with plain text (`xdg-mime query default text/plain`, started with `gtk-launch`), then `VISUAL` or `EDITOR`, and `xdg-open` only when neither is available. The file's own type is not consulted, so a PNG or PDF opens in the text editor, not in the image viewer or PDF reader. `VISUAL` and `EDITOR` start without a terminal, so they need a graphical editor. On Windows the file opens in Notepad. URLs are refused.
 
 ## host-clip
 
@@ -95,7 +95,7 @@ host-clip copy < file
 host-clip paste
 ```
 
-Copies the arguments (joined with spaces) to the host clipboard, reads standard input when `copy` has no text argument, or prints the clipboard contents with `paste`. Copied text is limited to 2047 characters. Line breaks are kept on input and output, including trailing newlines. Text is converted between the Amiga's ISO-8859-1 and the host's encoding with `iconv` on Linux and macOS, or with PowerShell on Windows. Linux and macOS hosts use `pbcopy`/`pbpaste`, `wl-clipboard`, `xclip` or `xsel`, whichever is available.
+Copies the arguments (joined with spaces) to the host clipboard, reads standard input when `copy` has no text argument, or prints the clipboard contents with `paste`. Copied text is limited to 2047 characters. Standard input that holds a NUL byte, or cannot be read, is refused with its own message and the clipboard stays as it was. Line breaks are kept on input and output, including trailing newlines. Text is converted between the Amiga's ISO-8859-1 and the host's encoding with `iconv` on Linux and macOS, or with PowerShell on Windows. Linux and macOS hosts use `pbcopy`/`pbpaste`, `wl-clipboard`, `xclip` or `xsel`, whichever is available.
 
 ```text
 host-clip copy "Hello from Amiga"
@@ -118,7 +118,7 @@ host-download <URL> [<destination>] [FORCE]
 
 Downloads an HTTP, HTTPS, FTP or FTPS URL with the host's `curl` or `wget` (`curl.exe` on Windows), then writes the result through AmigaDOS. This works with `RAM:`, hardfiles and directory mounts, including destinations the host cannot see.
 
-Without a destination, the file goes in the current directory under the name from the URL. A destination that is an existing directory also keeps the URL's file name. An existing file is not overwritten unless you give `FORCE`. The tool writes to a temporary file next to the destination and moves it into place after a successful transfer, so a failed or cancelled download leaves the old file alone. Ctrl-C aborts a download. A current Amiberry streams the data and shows progress while it downloads. Older Linux and macOS builds first download to the host and then transfer the file to the Amiga.
+Without a destination, the file goes in the current directory under the name from the URL. A destination that is an existing directory also keeps the URL's file name. The name must be a single file name: if the end of the URL contains `:` (for example `.../OUT:file`), is `.` or `..`, or contains control characters, the tool stops and asks for an explicit destination file. A name longer than 107 characters is shortened, with a warning. An existing file is not overwritten unless you give `FORCE`. The tool writes to a temporary file next to the destination and moves it into place after a successful transfer, so a failed or cancelled download leaves the old file alone. Ctrl-C aborts a download. A current Amiberry streams the data and shows progress while it downloads. Older Linux and macOS builds first download to the host and then transfer the file to the Amiga; the host sends a space about once a second meanwhile, so a slow download is not taken for a stalled one. Downloads do not resume. curl treats `{}` and `[]` in a URL literally. On Windows the URL reaches `curl.exe` through PowerShell, so `%NAME%` in a URL is not expanded; a URL with a double quote or a control character, or longer than about 1000 characters, is refused there. The size shown comes from a HEAD request. A server that refuses HEAD still works, with progress shown in kilobytes.
 
 ```text
 host-download https://github.com/BlitterStudio/host-tools/releases/download/v2.6/Host-Tools-2.6.lha RAM:
@@ -135,7 +135,7 @@ host-env list
 
 Reads, sets, removes or lists host **user** environment variables. Names use ASCII letters, digits and underscores and cannot start with a digit. Values cannot contain line breaks.
 
-On Windows, values are stored in the persistent user environment. On Linux and macOS, `set` and `unset` change `$HOME/.host-tools-env`, which is replaced atomically with mode `0600`. `get` and `list` read the host session's environment and the values from that file. Source the file from your host shell startup files to import the values into later login shells. Neither approach changes the environment of host processes that are already running, including Amiberry's parent process.
+On Windows, values are stored in the persistent user environment. On Linux and macOS, `set` and `unset` change `$HOME/.host-tools-env`, which is replaced atomically with mode `0600`. Two commands that run at the same time take turns, so neither change is lost; one that cannot get its turn within five seconds fails with a message. `get` and `list` read the host session's environment and the values from that file. Source the file from your host shell startup files to import the values into later login shells. Neither approach changes the environment of host processes that are already running, including Amiberry's parent process.
 
 ## host-quit
 

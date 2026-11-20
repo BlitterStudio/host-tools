@@ -166,7 +166,7 @@ Usage:
 host-notify <message>
 host-notify <title> <message...>
 
-With one argument the title is Amiga. On Linux the notification is sent with notify-send, on macOS with osascript, and on Windows as a toast. The Windows toast is shown under the name Windows PowerShell. Title and message together are limited to about 900 characters on Windows.
+With one argument the title is Amiga. On Linux the notification is sent with notify-send, on macOS with osascript, and on Windows as a toast. A title or message that starts with - is shown as text. The Windows toast is shown under the name Windows PowerShell. Title and message together are limited to about 900 characters on Windows.
 
 @endnode
 
@@ -177,7 +177,7 @@ Usage:
 
 host-edit <path> [path2 ...]
 
-On Windows the files are opened in Notepad. URLs are refused.
+On Linux the files open in the application the desktop associates with plain text, started through xdg-mime and gtk-launch. If there is none, VISUAL or EDITOR is used, and xdg-open only as a last resort. The type of the file itself is not consulted, so an image or a PDF still opens in the text editor. VISUAL and EDITOR start without a terminal, so they need a graphical editor. macOS uses open -t. On Windows the files are opened in Notepad. URLs are refused.
 
 @endnode
 
@@ -190,7 +190,7 @@ host-clip [copy] <text...>
 host-clip copy < file
 host-clip paste
 
-Without text arguments, host-clip copy reads standard input unchanged, including line breaks. Pasted text also keeps its trailing line breaks. Copied text is limited to 2047 characters. Text is converted between the Amiga ISO-8859-1 character set and the host character set automatically, through iconv on Linux and macOS and through PowerShell on Windows.
+Without text arguments, host-clip copy reads standard input unchanged, including line breaks. Pasted text also keeps its trailing line breaks. Copied text is limited to 2047 characters. Input that contains a NUL byte or cannot be read is refused and the clipboard stays as it was. Text is converted between the Amiga ISO-8859-1 character set and the host character set automatically, through iconv on Linux and macOS and through PowerShell on Windows.
 
 @endnode
 
@@ -210,9 +210,11 @@ Usage:
 
 host-download <URL> [<destination>] [FORCE]
 
-Without a destination, the file is saved in the current directory under the name from the URL. A destination that is an existing directory also keeps the URL's file name. An existing destination file is overwritten only when FORCE is given.
+Without a destination, the file is saved in the current directory under the name from the URL. A destination that is an existing directory also keeps the URL's file name. An existing destination file is overwritten only when FORCE is given. The name from the URL must be a single file name. If the end of the URL contains a colon, is . or .., or contains control characters, host-download stops and asks for a destination file. A name longer than 107 characters is shortened, with a warning.
 
-The file is written through AmigaDOS, so any writable volume works, including RAM: and hardfiles. It is first written to a temporary file beside the destination and moved into place only after a successful transfer. A failed, stalled or aborted download leaves no partial file. With FORCE, the old destination is kept until the replacement is ready. Press Ctrl-C to abort.
+The file is written through AmigaDOS, so any writable volume works, including RAM: and hardfiles. It is first written to a temporary file beside the destination and moved into place only after a successful transfer. A failed, stalled or aborted download leaves no partial file. With FORCE, the old destination is kept until the replacement is ready. Press Ctrl-C to abort. Downloads do not resume.
+
+On older Linux and macOS builds the host downloads the whole file before sending it, and sends a space about once a second meanwhile, so a slow download is not taken for a stalled one. The size shown comes from a HEAD request; a server that refuses HEAD still works, with progress shown in kilobytes. Curly braces and square brackets in a URL are not expanded. On Windows the URL reaches curl.exe through PowerShell, so %NAME% in a URL stays as typed; a URL with a double quote or a control character, or longer than about 1000 characters, is refused there.
 
 host-download works on Linux, macOS and Windows hosts. On Windows it needs a current Amiberry.
 
@@ -230,7 +232,7 @@ host-env list
 
 On Windows, host-env updates the user's persistent environment through PowerShell. New host processes see the changed values.
 
-On Linux and macOS, set and unset change the file $HOME/.host-tools-env. The file is replaced atomically and restricted to the host user with mode 0600. Source it from your host shell startup files if you want future host login shells to import the values. get and list read the host session's environment and the values from that file.
+On Linux and macOS, set and unset change the file $HOME/.host-tools-env. The file is replaced atomically and restricted to the host user with mode 0600. Commands that run at the same time take turns, so no change is lost; one that cannot get its turn within five seconds fails with a message. Source it from your host shell startup files if you want future host login shells to import the values. get and list read the host session's environment and the values from that file.
 
 host-env cannot change the live environment of host shells, desktop applications or Amiberry's parent process that are already running.
 

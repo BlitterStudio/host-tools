@@ -31,6 +31,7 @@ Select "Command tools" in the installer to copy the programs to C:. They all wor
 @{"host-say" link HostSay} speaks text through the host speech synthesizer.
 @{"host-info" link HostInfo} prints host integration details.
 @{"host-download" link HostDownload} downloads files through the host.
+@{"host-copy" link HostCopy} copies one file between a host path and the Amiga.
 @{"host-env" link HostEnv} gets and sets host environment variables.
 @{"host-quit" link HostQuit} closes Amiberry.
 
@@ -238,6 +239,26 @@ The file is written through AmigaDOS, so any writable volume works, including RA
 On older Linux and macOS builds the host downloads the whole file before sending it, and sends a space about once a second meanwhile, so a slow download is not taken for a stalled one. The size shown comes from a HEAD request; a server that refuses HEAD still works, with progress shown in kilobytes. Curly braces and square brackets in a URL are not expanded. On Windows the URL reaches curl.exe through PowerShell, so %NAME% in a URL stays as typed; a URL with a double quote or a control character, or longer than about 1000 characters, is refused there.
 
 host-download works on Linux, macOS and Windows hosts. On Windows it needs a current Amiberry.
+
+@endnode
+
+@node HostCopy "host-copy"
+host-copy copies one file between any host path and the Amiga. The host folder does not have to be mounted as an Amiga volume.
+
+Usage:
+
+host-copy get <host path> <Amiga destination> [FORCE]
+host-copy put <Amiga source> <host path> [FORCE]
+
+get copies a host file to the Amiga. put copies an Amiga file to the host. Only single files are copied, and a file must be smaller than 2 GB.
+
+The host path is typed the way the host writes it, for example /home/me/notes.txt on Linux and macOS or C:\Users\me\notes.txt on Windows. A leading ~ stands for the host user's home folder. A relative path starts in the folder Amiberry was started from. On Linux and macOS the host path is converted from ISO-8859-1 to UTF-8.
+
+The destination may be a folder, in which case the file keeps its name. An existing destination file is overwritten only when FORCE is given.
+
+get writes a temporary file beside the Amiga destination, checks its size and moves it into place. put has the host write a temporary file named .htput.<number> beside the host target, check its size and move it into place. host-copy reports success only after the host confirms the size. A failed or aborted copy leaves the old destination alone.
+
+There is no time limit while the host process runs. Press Ctrl-C to abort. host-copy needs an Amiberry build with host pipe sessions. Linux and macOS hosts need sh, head, wc, cat, tr and mv, and Windows hosts need PowerShell.
 
 @endnode
 

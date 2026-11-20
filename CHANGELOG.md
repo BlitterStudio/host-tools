@@ -16,6 +16,12 @@ versioning for release tags.
   It reads standard input when given no text, and Ctrl-C stops the speech. It
   uses `say` on macOS, `spd-say`, `espeak-ng` or `espeak` on Linux, and
   `System.Speech` through PowerShell on Windows.
+- `host-copy` copies one file between any host path and the Amiga, also when the
+  host folder is not mounted as an Amiga volume: `host-copy get <host path>
+  <Amiga destination>` and `host-copy put <Amiga source> <host path>`. It
+  refuses to overwrite an existing destination unless you give `FORCE`, checks
+  the byte count before moving the file into place, and works on Linux, macOS
+  and Windows hosts.
 - `host-run`, `host-multiview`, `host-edit`, `host-notify`, and `host-shell` now
   work on Windows hosts, so every command tool supports Linux, macOS, and
   Windows. `host-run` and `host-multiview` use PowerShell's `Start-Process`,

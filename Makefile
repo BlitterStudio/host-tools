@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2020-2026 Dimitris Panokostas
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-say host-info host-download host-env host-quit
-TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_path.out tests/test_host_edit_command.out tests/test_host_download_command.out tests/test_host_say_command.out tests/test_host_terminal_filter.out tests/test_host_env_cli.out tests/test_host_clip_cli.out tests/test_host_posix_scripts.out
+TOOLS		= host-run host-multiview host-shell host-path host-reveal host-notify host-edit host-clip host-say host-info host-download host-copy host-env host-quit
+TEST_BINS	= tests/test_host_common.out tests/test_host_command_builders.out tests/test_host_path.out tests/test_host_edit_command.out tests/test_host_download_command.out tests/test_host_say_command.out tests/test_host_copy_command.out tests/test_host_terminal_filter.out tests/test_host_env_cli.out tests/test_host_clip_cli.out tests/test_host_posix_scripts.out
 TEST_SCRIPTS	= tests/test_package_layout.sh tests/test_ahi_driver_source.sh tests/test_runtime_source.sh
 include version.mk
-COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_path_logic.h src/host_capture.h src/host_launch.h src/host_base64.h src/host_clip_command.h src/host_download_command.h src/host_edit_command.h src/host_env_command.h src/host_info_command.h src/host_multiview_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h src/host_run_command.h src/host_say_command.h src/host_shell_command.h src/uae_pragmas.h
+COMMON_HEADERS	= src/host_common.h src/host_path.h src/host_path_logic.h src/host_capture.h src/host_launch.h src/host_amiga_file.h src/host_base64.h src/host_clip_command.h src/host_copy_command.h src/host_download_command.h src/host_edit_command.h src/host_env_command.h src/host_info_command.h src/host_multiview_command.h src/host_notify_command.h src/host_powershell.h src/host_reveal_command.h src/host_run_command.h src/host_say_command.h src/host_shell_command.h src/uae_pragmas.h
 PACKAGE		= Host-Tools-$(VERSION).lha
 PACKAGE_ROOT	= Host-Tools
 PACKAGE_DIR	?= build/package
@@ -125,6 +125,9 @@ host-info: src/host-info.c $(COMMON_HEADERS)
 host-download: src/host-download.c $(COMMON_HEADERS)
 	$(CC) $(CFLAGS) $(VERFLAGS) $(INCLUDES) src/host-download.c -o $@
 
+host-copy: src/host-copy.c $(COMMON_HEADERS)
+	$(CC) $(CFLAGS) $(VERFLAGS) $(INCLUDES) src/host-copy.c -o $@
+
 host-env: src/host-env.c $(COMMON_HEADERS)
 	$(CC) $(CFLAGS) $(VERFLAGS) $(INCLUDES) src/host-env.c -o $@
 
@@ -150,6 +153,8 @@ tests/test_host_download_command.out: tests/test_host_download_command.c src/hos
 
 tests/test_host_say_command.out: tests/test_host_say_command.c src/host_say_command.h src/host_base64.h src/host_common.h src/host_powershell.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_say_command.c -o $@
+tests/test_host_copy_command.out: tests/test_host_copy_command.c src/host_copy_command.h src/host_base64.h src/host_common.h src/host_powershell.h
+	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_copy_command.c -o $@
 
 tests/test_host_terminal_filter.out: tests/test_host_terminal_filter.c src/host_terminal_filter.h
 	$(HOST_CC) $(HOST_NATIVE_FLAGS) $(HOST_CFLAGS) tests/test_host_terminal_filter.c -o $@

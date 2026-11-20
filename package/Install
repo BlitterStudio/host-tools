@@ -5,7 +5,7 @@
 (set @default-dest "")
 
 (welcome
-	"Host-Tools installs command line tools and the optional UAE and UAESND AHI audio drivers and UAE MHI MP3 decoder library for classic AmigaOS 68k systems running under Amiberry."
+	"Host-Tools installs the command line tools, the AmigaGuide, the UAE and UAESND AHI audio drivers and the UAE MHI MP3 decoder library for classic AmigaOS 68k systems running under Amiberry."
 )
 
 (procedure P_SetVersionFields #_source #_destfile
@@ -292,7 +292,7 @@
 				"MHI MP3: mhiuae.library to LIBS:MHI."
 			)
 			(help
-				"All components are selected by default. Novice installs every component and replaces existing files without further questions. Intermediate lets you select components, then copies versioned files automatically and replaces unversioned files. Expert shows installed and package versions before replacing existing versioned files, and asks before replacing unversioned files. No startup files, AHI preferences, or system preferences are changed."
+				"All components are selected by default. Novice installs every component and replaces existing files without asking. Intermediate lets you select components, copies versioned files automatically and replaces unversioned files. Expert shows the installed and package versions before replacing a versioned file and asks before replacing an unversioned one. The installer changes no startup files, AHI preferences or system preferences."
 			)
 			(choices
 				"Command tools"

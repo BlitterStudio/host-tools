@@ -2,5 +2,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Release metadata shared by the command tools and bundled drivers.
-VERSION ?= 2.9
-DATE ?= 2026-11-04
+VERSION ?= 2.10
+DATE ?= 2026-11-20

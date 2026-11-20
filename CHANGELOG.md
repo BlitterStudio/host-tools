@@ -8,129 +8,116 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Notable user-visible changes are recorded here. This project follows semantic
 versioning for release tags.
 
-## [Unreleased]
+## [2.10] - 2026-11-20
 
 ### Added
 
-- `host-say <text...>` speaks text on the host and returns when the speech ends.
-  It reads standard input when given no text, and Ctrl-C stops the speech. It
-  uses `say` on macOS, `spd-say`, `espeak-ng` or `espeak` on Linux, and
-  `System.Speech` through PowerShell on Windows.
-- `host-copy` copies one file between any host path and the Amiga, also when the
-  host folder is not mounted as an Amiga volume: `host-copy get <host path>
-  <Amiga destination>` and `host-copy put <Amiga source> <host path>`. It
-  refuses to overwrite an existing destination unless you give `FORCE`, checks
-  the byte count before moving the file into place, and works on Linux, macOS
-  and Windows hosts.
-- `host-run`, `host-multiview`, `host-edit`, `host-notify`, and `host-shell` now
-  work on Windows hosts, so every command tool supports Linux, macOS, and
-  Windows. `host-run` and `host-multiview` use PowerShell's `Start-Process`,
-  `host-edit` opens Notepad, and `host-notify` shows a toast that Windows lists
-  as Windows PowerShell. `host-shell` opens `%ComSpec%` in a ConPTY pseudo
-  console through the new `HostShell_OpenSized` call; it needs Amiberry 8.6.0 or
-  newer on Windows 10 version 1809 or later.
-- `host-config` reads and changes Amiberry configuration options while Amiberry
-  runs: `host-config get cpu_speed`, `host-config set cpu_speed max`. A value
-  that names an existing Amiga file is passed to Amiberry as its host path.
-- `host-disk` lists the floppy drives DF0: to DF3: with their disk images and
-  inserts or ejects an image: `host-disk insert DF0: Work:Disks/Game.adf`. It
+- `host-copy` copies one file between any host path and the Amiga, including
+  host folders that are not mounted as Amiga volumes:
+  `host-copy get <host path> <Amiga destination>` and
+  `host-copy put <Amiga source> <host path>`. It checks the byte count before
+  it replaces the destination, and it refuses to overwrite an existing file
+  unless you give `FORCE`.
+- `host-say` speaks text on the host and returns when the speech ends. It reads
+  standard input when given no text, and Ctrl-C stops the speech. It uses `say`
+  on macOS, `spd-say`, `espeak-ng` or `espeak` on Linux, and `System.Speech` on
+  Windows.
+- `host-config` reads and changes Amiberry settings while Amiberry runs, for
+  example `host-config get cpu_speed` and `host-config set cpu_speed max`. A
+  value that names an existing Amiga file is passed on as its host path.
+- `host-disk` lists the floppy drives DF0: to DF3: with their disk images, and
+  inserts or ejects images: `host-disk insert DF0: Work:Disks/Game.adf`. It
   reports an error when the drive is not in the configuration or Amiberry
   cannot load the image.
 - `host-config` and `host-disk` talk to Amiberry through `uae.resource` and run
-  no host commands. They work on every host and without Native Code.
-
-### Fixed
-
-- `host-download` can no longer be sent outside the destination by a URL that
-  ends in something like `OUT:file`. A file name taken from the URL must be a
-  single name; otherwise the tool asks for a destination. A name cut to fit
-  107 characters now produces a warning.
-- `host-download` no longer saves a stray `0` at the start of a file when the
-  server refuses HEAD but serves GET. The expected size now comes from the
-  Content-Length header, so the size check and the progress percentage work,
-  and curl no longer expands `{}` or `[]` in the URL.
-- `host-download` on older Linux and macOS builds no longer gives up on a
-  download that takes more than about 30 seconds.
-- `host-download` on Windows passes the URL to `curl.exe` through PowerShell,
-  so `%NAME%` in a URL is no longer replaced by an environment variable.
-- `host-env get NAME` no longer prints the path of the environment file for
-  names such as `f`, and two `host-env set` or `unset` commands that run at the
-  same time no longer lose one of the changes.
-- `host-clip copy` refuses standard input that contains a NUL byte or cannot be
-  read, with a message of its own, instead of copying a shortened text.
-- `host-notify` on Linux and macOS shows titles and messages that start with `-`
-  as text instead of passing them to the notification program as options.
-- `host-edit` on Linux opens files with the desktop's plain-text association, then
-  `VISUAL` or `EDITOR`, and `xdg-open` last, so an image or a PDF no longer opens
-  in a viewer.
+  no host commands, so they work on every host and without Native Code.
+- `host-run`, `host-multiview`, `host-edit`, `host-notify` and `host-shell` now
+  work on Windows hosts, so every command tool supports Linux, macOS and
+  Windows. `host-run` and `host-multiview` use PowerShell's `Start-Process`,
+  `host-edit` opens Notepad, and `host-notify` shows a toast listed under
+  Windows PowerShell. `host-shell` opens `%ComSpec%` in a ConPTY pseudo
+  console. It needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or
+  later.
 
 ### Changed
 
+- `?` prints the usage before a tool looks for `uae.resource`, so it also works
+  outside Amiberry. An argument after `?` is an error in every tool.
+- `host-shell` converts typed text from ISO-8859-1 to UTF-8, and host output
+  back to ISO-8859-1, on every host. Characters with no ISO-8859-1 form show as
+  ASCII stand-ins or `?`.
+- On Windows, a failing host command prints PowerShell's error message before
+  the tool's own.
+- `host-run` and `host-edit` on Linux and macOS start the program through a host
+  command session, so they can report a program or editor that cannot be
+  started. They used to report success in every case.
+- The README, wiki and AmigaGuide are rewritten in plainer language, and several
+  wrong statements are corrected. The AmigaGuide gains a page on exit codes.
 - Build with `amigadev/crosstools:m68k-amigaos` (AmigaDev GCC 16.2-rc24-9,
   binutils 2.47 snapshot), the tag that replaces `m68k-amigaos-gcc10`.
-- `?` prints the usage before the tools look for `uae.resource`, so it works
-  outside Amiberry. An argument after `?` is an error in every tool.
-- `host-shell` converts typed text from ISO-8859-1 to UTF-8 and host output back
-  to ISO-8859-1 on every host. Characters without an ISO-8859-1 form show as
-  ASCII stand-ins or `?`. `host-shell ?` now explains how one argument and
-  several arguments are handled.
-- On Windows, a failing PowerShell command prints PowerShell's error message
-  before the tool's own.
 
 ### Fixed
 
-- `host-multiview`, `host-reveal`, `host-edit` and `host-run` no longer pass an
-  Amiga path that does not exist to the host as text. `host-multiview
-  HT:no-such-file` is now an error with exit code 10. `host-run` still passes
-  options and other words that are not paths to the host as written.
-- Volumes and assigns named like URL schemes (`DATA:`, `FILE:`, `FTP:`) are
-  treated as Amiga paths when they exist. They used to be refused or sent to the
-  host as URLs.
-- Paths longer than 255 characters are refused before AmigaDOS sees them, and
-  `host-run` no longer looks up a long ordinary argument as a path.
-- `host-edit` creates a new file only in a directory that exists and has a host
-  path.
-- Paths and arguments with accented characters, such as `café.txt`, reach the
-  host intact. Amiberry hands paths to the tools in ISO-8859-1. On Windows the
-  PowerShell scripts now carry them as UTF-16, and on Linux and macOS
-  `host-run`, `host-multiview`, `host-edit` and `host-reveal` convert them to
-  UTF-8 before they reach the shell.
-- `host-reveal` on Windows starts Explorer through PowerShell. A percent sign in
-  the path is no longer expanded as an environment variable, and non-ASCII names
-  no longer depend on the ANSI code page.
+- Command tools:
+  - Paths and arguments with accented characters, such as `café.txt`, reach
+    the host intact. Linux and macOS used to receive them in ISO-8859-1.
+  - An Amiga path that does not exist is an error instead of being passed to
+    the host as text. `host-multiview HT:no-such-file` used to open a "Pick an
+    app" dialog on Windows.
+  - Volumes and assigns named like URL schemes (`DATA:`, `FILE:`, `FTP:`) are
+    treated as Amiga paths when they exist.
+  - Paths longer than 255 characters are refused before AmigaDOS sees them.
+  - `host-edit` creates a new file only in a directory that exists and has a
+    host path.
+- `host-download`:
+  - A URL that ends in something like `OUT:file` can no longer write outside
+    the destination. The file name taken from a URL must be a single name.
+  - The tool warns when it shortens a long file name to fit 107 characters.
+  - A server that refuses HEAD but serves GET no longer leaves a stray `0` at
+    the start of the file.
+  - The expected size is now read from the Content-Length header, so the size
+    check and the progress percentage work.
+  - curl no longer expands `{}` or `[]` in the URL.
+  - Older Linux and macOS builds no longer give up on a download that takes
+    more than about 30 seconds.
+  - On Windows, `%NAME%` in a URL is no longer replaced by an environment
+    variable.
+- `host-env`:
+  - `host-env get f` and similar short names print the variable instead of the
+    path of the environment file.
+  - Two `set` or `unset` commands that run at the same time no longer lose one
+    of the changes.
+- `host-clip copy` refuses standard input that contains a NUL byte or cannot be
+  read, instead of copying a shortened text.
+- `host-notify` on Linux and macOS shows titles and messages that start with
+  `-` as text, instead of passing them to the notification program as options.
+- `host-edit` on Linux opens files with the desktop's plain-text editor, then
+  `VISUAL` or `EDITOR`, and `xdg-open` last, so an image or a PDF no longer
+  opens in a viewer.
+- `host-reveal` on Windows starts Explorer through PowerShell, so a percent sign
+  in a path is no longer expanded as an environment variable.
 - `host-run` on Windows no longer lets an argument such as `x&calc.exe` start a
   second command when the target is a `.bat` or `.cmd` file. Arguments with
   quotes, percent signs or line breaks are refused for batch files.
-- `host-run` and `host-edit` on Linux and macOS report a command or editor that
-  cannot be started. They used to return success after handing the command to a
-  background shell.
-
-### Fixed
-
-- `uaesnd.audio` now lets other EXTER interrupt servers run when the sound board
-  has nothing pending. It used to end the interrupt chain for every interrupt.
-- `uaesnd.audio` Disable and Enable preserve all registers. Disable also
-  masks capture interrupts, `Update` no longer re-enables interrupts inside an
-  outstanding Disable, and the interrupt server does nothing while disabled.
-- `uaesnd.audio` allows one AHI allocation at a time. A second allocation fails
-  instead of resetting the board under the first and releasing it on free.
-- `uaesnd.audio` returns an error from Start when recording cannot begin,
-  because the host has no capture device, instead of reporting success.
-- `uae.audio` calls `Cause()` with ExecBase in A6. A higher priority server
-  could leave another value there.
-- `uae.audio` frees its per-allocation driver data when AHI frees the audio
-  control, and frees the mixing and DMA buffers when Start fails, for example
-  when the host cannot open an audio device.
-- `uae.audio` starting recording twice no longer loses the recording buffers,
-  and a Start without recording leaves a running recording alone.
-- `uae.audio` stopping only recording keeps playback running, and stopping only
-  playback keeps recording running, with silence sent to the host and no player
-  or mixer calls. The shared host audio session now closes only when neither is
-  active.
-- `uae.audio` and `uaesnd.audio` free their library base and close the
-  libraries they opened when initialization fails.
-- The root build now also watches `drivers/mhi/src/mhi_abi.h`, so changing only
-  that header rebuilds `mhiuae.library`.
+- `uaesnd.audio`:
+  - It lets other EXTER interrupt servers run when the sound board has nothing
+    pending. It used to end the interrupt chain for every interrupt.
+  - Disable and Enable preserve all registers.
+  - Disable also masks capture interrupts, and Update no longer re-enables
+    interrupts inside an outstanding Disable.
+  - It allows one AHI allocation at a time. A second allocation used to reset
+    the board under the first one.
+  - Start returns an error when recording cannot begin, for example when the
+    host has no capture device.
+- `uae.audio`:
+  - It calls `Cause()` with ExecBase in A6.
+  - It no longer leaks memory on every allocate and free, or when Start fails.
+  - Starting recording twice no longer loses the recording buffers.
+  - Stopping only recording keeps playback running, and stopping only playback
+    keeps recording running.
+- Both AHI drivers free their library base and close the libraries they opened
+  when initialisation fails.
+- Changing `drivers/mhi/src/mhi_abi.h` alone now rebuilds `mhiuae.library`.
 
 ## [2.9] - 2026-11-04
 
@@ -202,6 +189,7 @@ versioning for release tags.
 - Added `host-env` and the UAE MHI MP3 decoder library.
 - Added UAESND recording support and driver refinements.
 
+[2.10]: https://github.com/BlitterStudio/host-tools/compare/v2.9...v2.10
 [2.9]: https://github.com/BlitterStudio/host-tools/compare/v2.8...v2.9
 [2.8]: https://github.com/BlitterStudio/host-tools/compare/v2.7...v2.8
 [2.7]: https://github.com/BlitterStudio/host-tools/compare/v2.6...v2.7

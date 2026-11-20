@@ -51,6 +51,26 @@ static int lock_is_directory(BPTR lock)
     return fib.fib_DirEntryType > 0;
 }
 
+/*
+ * Name the file after the URL. Only a single file name is accepted, so a
+ * URL such as .../OUT:x cannot choose a different volume or directory.
+ */
+static int derive_url_name(const char *url, char *name, size_t name_size)
+{
+    switch (host_url_filename(url, name, name_size)) {
+    case HOST_URL_FILENAME_INVALID:
+        printf("Cannot use the end of the URL as a file name; give a destination file: %s\n", url);
+        return 0;
+    case HOST_URL_FILENAME_TRUNCATED:
+        printf("Warning: the file name from the URL was shortened to %lu characters: %s\n",
+               (unsigned long)(name_size - 1), name);
+        break;
+    default:
+        break;
+    }
+    return 1;
+}
+
 static int make_unused_sidecar_path(const char *destination, char kind,
                                     char *path, size_t path_size)
 {
@@ -199,10 +219,11 @@ int main(int argc, char *argv[])
         return HOST_RETURN_ERROR;
     }
 
-    host_url_filename(url, urlname, sizeof(urlname));
-
     destpath[0] = '\0';
     if (dest == NULL) {
+        if (!derive_url_name(url, urlname, sizeof(urlname))) {
+            return HOST_RETURN_ERROR;
+        }
         if (!host_append_literal(destpath, sizeof(destpath), urlname)) {
             printf("Destination path is too long\n");
             return HOST_RETURN_ERROR;
@@ -220,9 +241,14 @@ int main(int argc, char *argv[])
             printf("Destination path is too long\n");
             return HOST_RETURN_ERROR;
         }
-        if (isdir && !AddPart((STRPTR)destpath, (STRPTR)urlname, sizeof(destpath))) {
-            printf("Destination path is too long\n");
-            return HOST_RETURN_ERROR;
+        if (isdir) {
+            if (!derive_url_name(url, urlname, sizeof(urlname))) {
+                return HOST_RETURN_ERROR;
+            }
+            if (!AddPart((STRPTR)destpath, (STRPTR)urlname, sizeof(destpath))) {
+                printf("Destination path is too long\n");
+                return HOST_RETURN_ERROR;
+            }
         }
     }
 
@@ -246,7 +272,13 @@ int main(int argc, char *argv[])
             built = host_append_download_stream_command(command, sizeof(command), url);
         }
         if (!built) {
-            printf("Command is too long\n");
+            if (platform == HOST_PLATFORM_WINDOWS && !host_download_url_windows_safe(url)) {
+                printf("The URL contains characters a Windows host cannot receive (double quote or control character)\n");
+            } else if (platform == HOST_PLATFORM_WINDOWS) {
+                printf("URL is too long for a Windows host (limit about 1000 characters)\n");
+            } else {
+                printf("Command is too long\n");
+            }
             return HOST_RETURN_ERROR;
         }
 

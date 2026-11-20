@@ -26,6 +26,15 @@ static void require_contains(const char *value, const char *needle)
     }
 }
 
+static void require_not_contains(const char *value, const char *needle)
+{
+    if (strstr(value, needle) != NULL) {
+        fprintf(stderr, "unexpected substring: %s\n", needle);
+        fprintf(stderr, "value: %s\n", value);
+        exit(1);
+    }
+}
+
 static void require_shell_syntax(const char *command)
 {
     char syntax_command[HOST_MAX_COMMAND_LEN * 2];
@@ -47,11 +56,12 @@ static void test_stream_command(void)
                                                 "https://example.com/file's.lha"),
             "stream download command should build");
 
-    require_contains(command, "curl --proto '=http,https,ftp,ftps' --proto-redir '=http,https,ftp,ftps'");
-    require_contains(command, "-sfIL -o /dev/null -w '%{content_length}\\n'");
+    require_contains(command, "curl --globoff --proto '=http,https,ftp,ftps' --proto-redir '=http,https,ftp,ftps'");
+    require_contains(command, "-sIL 'https://example.com/file'\\''s.lha' 2>/dev/null | tr -d '\\r' | awk '");
     require_contains(command, "-sfL 'https://example.com/file'\\''s.lha'");
     require_contains(command, "echo 0; wget -q -O - 'https://example.com/file'\\''s.lha'");
     require_contains(command, "else exit 127; fi");
+    require_not_contains(command, "%{content_length}");
     require_shell_syntax(command);
 }
 
@@ -65,30 +75,71 @@ static void test_b64_command(void)
             "base64 download command should build");
 
     require_contains(command, "t=$(mktemp) || exit 1");
-    require_contains(command, "--proto-redir '=http,https,ftp,ftps' -sfL -o \"$t\"");
-    require_contains(command, "wget -q -O \"$t\" 'https://example.com/a b.adf'");
-    require_contains(command, "|| { rm -f \"$t\"; exit 22; }");
-    require_contains(command, "wc -c < \"$t\"; base64 < \"$t\"; rm -f \"$t\"");
+    require_contains(command, "curl --globoff --proto '=http,https,ftp,ftps' --proto-redir '=http,https,ftp,ftps'");
+    require_contains(command, "-sfL -o \"$t\" 'https://example.com/a b.adf' & p=$!");
+    require_contains(command, "wget -q -T 60 -O \"$t\" 'https://example.com/a b.adf' & p=$!");
+    require_contains(command, "while kill -0 \"$p\" 2>/dev/null; do printf ' '; sleep 1; done");
+    require_contains(command, "wait \"$p\" || exit 22");
+    require_contains(command, "wc -c < \"$t\"; base64 < \"$t\"");
     require_shell_syntax(command);
+}
+
+/* Decode the script inside "powershell -NoProfile -EncodedCommand <base64>" */
+static const char *decode_ps_script(const char *command)
+{
+    static const char prefix[] = "powershell -NoProfile -EncodedCommand ";
+    static unsigned char decoded[HOST_MAX_COMMAND_LEN * 3];
+    static char script[HOST_MAX_COMMAND_LEN * 2];
+    struct host_base64_state st;
+    long n;
+
+    require(strncmp(command, prefix, sizeof(prefix) - 1) == 0,
+            "windows download command should be an encoded powershell command");
+    host_base64_init(&st);
+    n = host_base64_feed(&st, command + sizeof(prefix) - 1,
+                         (long)strlen(command + sizeof(prefix) - 1), decoded);
+    require(n > 0 && n % 2 == 0, "decoded script should be UTF-16");
+    for (long i = 0; i < n / 2; i++) {
+        require(decoded[i * 2 + 1] == 0, "script should be Latin-1 text");
+        script[i] = (char)decoded[i * 2];
+    }
+    script[n / 2] = '\0';
+    return script;
 }
 
 static void test_windows_stream_command(void)
 {
     char command[HOST_MAX_COMMAND_LEN];
+    const char *script;
 
     command[0] = '\0';
     require(host_append_download_stream_command_windows(command, sizeof(command),
-                                                        "https://example.com/file.lha"),
+                                                        "https://example.com/a'b/%TEMP%.lha?x=%20&y=[1-2]{a,b}"),
             "windows stream download command should build");
 
-    require_contains(command, "--proto \"=http,https,ftp,ftps\"");
-    require_contains(command, "-sIL -o NUL -w \"%{content_length}\\n\" \"https://example.com/file.lha\" || echo 0)");
-    require_contains(command, "-sfL \"https://example.com/file.lha\"");
+    /* nothing but the powershell launcher and base64 reaches cmd.exe, so
+     * %NAME%, &, quotes and ^ in the URL cannot be interpreted by it */
+    for (const char *p = command; *p; p++) {
+        require((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
+                (*p >= '0' && *p <= '9') || *p == ' ' || *p == '-' ||
+                *p == '+' || *p == '/' || *p == '=',
+                "windows download command must not contain cmd metacharacters");
+    }
+
+    script = decode_ps_script(command);
+    require_contains(script, "$u='https://example.com/a''b/%TEMP%.lha?x=%20&y=[1-2]{a,b}'");
+    require_contains(script, "& curl.exe --globoff --proto $p --proto-redir $p --max-time 15 -sIL $u");
+    require_contains(script, "& curl.exe --globoff --proto $p --proto-redir $p -sfL $u;exit $LASTEXITCODE");
+    require_not_contains(script, "content_length");
 
     command[0] = '\0';
     require(!host_append_download_stream_command_windows(command, sizeof(command),
                                                          "https://example.com/a\"b"),
-            "embedded quotes should be rejected for cmd quoting");
+            "embedded quotes cannot be passed to curl.exe");
+    require(!host_download_url_windows_safe("https://example.com/a\nb"),
+            "line breaks cannot be passed to curl.exe");
+    require(host_download_url_windows_safe("https://example.com/a b%20c"),
+            "spaces and percent signs are fine");
 }
 
 static void test_small_buffer_failures(void)
@@ -102,17 +153,34 @@ static void test_small_buffer_failures(void)
     command[0] = '\0';
     require(!host_append_download_b64_command(command, sizeof(command), "https://e.com/f"),
             "small base64 command buffer should fail");
+
+    command[0] = '\0';
+    require(!host_append_download_stream_command_windows(command, sizeof(command),
+                                                         "https://e.com/f"),
+            "small windows command buffer should fail");
 }
 
 static void require_filename(const char *url, const char *expected)
 {
     char name[108];
 
-    host_url_filename(url, name, sizeof(name));
+    require(host_url_filename(url, name, sizeof(name)) == HOST_URL_FILENAME_OK,
+            "filename should be accepted");
     if (strcmp(name, expected) != 0) {
         fprintf(stderr, "filename for %s: expected %s, got %s\n", url, expected, name);
         exit(1);
     }
+}
+
+static void require_invalid_filename(const char *url)
+{
+    char name[108];
+
+    if (host_url_filename(url, name, sizeof(name)) != HOST_URL_FILENAME_INVALID) {
+        fprintf(stderr, "filename for %s should be rejected, got %s\n", url, name);
+        exit(1);
+    }
+    require(name[0] == '\0', "rejected filename should be empty");
 }
 
 static void test_url_filename(void)
@@ -122,13 +190,33 @@ static void test_url_filename(void)
     require_filename("https://example.com/path/", "download");
     require_filename("https://example.com/", "download");
     require_filename("https://example.com", "download");
+    require_filename("https://user:pw@example.com:8080", "download");
+    require_filename("https://example.com/a?next=OUT:x/y", "a");
     require_filename("ftp://example.com/a/b/c.adf", "c.adf");
+    require_filename("https://example.com/a%3Ab", "a%3Ab");
 
     {
         char name[8];
-        host_url_filename("https://example.com/verylongname.bin", name, sizeof(name));
+        require(host_url_filename("https://example.com/verylongname.bin", name, sizeof(name)) ==
+                    HOST_URL_FILENAME_TRUNCATED,
+                "long filenames should report truncation");
         require(strcmp(name, "verylon") == 0, "long filenames should truncate");
+        require(host_url_filename("https://example.com/1234567", name, sizeof(name)) ==
+                    HOST_URL_FILENAME_OK,
+                "a name that exactly fits is not truncated");
     }
+}
+
+/* AmigaDOS would read OUT:payload.bin as a path on another volume. */
+static void test_url_filename_must_be_one_component(void)
+{
+    require_invalid_filename("https://example.com/OUT:payload.bin");
+    require_invalid_filename("https://example.com/dir/SYS:Dir");
+    require_invalid_filename("https://example.com/:x");
+    require_invalid_filename("https://example.com/..");
+    require_invalid_filename("https://example.com/a/.");
+    require_invalid_filename("https://example.com/a\nb");
+    require_invalid_filename("https://example.com/a\x01" "b");
 }
 
 static void test_supported_urls(void)
@@ -253,6 +341,7 @@ int main(void)
     test_windows_stream_command();
     test_small_buffer_failures();
     test_url_filename();
+    test_url_filename_must_be_one_component();
     test_supported_urls();
     test_sidecar_path();
     test_base64_decode();

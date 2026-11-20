@@ -88,5 +88,6 @@ host-clip
 host-say
 host-info
 host-download
+host-copy
 host-env
 host-quit

@@ -3,6 +3,7 @@ set -eu
 
 CAPTURE_HEADER="src/host_capture.h"
 DOWNLOAD_SOURCE="src/host-download.c"
+COPY_SOURCE="src/host-copy.c"
 SHELL_SOURCE="src/host-shell.c"
 MHI_HEADER="drivers/mhi/src/mhiuae.h"
 MHI_SOURCE="drivers/mhi/src/mhiuae.c"
@@ -13,10 +14,21 @@ grep -F -q 'Aborted host command.' "$CAPTURE_HEADER"
 
 grep -F -q 'static char session_command[HOST_MAX_COMMAND_LEN];' "$SHELL_SOURCE"
 
-grep -F -q "make_unused_sidecar_path(destpath, 'p'" "$DOWNLOAD_SOURCE"
-grep -F -q 'install_download(temp_path, destpath, force' "$DOWNLOAD_SOURCE"
+grep -F -q "host_make_unused_sidecar_path(destpath, 'p'" "$DOWNLOAD_SOURCE"
+grep -F -q 'host_install_file(temp_path, destpath, force' "$DOWNLOAD_SOURCE"
 if grep -F -q 'Open((STRPTR)destpath, MODE_NEWFILE)' "$DOWNLOAD_SOURCE"; then
 	echo "host-download must write to a sidecar before replacing the destination" >&2
+	exit 1
+fi
+
+grep -F -q "host_make_unused_sidecar_path(destpath, 'p'" "$COPY_SOURCE"
+grep -F -q 'host_install_file(temp_path, destpath, force' "$COPY_SOURCE"
+if grep -F -q 'Open((STRPTR)destpath, MODE_NEWFILE)' "$COPY_SOURCE"; then
+	echo "host-copy get must write to a sidecar before replacing the destination" >&2
+	exit 1
+fi
+if grep -F -q 'host_print_command_output' "$COPY_SOURCE"; then
+	echo "host-copy must not use the idle-timeout capture loop for file transfers" >&2
 	exit 1
 fi
 

@@ -112,6 +112,23 @@ host-clip copy "Hello from Amiga"
 host-clip paste
 ```
 
+## host-say
+
+```text
+host-say <text...>
+host-say < file
+```
+
+Speaks the arguments (joined with spaces) through the host's speech synthesizer and returns when the speech ends. Without text arguments it reads standard input, so `host-say < RAM:note.txt` reads a file aloud; typing `host-say` alone at a console is an error. Ctrl-C stops the speech. The text is limited to 2047 characters, or about 1100 on Windows. The text may start with a dash.
+
+macOS uses `say`. Linux uses `spd-say` (Speech Dispatcher), then `espeak-ng`, then `espeak`, whichever is installed first, and `host-say` fails if none is. Windows uses the speech synthesizer in `System.Speech` through PowerShell, with the voice set as the Windows default. Amiga text is converted from ISO-8859-1 to UTF-8 with `iconv` on Linux and macOS, and by PowerShell on Windows.
+
+Speech can last longer than the 30 seconds that other commands wait for output. `host-say` keeps waiting for as long as the host reports the speech program running. On Amiberry builds without `HostShell_Status` it gives up after about 5 seconds, so only short text works there.
+
+```text
+host-say "The build has finished"
+```
+
 ## host-info
 
 ```text
@@ -159,6 +176,6 @@ Closes Amiberry, as quitting from its menu does. Amiberry's WHDLoad booter runs 
 
 Commands return `0` on success, `10` for missing or invalid arguments or a failed operation, and `2` if `uae.resource` is unavailable (for example outside Amiberry, or with Native Code disabled). A command that waits for a host command returns `10` if that command exits with a nonzero status. `?` prints the usage and returns `0`, even without `uae.resource`. Any argument after `?` is an error and returns `10`.
 
-On Linux, the desktop commands need the matching host utilities: `xdg-utils`, `notify-send`, a clipboard backend, and optionally `gdbus` or `iconv`. Downloads need `curl` or `wget` on Linux and macOS and `curl.exe` on Windows. On Windows, `host-run`, `host-multiview`, `host-edit`, `host-notify`, `host-clip`, `host-info` and `host-env` run PowerShell, `host-reveal` runs Explorer, and `host-edit` needs Notepad.
+On Linux, the desktop commands need the matching host utilities: `xdg-utils`, `notify-send`, a clipboard backend, `spd-say`, `espeak-ng` or `espeak` for `host-say`, and optionally `gdbus` or `iconv`. Downloads need `curl` or `wget` on Linux and macOS and `curl.exe` on Windows. On Windows, `host-run`, `host-multiview`, `host-edit`, `host-notify`, `host-clip`, `host-say`, `host-info` and `host-env` run PowerShell, `host-reveal` runs Explorer, and `host-edit` needs Notepad.
 
-`host-reveal`, `host-notify`, `host-clip`, `host-info` and `host-env` can be cancelled with Ctrl-C, and so can `host-run`, `host-multiview` and `host-edit` on Windows. These commands give up when the host sends no output for about 30 seconds, or 5 seconds on older Amiberry builds that lack `HostShell_Status`. See [Getting started](Getting-Started) for installation and host support.
+`host-reveal`, `host-notify`, `host-clip`, `host-say`, `host-info` and `host-env` can be cancelled with Ctrl-C, and so can `host-run`, `host-multiview` and `host-edit` on Windows. These commands give up when the host sends no output for about 30 seconds (`host-say` excepted, see above), or 5 seconds on older Amiberry builds that lack `HostShell_Status`. See [Getting started](Getting-Started) for installation and host support.

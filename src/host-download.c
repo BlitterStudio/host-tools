@@ -183,15 +183,21 @@ int main(int argc, char *argv[])
     int rc = HOST_RETURN_ERROR;
     const char *failure = NULL;
 
+    if (argc >= 2 && strcmp(argv[1], "?") == 0)
+    {
+        if (argc > 2)
+        {
+            printf("Unexpected argument after ?\n");
+            print_usage();
+            return HOST_RETURN_ERROR;
+        }
+        return print_usage();
+    }
+
     if (!InitUAEResource())
     {
         printf("UAEResource not found!\n");
         return 2;
-    }
-
-    if (argc == 2 && strcmp(argv[1], "?") == 0)
-    {
-        return print_usage();
     }
 
     for (int i = 1; i < argc; i++) {

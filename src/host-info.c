@@ -20,12 +20,6 @@ static int print_usage(void)
 
 int main(int argc, char *argv[])
 {
-    if (!InitUAEResource())
-    {
-        printf("UAEResource not found!\n");
-        return 2;
-    }
-
     if (argc == 2 && strcmp(argv[1], "?") == 0)
     {
         return print_usage();
@@ -33,9 +27,16 @@ int main(int argc, char *argv[])
 
     if (argc > 1)
     {
-        printf("Unexpected argument\n");
+        printf(strcmp(argv[1], "?") == 0 ? "Unexpected argument after ?\n"
+                                         : "Unexpected argument\n");
         print_usage();
         return HOST_RETURN_ERROR;
+    }
+
+    if (!InitUAEResource())
+    {
+        printf("UAEResource not found!\n");
+        return 2;
     }
 
     if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {

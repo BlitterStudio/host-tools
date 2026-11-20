@@ -205,7 +205,7 @@ Usage:
 host-say <text...>
 host-say < file
 
-Without text arguments, host-say reads standard input. Typing host-say alone at a console is an error. Ctrl-C stops the speech. The text is limited to 2047 characters, or about 1100 on Windows, and may start with a dash.
+Without text arguments, host-say reads standard input. Typing host-say alone at a console is an error. Ctrl-C stops the speech. The text is limited to 2047 characters, or about 1000 on Windows, and may start with a dash.
 
 macOS uses say. Linux uses spd-say, then espeak-ng, then espeak, whichever is installed first, and host-say fails if none is. Windows uses the System.Speech synthesizer through PowerShell. Text is converted from ISO-8859-1 to UTF-8 through iconv on Linux and macOS and through PowerShell on Windows.
 

@@ -48,15 +48,20 @@ int main(int argc, char *argv[])
     command[0] = '\0';
     text[0] = '\0';
 
+    if (argc > 1 && strcmp(argv[1], "?") == 0)
+    {
+        if (argc > 2) {
+            printf("Unexpected argument after ?\n");
+            print_usage();
+            return HOST_RETURN_ERROR;
+        }
+        return print_usage();
+    }
+
     if (!InitUAEResource())
     {
         printf("UAEResource not found!\n");
         return 2;
-    }
-
-    if (argc > 1 && strcmp(argv[1], "?") == 0)
-    {
-        return print_usage();
     }
 
     if (argc <= 1) {
@@ -82,9 +87,9 @@ int main(int argc, char *argv[])
     }
 
     if (GetHostPlatform() == HOST_PLATFORM_WINDOWS) {
-        /* the script travels base64-encoded, which leaves room for about 1100 characters */
+        /* the script travels base64-encoded, which leaves room for about 1000 characters */
         if (!host_append_say_command_windows(command, sizeof(command), text)) {
-            printf("Text is too long for a Windows host (limit about 1100 characters)\n");
+            printf("Text is too long for a Windows host (limit about 1000 characters)\n");
             return HOST_RETURN_ERROR;
         }
     } else if (!host_append_say_command(command, sizeof(command), text)) {

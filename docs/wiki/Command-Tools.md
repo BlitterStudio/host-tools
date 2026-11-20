@@ -119,7 +119,7 @@ host-say <text...>
 host-say < file
 ```
 
-Speaks the arguments (joined with spaces) through the host's speech synthesizer and returns when the speech ends. Without text arguments it reads standard input, so `host-say < RAM:note.txt` reads a file aloud; typing `host-say` alone at a console is an error. Ctrl-C stops the speech. The text is limited to 2047 characters, or about 1100 on Windows. The text may start with a dash.
+Speaks the arguments (joined with spaces) through the host's speech synthesizer and returns when the speech ends. Without text arguments it reads standard input, so `host-say < RAM:note.txt` reads a file aloud; typing `host-say` alone at a console is an error. Ctrl-C stops the speech. The text is limited to 2047 characters, or about 1000 on Windows. The text may start with a dash.
 
 macOS uses `say`. Linux uses `spd-say` (Speech Dispatcher), then `espeak-ng`, then `espeak`, whichever is installed first, and `host-say` fails if none is. Windows uses the speech synthesizer in `System.Speech` through PowerShell, with the voice set as the Windows default. Amiga text is converted from ISO-8859-1 to UTF-8 with `iconv` on Linux and macOS, and by PowerShell on Windows.
 

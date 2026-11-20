@@ -33,13 +33,17 @@ static void require_string(const char *actual, const char *expected, const char 
     }
 }
 
-static void require_ps_script(const char *command, const char *script)
+/*
+ * Decode the -EncodedCommand payload (UTF-16LE) of a PowerShell command
+ * into UTF-8, independently of the encoder under test.
+ */
+static void decode_ps_command(const char *command, char *out, size_t out_size)
 {
     static const char prefix[] = "powershell -NoProfile -EncodedCommand ";
     struct host_base64_state st;
-    unsigned char decoded[4096];
+    static unsigned char decoded[HOST_MAX_COMMAND_LEN * 4];
     long n;
-    size_t script_len = strlen(script);
+    size_t pos = 0;
 
     require(strncmp(command, prefix, sizeof(prefix) - 1) == 0,
             "encoded command should start with the powershell prefix");
@@ -47,11 +51,36 @@ static void require_ps_script(const char *command, const char *script)
     host_base64_init(&st);
     n = host_base64_feed(&st, command + sizeof(prefix) - 1,
                          (long)strlen(command + sizeof(prefix) - 1), decoded);
-    require(n == (long)(script_len * 2), "decoded UTF-16 length should match script");
-    for (size_t i = 0; i < script_len; i++) {
-        require(decoded[i * 2] == (unsigned char)script[i] && decoded[i * 2 + 1] == 0,
-                "decoded UTF-16 bytes should spell the script");
+    require(n >= 0 && n % 2 == 0, "decoded UTF-16 should hold whole code units");
+
+    for (long i = 0; i < n; i += 2) {
+        unsigned long cp = decoded[i] | ((unsigned long)decoded[i + 1] << 8);
+
+        require(cp < 0xD800 || cp > 0xDFFF, "test text has no surrogate pairs");
+        require(pos + 4 < out_size, "decoded script buffer should be large enough");
+        if (cp < 0x80) {
+            out[pos++] = (char)cp;
+        } else if (cp < 0x800) {
+            out[pos++] = (char)(0xC0 | (cp >> 6));
+            out[pos++] = (char)(0x80 | (cp & 0x3F));
+        } else {
+            out[pos++] = (char)(0xE0 | (cp >> 12));
+            out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+            out[pos++] = (char)(0x80 | (cp & 0x3F));
+        }
     }
+    out[pos] = '\0';
+}
+
+/* The script (UTF-8) that the command runs inside the error-reporting wrapper */
+static void require_ps_script(const char *command, const char *script)
+{
+    static char decoded[HOST_MAX_COMMAND_LEN * 2];
+    static char expected[HOST_MAX_COMMAND_LEN * 2];
+
+    decode_ps_command(command, decoded, sizeof(decoded));
+    snprintf(expected, sizeof(expected), "%s%s%s", HOST_PS_TRY, script, HOST_PS_CATCH);
+    require_string(decoded, expected, "decoded PowerShell script");
 }
 
 /* ---- POSIX script, run against stub speech programs ---- */
@@ -340,17 +369,29 @@ static void test_windows_say_command(void)
                       "$s.Dispose()");
 }
 
+static void test_windows_say_command_latin1(void)
+{
+    char command[HOST_MAX_COMMAND_LEN];
+
+    /* guest text is ISO-8859-1 and reaches the script as UTF-8 */
+    command[0] = '\0';
+    require(host_append_say_command_windows(command, sizeof(command), "caf\xE9 na\xEFve"),
+            "windows say command with accents should build");
+    require_ps_script(command,
+                      HOST_SAY_PS_HEAD "'caf\xC3\xA9 na\xC3\xAFve'" HOST_SAY_PS_TAIL);
+}
+
 static void test_windows_say_command_limit(void)
 {
     char command[HOST_MAX_COMMAND_LEN];
     static char text[2048];
 
     /* the limit quoted in host-say's error message */
-    memset(text, 'a', 1100);
-    text[1100] = '\0';
+    memset(text, 'a', 1000);
+    text[1000] = '\0';
     command[0] = '\0';
     require(host_append_say_command_windows(command, sizeof(command), text),
-            "windows say command should fit 1100 characters");
+            "windows say command should fit 1000 characters");
     memset(text, 'a', sizeof(text) - 1);
     text[sizeof(text) - 1] = '\0';
     command[0] = '\0';
@@ -385,6 +426,7 @@ int main(void)
     test_latin1_text_becomes_utf8();
     test_session_close_stops_speech();
     test_windows_say_command();
+    test_windows_say_command_latin1();
     test_windows_say_command_limit();
     test_small_buffer_failures();
 

@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Requirements
 
-Run the tools in Amiberry v6.0 or newer, or in a build with the `uae.resource`/`uaelib` support the tools use. Enable **Native Code** execution for the command tools and the MHI decoder. `host-quit` is the exception: it needs only `uae.resource`. The UAESND AHI driver also needs the **UAESND sound board** enabled in Amiberry. The audio drivers run on the Amiga side, so the host requirements below apply to the command tools only.
+Run the tools in Amiberry v6.0 or newer, or in a build with the `uae.resource`/`uaelib` support the tools use. Enable **Native Code** execution for the command tools and the MHI decoder. `host-quit`, `host-config` and `host-disk` are the exceptions: they need only `uae.resource`. The UAESND AHI driver also needs the **UAESND sound board** enabled in Amiberry. The audio drivers run on the Amiga side, so the host requirements below apply to the command tools only.
 
 All commands work on Linux, macOS and Windows hosts. On Windows, `host-shell` needs Amiberry 8.6.0 or newer and Windows 10 version 1809 or later, which provides the ConPTY pseudo console. The other commands work with a current Amiberry on every host.
 

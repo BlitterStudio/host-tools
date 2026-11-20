@@ -90,4 +90,6 @@ host-info
 host-download
 host-copy
 host-env
+host-config
+host-disk
 host-quit

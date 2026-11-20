@@ -29,6 +29,15 @@ versioning for release tags.
   as Windows PowerShell. `host-shell` opens `%ComSpec%` in a ConPTY pseudo
   console through the new `HostShell_OpenSized` call; it needs Amiberry 8.6.0 or
   newer on Windows 10 version 1809 or later.
+- `host-config` reads and changes Amiberry configuration options while Amiberry
+  runs: `host-config get cpu_speed`, `host-config set cpu_speed max`. A value
+  that names an existing Amiga file is passed to Amiberry as its host path.
+- `host-disk` lists the floppy drives DF0: to DF3: with their disk images and
+  inserts or ejects an image: `host-disk insert DF0: Work:Disks/Game.adf`. It
+  reports an error when the drive is not in the configuration or Amiberry
+  cannot load the image.
+- `host-config` and `host-disk` talk to Amiberry through `uae.resource` and run
+  no host commands. They work on every host and without Native Code.
 
 ### Fixed
 

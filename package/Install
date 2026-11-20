@@ -321,6 +321,8 @@
 		(P_InstallCommandTool "host-download")
 		(P_InstallCommandTool "host-copy")
 		(P_InstallCommandTool "host-env")
+		(P_InstallCommandTool "host-config")
+		(P_InstallCommandTool "host-disk")
 		(P_InstallCommandTool "host-quit")
 	)
 )

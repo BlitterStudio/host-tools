@@ -284,5 +284,17 @@ printf '%s\n' "$v1_stop" | grep -F -q 'tst.b p_Streams(a3)'
 grep -A30 '^engine_stop:' "$DRIVER_SOURCE" | grep -F -q 'call  FreeVec'
 grep -A30 '^engine_stop:' "$DRIVER_SOURCE" | grep -B6 -F '.notrunning' | grep -F -q 'RemIntServer'
 
+# v1: Stop(PLAY) while recording keeps the engine for the sampler but stops mixing
+grep -A1 -F 'tst.b noplay' "$DRIVER_SOURCE" | grep -F -q 'bne .exit2'
+printf '%s\n' "$v1_stop" | grep -F -q 'move.b #1,noplay'
+printf '%s\n' "$v1_stop" | grep -F -q 'bsr dma_silence'
+printf '%s\n' "$v1_start" | grep -F -q 'move.b #1,noplay'
+grep -F -q 'MOVE.l  d0,p_DMASize(a3)' "$DRIVER_SOURCE"
+grep -A12 '^dma_silence:' "$DRIVER_SOURCE" | grep -F -q 'CLR.l (a0)+'
+if grep -q '^ *;bne .exit$' "$DRIVER_SOURCE"; then
+	echo "v1 softint must not keep the commented-out noplay branch" >&2
+	exit 1
+fi
+
 # root build must rebuild the MHI library when only its ABI header changes
 grep -A8 '^MHI_SOURCES' "$ROOT_MAKEFILE" | grep -F -q 'drivers/mhi/src/mhi_abi.h'

@@ -105,8 +105,9 @@ versioning for release tags.
 - `uae.audio` starting recording twice no longer loses the recording buffers,
   and a Start without recording leaves a running recording alone.
 - `uae.audio` stopping only recording keeps playback running, and stopping only
-  playback keeps recording running. The shared host audio session now closes
-  only when neither is active.
+  playback keeps recording running, with silence sent to the host and no player
+  or mixer calls. The shared host audio session now closes only when neither is
+  active.
 - `uae.audio` and `uaesnd.audio` free their library base and close the
   libraries they opened when initialization fails.
 - The root build now also watches `drivers/mhi/src/mhi_abi.h`, so changing only

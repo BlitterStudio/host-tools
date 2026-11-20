@@ -103,6 +103,7 @@ AHIDB_PaulaTable  EQU AHIDB_UserBase+1  * Boolean
   APTR  p_ParBitsUser
   APTR  p_ParPortUser
   APTR  p_CardHandle
+  ULONG p_DMASize       ;size of p_DMAbuffer in bytes
 
   STRUCT  p_PlayInt,IS_SIZE
   STRUCT  p_PlaySoftInt,IS_SIZE
@@ -962,7 +963,6 @@ AHIsub_Start:
   beq .error_unknown
   tst.l p_audiodev(a3)
   beq .error_unknown
-  clr.b noplay
 
 * The play interrupt also drives recording, so it runs while either
 * direction is active. A recording-only Start joins a running engine
@@ -978,6 +978,14 @@ AHIsub_Start:
   MOVE.l  pb_SysLib(a5),a6
   bsr engine_stop       ;Stop current playback if any.
   MOVE.l  a5,a6
+* Playing: run the hooks. Recording only: the engine just drives the
+* sampler, the soft interrupt skips the player and mixer and the host gets
+* silence.
+  clr.b noplay
+  BTST  #AHISB_PLAY,d7
+  BNE.b .playrequested
+  move.b #1,noplay
+.playrequested
   MOVE.l  ahiac_MixFreq(a2),d1
   MOVE.l  d1,p_AudPer(a3)
   call  AHIsub_Update     ;fill variables
@@ -1098,6 +1106,7 @@ initahisound:                  ;init ahisound
   ADDQ.l  #1,d0
   BCLR  #0,d0       ;force even
   LSL.l #3,d0       ;Double buffer + 2W8 bit + Stereo
+  MOVE.l  d0,p_DMASize(a3)
   MOVE.l  #MEMF_PUBLIC|MEMF_CLEAR,d1
   call  AllocVec
   MOVE.l  d0,p_DMAbuffer(a3)
@@ -1252,6 +1261,7 @@ AHIsub_Stop:
   BTST  #AHISB_PLAY,d2
   BEQ.b .keepplay
   BCLR  #PSB_PLAY,p_Streams(a3)
+  move.b #1,noplay      ;the soft interrupt stops mixing, see softint_ahisound
 .keepplay
   BTST  #AHISB_RECORD,d2
   BEQ.b .keeprecord
@@ -1259,11 +1269,36 @@ AHIsub_Stop:
   bsr rec_free
 .keeprecord
   tst.b p_Streams(a3)
-  BNE.b .return
+  BNE.b .engine_kept
   bsr engine_stop
+  BRA.b .return
+.engine_kept
+* Recording keeps the engine up but playback stopped: queue silence, not the
+* last mixed block.
+  BTST  #AHISB_PLAY,d2
+  BEQ.b .return
+  bsr dma_silence
 .return
   MOVEQ #0,d0
   popm  d2-d7/a2-a6
+  RTS
+
+;in:
+* a3  paula
+* Zero both halves of the DMA buffer. noplay is already set, so the soft
+* interrupt does not write mixed samples into it again.
+dma_silence:
+  MOVE.l  p_DMAbuffer(a3),d0
+  BEQ.b .done
+  MOVE.l  d0,a0
+  MOVE.l  p_DMASize(a3),d1
+  LSR.l #2,d1
+  BEQ.b .done
+.clear
+  CLR.l (a0)+
+  SUBQ.l  #1,d1
+  BNE.b .clear
+.done
   RTS
 
 ;in:
@@ -1833,7 +1868,7 @@ softint_ahisound:           ;@1
 .st
  
   tst.b noplay
-  ;bne .exit
+  bne .exit2        ;recording only: no player hook, no mixing
   JSR (a3)        ;call Player Hook
  
   tst.l d7
